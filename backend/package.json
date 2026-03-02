@@ -1,7 +1,7 @@
 {
   "name": "@spendlens/backend",
   "version": "1.0.0",
-  "description": "SpendLens — Lambda backend (Node.js 20 / TypeScript)",
+  "description": "Costscrunch — Lambda backend (Node.js 20 / TypeScript)",
   "private": true,
 
   "scripts": {

@@ -1,4 +1,4 @@
-// ─── SpendLens — Receipt Scan Lambda ─────────────────────────────────────────
+// ─── Costscrunch — Receipt Scan Lambda ─────────────────────────────────────────
 // Triggered by S3 PUT events on receipts/ prefix
 // Pipeline: S3 → Textract → Claude (Bedrock) → DynamoDB update → EventBridge
 
@@ -43,7 +43,7 @@ const BEDROCK_MODEL = "anthropic.claude-3-haiku-20240307-v1:0";
 
 const logger = new Logger({ serviceName: "receipts" });
 const tracer = new Tracer({ serviceName: "receipts" });
-const metrics = new Metrics({ namespace: "SpendLens", serviceName: "receipts" });
+const metrics = new Metrics({ namespace: "Costscrunch", serviceName: "receipts" });
 
 // ─── Category mapping ─────────────────────────────────────────────────────────
 const CATEGORY_KEYWORDS: Record<string, string[]> = {

@@ -1,4 +1,4 @@
-// ─── SpendLens — Analytics Lambda ────────────────────────────────────────────
+// ─── Costscrunch — Analytics Lambda ────────────────────────────────────────────
 // Routes: GET /analytics/summary, GET /analytics/trends
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -10,7 +10,7 @@ import type { ApiEvent } from "../shared/models/types";
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE = process.env.TABLE_NAME!;
 const logger = new Logger({ serviceName: "analytics" });
-const metrics = new Metrics({ namespace: "SpendLens" });
+const metrics = new Metrics({ namespace: "Costscrunch" });
 
 const ok = (body: unknown) => ({ statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
