@@ -1,4 +1,4 @@
-# 💸 Costscrunch
+# 💸 CostsCrunch
 ### Serverless Expense Tracker · Individual / Group / Business
 
 > **MVP Boilerplate** built on the AWS serverless architecture blueprint: Lambda + DynamoDB + Cognito + S3 + API Gateway + Textract + Bedrock
@@ -62,7 +62,7 @@ costscrunch/
 │
 ├── infrastructure/
 │   └── stacks/
-│       └── CostscrunchStack.ts    # Full AWS CDK v2 stack
+│       └── CostsCrunchStack.ts    # Full AWS CDK v2 stack
 │
 └── .github/
     └── workflows/

@@ -1,4 +1,4 @@
-name: Costscrunch CI/CD Pipeline
+name: CostsCrunch CI/CD Pipeline
 
 on:
   push:
@@ -207,7 +207,7 @@ jobs:
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          text: "Costscrunch production deploy ${{ job.status }} — ${{ github.sha }}"
+          text: "CostsCrunch production deploy ${{ job.status }} — ${{ github.sha }}"
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: always()
@@ -224,4 +224,4 @@ jobs:
         run: |
           echo "Rolling back to previous stack version..."
           # In practice: redeploy the previous Git SHA
-          # aws cloudformation rollback-stack --stack-name costscrunch-prod-CostscrunchStack
+          # aws cloudformation rollback-stack --stack-name costscrunch-prod-CostsCrunchStack

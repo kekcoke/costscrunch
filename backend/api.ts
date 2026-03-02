@@ -1,4 +1,4 @@
-// ─── Costscrunch — Frontend API Service ────────────────────────────────────────
+// ─── CostsCrunch — Frontend API Service ────────────────────────────────────────
 // Wraps all backend calls with auth, error handling, retry logic
 
 import { fetchAuthSession } from "aws-amplify/auth";

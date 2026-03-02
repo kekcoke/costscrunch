@@ -1,4 +1,4 @@
-// ─── Costscrunch — Expenses Lambda Handler ─────────────────────────────────────
+// ─── CostsCrunch — Expenses Lambda Handler ─────────────────────────────────────
 // Routes: GET /expenses, POST /expenses, GET /expenses/:id, PATCH /expenses/:id, DELETE /expenses/:id
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -25,7 +25,7 @@ const TABLE = process.env.TABLE_NAME!;
 // ─── Powertools ───────────────────────────────────────────────────────────────
 const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
-const metrics = new Metrics({ namespace: "Costscrunch", serviceName: "expenses" });
+const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ok = (body: unknown, statusCode = 200) => ({

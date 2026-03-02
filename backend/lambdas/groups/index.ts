@@ -1,4 +1,4 @@
-// ─── Costscrunch — Groups Lambda Handler ───────────────────────────────────────
+// ─── CostsCrunch — Groups Lambda Handler ───────────────────────────────────────
 // Routes: POST /groups, GET /groups, GET /groups/:id, PATCH /groups/:id
 //         POST /groups/:id/members, DELETE /groups/:id/members/:userId
 //         POST /groups/:id/settle, GET /groups/:id/balances
@@ -17,7 +17,7 @@ const TABLE = process.env.TABLE_NAME!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;
 
 const logger = new Logger({ serviceName: "groups" });
-const metrics = new Metrics({ namespace: "Costscrunch", serviceName: "groups" });
+const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" });
 
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
@@ -238,10 +238,10 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
         Source: FROM_EMAIL,
         Destination: { ToAddresses: [body.email] },
         Message: {
-          Subject: { Data: `You've been added to a Costscrunch group` },
+          Subject: { Data: `You've been added to a CostsCrunch group` },
           Body: {
             Html: {
-              Data: `<p>You've been invited to join a group on Costscrunch. <a href="https://app.costscrunch.io/join/${groupId}">Click here to accept</a></p>`,
+              Data: `<p>You've been invited to join a group on CostsCrunch. <a href="https://app.costscrunch.io/join/${groupId}">Click here to accept</a></p>`,
             },
           },
         },

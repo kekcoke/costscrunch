@@ -1,4 +1,4 @@
-// ─── Costscrunch — Receipt Scan Lambda ─────────────────────────────────────────
+// ─── CostsCrunch — Receipt Scan Lambda ─────────────────────────────────────────
 // Triggered by S3 PUT events on receipts/ prefix
 // Pipeline: S3 → Textract → Claude (Bedrock) → DynamoDB update → EventBridge
 

@@ -1,7 +1,7 @@
 {
   "name": "costscrunch",
   "version": "1.0.0",
-  "description": "Costscrunch — Serverless Expense Tracker (Individual / Group / Business)",
+  "description": "CostsCrunch — Serverless Expense Tracker (Individual / Group / Business)",
   "private": true,
   "workspaces": ["frontend", "backend", "infrastructure"],
   "scripts": {
