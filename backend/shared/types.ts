@@ -1,4 +1,4 @@
-// ─── SpendLens — Shared Types & DynamoDB Data Model ─────────────────────────
+// ─── CostsCrunch — Shared Types & DynamoDB Data Model ─────────────────────────
 // Single-table design pattern for all entities
 
 export type UserRole = "owner" | "admin" | "member" | "viewer";
@@ -41,7 +41,7 @@ export interface User {
   plan: "free" | "pro" | "business";
 
   // Preferences
-  notificationPrefs: {
+  notificationPreferences: {
     email: boolean;
     push: boolean;
     sms: boolean;
