@@ -9,7 +9,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { ulid } from "ulid";
-import type { ApiEvent, Group, GroupMember } from "../shared/models/types";
+import type { ApiEvent, Group, GroupMember } from "../../shared/models/types";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});

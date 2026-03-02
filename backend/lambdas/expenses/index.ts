@@ -14,7 +14,7 @@ import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
   Expense, ExpenseSummary, GetExpensesQuery,
-} from "../shared/models/types";
+} from "../../shared/models/types";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
@@ -70,7 +70,7 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
   if (route.startsWith("GET") && !expenseId) {
     const q = (event.queryStringParameters || {}) as GetExpensesQuery;
     const seg = tracer.getSegment()!;
-    const sub = tracer.addNewSubsegment("listExpenses");
+    const sub = seg.addNewSubsegment("listExpenses");
 
     try {
       const params: any = {
@@ -177,7 +177,7 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
     }));
 
     metrics.addMetric("ExpenseCreated", MetricUnit.Count, 1);
-    metrics.addMetric("ExpenseAmount", MetricUnit.None, body.amount);
+    metrics.addMetric("ExpenseAmount", MetricUnit.NoUnit, body.amount);
     logger.info("Expense created", { expenseId: id, amount: body.amount });
 
     return ok(expense, 201);

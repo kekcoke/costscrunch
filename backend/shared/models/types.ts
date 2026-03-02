@@ -104,7 +104,7 @@ export interface Expense {
   scanId?: string;        // Textract job ID
 
   // Splits (for group expenses)
-  splits?: Split[];
+  splits?:  (Split | Omit<Split, "settled" | "settledAt">)[];
   splitMethod?: SplitMethod;
 
   // Business fields

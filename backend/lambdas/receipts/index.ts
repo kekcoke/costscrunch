@@ -28,7 +28,7 @@ import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import type { S3Event } from "aws-lambda";
 import { ulid } from "ulid";
-import type { ScanResult } from "../shared/models/types";
+import type { ScanResult } from "../../shared/models/types";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const s3 = new S3Client({});
@@ -39,7 +39,7 @@ const eb = new EventBridgeClient({});
 
 const TABLE = process.env.TABLE_NAME!;
 const EVENT_BUS = process.env.EVENT_BUS_NAME!;
-const BEDROCK_MODEL = "anthropic.claude-3-haiku-20240307-v1:0";
+const BEDROCK_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0";
 
 const logger = new Logger({ serviceName: "receipts" });
 const tracer = new Tracer({ serviceName: "receipts" });
@@ -202,7 +202,7 @@ export const handler = async (event: S3Event) => {
     try {
       // 1. Run Textract
       const segment = tracer.getSegment()!;
-      const textractSub = tracer.addNewSubsegment("textractAnalysis");
+      const textractSub = segment.addNewSubsegment("textractAnalysis");
       const jobId = await runTextractExpenseAnalysis(bucket, key);
       const docs = await getTextractResults(jobId);
       textractSub.close();
@@ -211,8 +211,13 @@ export const handler = async (event: S3Event) => {
       logger.info("Textract complete", { extracted, lineItemCount: lineItems.length });
 
       // 2. AI enrichment with Claude
-      const bedrockSub = tracer.addNewSubsegment("claudeEnrichment");
-      let aiEnrichment = guessCategory(String(extracted.merchant || ""), lineItems);
+      const bedrockSub = segment.addNewSubsegment("claudeEnrichment");
+      let aiEnrichment: { 
+          category: string; 
+          confidence: number; 
+          suggestedTags?: string[]; 
+          policyFlags?: string[] 
+        } = guessCategory(String(extracted.merchant || ""), lineItems);
       try {
         const claudeResult = await enrichWithClaude(extracted, lineItems);
         aiEnrichment = {
@@ -288,7 +293,7 @@ export const handler = async (event: S3Event) => {
 
       metrics.addMetric("ScanCompleted", MetricUnit.Count, 1);
       metrics.addMetric("ScanProcessingTime", MetricUnit.Milliseconds, processingMs);
-      metrics.addMetric("ScanConfidence", MetricUnit.None, aiEnrichment.confidence);
+      metrics.addMetric("ScanConfidence", MetricUnit.NoUnit, aiEnrichment.confidence);
       logger.info("Scan pipeline complete", { processingMs, confidence: aiEnrichment.confidence });
 
     } catch (error) {
