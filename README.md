@@ -38,7 +38,7 @@
 ## Repository Structure
 
 ```
-spendlens/
+costscrunch/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx              # Main React SPA (dashboard, expenses, groups, analytics)
@@ -192,18 +192,18 @@ Analytics
 
 ```bash
 # Backend (set via CDK / SSM)
-TABLE_NAME=spendlens-prod-main
-EVENT_BUS_NAME=spendlens-prod-events
-RECEIPTS_BUCKET=spendlens-prod-receipts-{account}
+TABLE_NAME=costscrunch-prod-main
+EVENT_BUS_NAME=costscrunch-prod-events
+RECEIPTS_BUCKET=costscrunch-prod-receipts-{account}
 REDIS_HOST=...elasticache.amazonaws.com
 REDIS_PORT=6379
 USER_POOL_ID=us-east-1_xxxxxxxx
-FROM_EMAIL=noreply@spendlens.io
+FROM_EMAIL=noreply@costscrunch.io
 ENVIRONMENT=prod
 LOG_LEVEL=INFO
 
 # Frontend (Vite env)
-VITE_API_URL=https://api.spendlens.io
+VITE_API_URL=https://api.costscrunch.io
 VITE_USER_POOL_ID=us-east-1_xxxxxxxx
 VITE_USER_POOL_CLIENT_ID=xxxxxxxxxx
 VITE_REGION=us-east-1

@@ -165,7 +165,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://app.spendlens.io
+      url: https://app.costscrunch.io
     steps:
       - uses: actions/checkout@v4
 
@@ -200,7 +200,7 @@ jobs:
 
       - name: Smoke test production
         run: |
-          curl -f https://app.spendlens.io/health || exit 1
+          curl -f https://app.costscrunch.io/health || exit 1
           echo "Production health check passed ✅"
 
       - name: Notify Slack
@@ -224,4 +224,4 @@ jobs:
         run: |
           echo "Rolling back to previous stack version..."
           # In practice: redeploy the previous Git SHA
-          # aws cloudformation rollback-stack --stack-name spendlens-prod-CostscrunchStack
+          # aws cloudformation rollback-stack --stack-name costscrunch-prod-CostscrunchStack

@@ -273,7 +273,7 @@ export const handler = async (event: S3Event) => {
       await eb.send(new PutEventsCommand({
         Entries: [{
           EventBusName: EVENT_BUS,
-          Source: "spendlens.receipts",
+          Source: "costscrunch.receipts",
           DetailType: "ReceiptScanCompleted",
           Detail: JSON.stringify({
             userId, expenseId, scanId,

@@ -7,7 +7,7 @@ import type {
   GetExpensesQuery, ExpenseSummary, InitiateUploadResponse,
 } from "./shared/types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://api.spendlens.io";
+const API_BASE = import.meta.env.VITE_API_URL || "https://api.costscrunch.io";
 
 // ─── Base fetch with auth ──────────────────────────────────────────────────────
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

@@ -36,12 +36,12 @@ const templates = {
             <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Category</td><td style="padding:8px 0">${data.category || "—"}</td></tr>
             <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Confidence</td><td style="padding:8px 0">${data.confidence}%</td></tr>
           </table>
-          <a href="https://app.spendlens.io/expenses/${data.expenseId}" style="display:inline-block;margin-top:20px;background:#0ea5e9;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+          <a href="https://app.costscrunch.io/expenses/${data.expenseId}" style="display:inline-block;margin-top:20px;background:#0ea5e9;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
             Review & Confirm →
           </a>
         </div>
         <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:20px">
-          Costscrunch · <a href="https://app.spendlens.io/settings/notifications" style="color:#94a3b8">Manage notifications</a>
+          Costscrunch · <a href="https://app.costscrunch.io/settings/notifications" style="color:#94a3b8">Manage notifications</a>
         </p>
       </div>
     `,
@@ -55,7 +55,7 @@ const templates = {
           <h3 style="margin-top:0">Expense ${data.status === "approved" ? "Approved ✅" : "Rejected ❌"}</h3>
           <p><strong>${data.merchant}</strong> for <strong>$${data.amount?.toFixed(2)}</strong> has been <strong>${data.status}</strong>.</p>
           ${data.approverNote ? `<p style="background:#f1f5f9;padding:12px;border-radius:8px;font-style:italic">"${data.approverNote}"</p>` : ""}
-          <a href="https://app.spendlens.io/expenses/${data.expenseId}" style="display:inline-block;margin-top:16px;background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+          <a href="https://app.costscrunch.io/expenses/${data.expenseId}" style="display:inline-block;margin-top:16px;background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
             View Expense →
           </a>
         </div>
@@ -71,7 +71,7 @@ const templates = {
           <h3 style="color:#d97706;margin-top:0">⚠️ Budget Alert</h3>
           <p>The <strong>${data.groupName}</strong> group has used <strong>${data.percentUsed}%</strong> of its ${data.period} budget.</p>
           <p>Spent: <strong>$${data.spent?.toFixed(2)}</strong> of <strong>$${data.budget?.toFixed(2)}</strong></p>
-          <a href="https://app.spendlens.io/groups/${data.groupId}" style="display:inline-block;margin-top:16px;background:#f59e0b;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+          <a href="https://app.costscrunch.io/groups/${data.groupId}" style="display:inline-block;margin-top:16px;background:#f59e0b;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
             View Group →
           </a>
         </div>

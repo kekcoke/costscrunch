@@ -1,5 +1,5 @@
 {
-  "name": "@spendlens/backend",
+  "name": "@costscrunch/backend",
   "version": "1.0.0",
   "description": "Costscrunch — Lambda backend (Node.js 20 / TypeScript)",
   "private": true,

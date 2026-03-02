@@ -241,7 +241,7 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
           Subject: { Data: `You've been added to a Costscrunch group` },
           Body: {
             Html: {
-              Data: `<p>You've been invited to join a group on Costscrunch. <a href="https://app.spendlens.io/join/${groupId}">Click here to accept</a></p>`,
+              Data: `<p>You've been invited to join a group on Costscrunch. <a href="https://app.costscrunch.io/join/${groupId}">Click here to accept</a></p>`,
             },
           },
         },
