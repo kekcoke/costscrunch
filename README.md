@@ -58,15 +58,20 @@ costscrunch/
 │   │   ├── analytics/index.ts   # Aggregations + trends
 │   │   └── notifications/index.ts  # SES email + Pinpoint push
 │   └── shared/
-│       └── models/types.ts      # All TypeScript types + DynamoDB key patterns
+│   │   └── models/types.ts      # All TypeScript types + DynamoDB key patterns
+│   └── package.json  
 │
 ├── infrastructure/
 │   └── stacks/
-│       └── CostsCrunchStack.ts    # Full AWS CDK v2 stack
+│   │   └── CostsCrunchStack.ts    # Full AWS CDK v2 stack
+│.  └── package.json
 │
 └── .github/
-    └── workflows/
-        └── deploy.yml           # CI/CD: test → SAST → staging → prod
+│   └── workflows/
+│       └── deploy.yml           # CI/CD: test → SAST → staging → prod
+└── package.json
+└── .gitignore
+└── README.md
 ```
 
 ---
