@@ -1,4 +1,4 @@
-# 💸 SpendLens
+# 💸 CostsCrunch
 ### Serverless Expense Tracker · Individual / Group / Business
 
 > **MVP Boilerplate** built on the AWS serverless architecture blueprint: Lambda + DynamoDB + Cognito + S3 + API Gateway + Textract + Bedrock
@@ -38,7 +38,7 @@
 ## Repository Structure
 
 ```
-spendlens/
+costscrunch/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx              # Main React SPA (dashboard, expenses, groups, analytics)
@@ -58,15 +58,20 @@ spendlens/
 │   │   ├── analytics/index.ts   # Aggregations + trends
 │   │   └── notifications/index.ts  # SES email + Pinpoint push
 │   └── shared/
-│       └── models/types.ts      # All TypeScript types + DynamoDB key patterns
+│   │   └── models/types.ts      # All TypeScript types + DynamoDB key patterns
+│   └── package.json  
 │
 ├── infrastructure/
 │   └── stacks/
-│       └── SpendLensStack.ts    # Full AWS CDK v2 stack
+│   │   └── CostsCrunchStack.ts    # Full AWS CDK v2 stack
+│.  └── package.json
 │
 └── .github/
-    └── workflows/
-        └── deploy.yml           # CI/CD: test → SAST → staging → prod
+│   └── workflows/
+│       └── deploy.yml           # CI/CD: test → SAST → staging → prod
+└── package.json
+└── .gitignore
+└── README.md
 ```
 
 ---
@@ -192,18 +197,18 @@ Analytics
 
 ```bash
 # Backend (set via CDK / SSM)
-TABLE_NAME=spendlens-prod-main
-EVENT_BUS_NAME=spendlens-prod-events
-RECEIPTS_BUCKET=spendlens-prod-receipts-{account}
+TABLE_NAME=costscrunch-prod-main
+EVENT_BUS_NAME=costscrunch-prod-events
+RECEIPTS_BUCKET=costscrunch-prod-receipts-{account}
 REDIS_HOST=...elasticache.amazonaws.com
 REDIS_PORT=6379
 USER_POOL_ID=us-east-1_xxxxxxxx
-FROM_EMAIL=noreply@spendlens.io
+FROM_EMAIL=noreply@costscrunch.io
 ENVIRONMENT=prod
 LOG_LEVEL=INFO
 
 # Frontend (Vite env)
-VITE_API_URL=https://api.spendlens.io
+VITE_API_URL=https://api.costscrunch.io
 VITE_USER_POOL_ID=us-east-1_xxxxxxxx
 VITE_USER_POOL_CLIENT_ID=xxxxxxxxxx
 VITE_REGION=us-east-1
