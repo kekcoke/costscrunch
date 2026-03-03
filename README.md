@@ -51,15 +51,17 @@ costscrunch/
 │   └── package.json
 │
 ├── backend/
-│   ├── lambdas/
-│   │   ├── expenses/index.ts    # CRUD + approval workflow
-│   │   ├── groups/index.ts      # Groups + splits + debt minimization
-│   │   ├── receipts/index.ts    # S3 → Textract → Claude AI pipeline
-│   │   ├── analytics/index.ts   # Aggregations + trends
-│   │   └── notifications/index.ts  # SES email + Pinpoint push
-│   └── shared/
-│   │   └── models/types.ts      # All TypeScript types + DynamoDB key patterns
-│   └── package.json  
+│   ├── src
+│   │   ├── lambdas/
+│   │   │   ├── expenses/index.ts    # CRUD + approval workflow
+│   │   │   ├── groups/index.ts      # Groups + splits + debt minimization
+│   │   │   ├── receipts/index.ts    # S3 → Textract → Claude AI pipeline
+│   │   │   ├── analytics/index.ts   # Aggregations + trends
+│   │   │   └── notifications/index.ts  # SES email + Pinpoint push
+│   │   └── shared/
+│   │       └── models/types.ts      # All TypeScript types + DynamoDB key patterns
+│   └── package.json
+│   └── tsconfig.json
 │
 ├── infrastructure/
 │   └── stacks/
