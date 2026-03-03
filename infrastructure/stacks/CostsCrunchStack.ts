@@ -47,5 +47,36 @@ export class CostsCrunchStack extends Stack {
             description: "Primary KMS encryption key",
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
+
+        // ── VPC & Subnets ───────────────────────────────────────────────────────
+        const vpc = new ec2.Vpc(this, "CostsCrunchVPC", {
+            maxAzs: 2,
+            natGateways: 1,
+            subnetConfiguration: [
+                { name: "Public", subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+                { name: "Private", subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
+            ],
+            gatewayEndpoints: {
+                S3: { service: ec2.GatewayVpcEndpointAwsService.S3 },
+                DynamoDB: { service: ec2.GatewayVpcEndpointAwsService.DYNAMODB },
+            },
+        });
+
+        // ─ VPC Interface Endpoints (keep traffic off the public internet) ───────────────
+        for (const service of [
+            ec2.InterfaceVpcEndpointAwsService.SSM,
+            ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            ec2.InterfaceVpcEndpointAwsService.SQS,
+            ec2.InterfaceVpcEndpointAwsService.SNS,
+            ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
+        ]) {
+            new ec2.InterfaceVpcEndpoint(this, `Endpoint${service.name.replace(/\./g, "")}`, 
+            {
+                vpc,
+                service,
+                privateDnsEnabled: true,
+                subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+            });
+        }
     }
 }
