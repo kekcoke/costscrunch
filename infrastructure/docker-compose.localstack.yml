@@ -1,0 +1,62 @@
+version: "3.9"
+
+# ─── Costscrunch — LocalStack dev/test environment ─────────────────────────────
+# Services mocked: DynamoDB, S3, SES, SQS, SNS, EventBridge, Lambda, Textract, SSM, CloudFront, Cognito, ElastiCache, KMS, IAM, (CloudWatch) Logs, WAF
+#
+# Usage:
+#   Start:  docker compose -f docker-compose.localstack.yml up -d
+#   Stop:   docker compose -f docker-compose.localstack.yml down
+#   Logs:   docker compose -f docker-compose.localstack.yml logs -f localstack
+#   Reset:  docker compose -f docker-compose.localstack.yml down -v && up -d
+
+services:
+  localstack:
+    image: localstack/localstack:3.5
+    container_name: costscrunch-localstack
+    ports:
+      - "4566:4566"  # Main LocalStack edge port/gateway
+    environment:
+      - SERVICES=cloudfront,cognito,dynamodb,elasticache,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,textract,secretsmanager,ssm,wafv2 # Only start necessary services for faster startup
+      - DEBUG=0
+      - PERSISTENCE=1 # Persist data across restarts (dev-only)
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-} # Set in .env file for LocalStack Pro features
+      - DEFAULT_REGION=canada-central-1
+      - ACCESS_KEY_ID=test
+      - SECRET_ACCESS_KEY=test
+      - HOSTNAME_EXTERNAL=localhost  # Allow host machine to access LocalStack services
+      - EAGER_SERVICE_LOADING=1  # Load all services at startup for faster response times
+      - DATA_DIR=/var/lib/localstack  # Persist data across restarts
+      - DISABLE_CORS_HEADERS=0  # Disable CORS headers for easier local development
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
+      # - ./localstack/scripts:/etc/localstack/scripts  # Custom scripts for service setup
+      # - ./localstack/config:/etc/localstack/config  # Custom config files for services
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── LocalStack seed runner (one-shot) ───────────────────────────────────────
+  localstack-seed:
+    image: amazon/aws-cli:2.7.32
+    container_name: costscrunch-localstack-seed
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - DEFAULT_REGION=canada-central-1
+      - ACCESS_KEY_ID=test
+      - SECRET_ACCESS_KEY=test
+      - ENDPOINT_URL=http://localstack:4566
+    volumes:
+      - ./localstack/seed:/seed  # Seed scripts to initialize LocalStack services
+    entrypoint: ["bin/bash", "/seed/setup.sh"]
+    restart: "no"  # Run once and exit
+  
+volumes:
+  localstack-data:
+    name: costscrunch-localstack-data
