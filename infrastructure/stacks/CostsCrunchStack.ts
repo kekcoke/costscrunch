@@ -82,29 +82,29 @@ export class CostsCrunchStack extends Stack {
 
         // ── DynamoDB Single Table ────────────────────────────────────────────────
         const table = new dynamodb.TableV2(this, "MainTable", {
-        tableName: `${prefix}-main`,
-        partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
-        sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
-        billing: dynamodb.Billing.onDemand(),
-        encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
-        pointInTimeRecovery: true,
-        deletionProtection: isProd,
-        timeToLiveAttribute: "ttl",
-        removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-        // Global Table replicas for prod
-        replicas: isProd ? [{ region: "us-west-2" }] : [],
-        globalSecondaryIndexes: [
-            {
-            indexName: "GSI1",
-            partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
-            sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
-            },
-            {
-            indexName: "GSI2",
-            partitionKey: { name: "gsi2pk", type: dynamodb.AttributeType.STRING },
-            sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
-            },
-        ],
+            tableName: `${prefix}-main`,
+            partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+            sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+            billing: dynamodb.Billing.onDemand(),
+            encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
+            pointInTimeRecovery: true,
+            deletionProtection: isProd,
+            timeToLiveAttribute: "ttl",
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            // Global Table replicas for prod
+            replicas: isProd ? [{ region: "us-west-2" }] : [],
+            globalSecondaryIndexes: [
+                {
+                    indexName: "GSI1",
+                    partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
+                    sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
+                },
+                {
+                    indexName: "GSI2",
+                    partitionKey: { name: "gsi2pk", type: dynamodb.AttributeType.STRING },
+                    sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
+                },
+            ],
         });
 
         // ── S3 Buckets ────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export class CostsCrunchStack extends Stack {
 
         // ── EventBridge ──────────────────────────────────────────────────────────
         const eventBus = new events.EventBus(this, "EventBus", {
-                eventBusName: `${prefix}-events`,
+            eventBusName: `${prefix}-events`,
         });
 
         const eventArchive = new events.Archive(this, "EventArchive", {
@@ -328,6 +328,71 @@ export class CostsCrunchStack extends Stack {
                 FROM_EMAIL: "noreply@costscrunch.com",
                 PINPOINT_APP_ID: ssm.StringParameter.valueForStringParameter(this, `/${prefix}/pinpoint-app-id`),
             },
+        });
+
+        // ── IAM Permissions ──────────────────────────────────────────────────────
+        table.grantReadWriteData(expensesLambda);
+        table.grantReadWriteData(groupsLambda);
+        table.grantReadWriteData(receiptsLambda);
+        table.grantReadData(analyticsLambda);
+        table.grantReadWriteData(notificationsLambda);
+
+        receiptsBucket.grantRead(receiptsLambda);
+        receiptsBucket.grantWrite(expensesLambda); // for pre-signed URL generation
+        eventBus.grantPutEventsTo(receiptsLambda);
+        eventBus.grantPutEventsTo(expensesLambda);
+
+        // Textract permissions for receipts Lambda
+        receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions: ["textract:StartExpenseAnalysis", "textract:GetExpenseAnalysis"],
+            resources: ["*"],
+        }));
+
+        // Bedrock permissions for AI enrichment
+        receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions: ["bedrock:InvokeModel"],
+            resources: [`arn:aws:bedrock:ca-central-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`],
+        }));
+
+        // KMS permissions
+        kmsKey.grantEncryptDecrypt(expensesLambda);
+        kmsKey.grantEncryptDecrypt(receiptsLambda);
+        kmsKey.grantEncryptDecrypt(groupsLambda);
+
+        // Notifications Lambda: SES + Pinpoint
+        notificationsLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions: ["ses:SendEmail", "ses:SendTemplatedEmail", "mobiletargeting:SendMessages"],
+            resources: ["*"],
+        }));
+
+        // ── S3 → Lambda Event Source (receipt scanning) ──────────────────────────
+        receiptsLambda.addEventSource(new lambdaEventSources.S3EventSource(receiptsBucket, {
+            events: [s3.EventType.OBJECT_CREATED],
+            filters: [{ prefix: "receipts/" }],
+        }));
+
+        // ── EventBridge → Notifications Lambda ───────────────────────────────────
+        new events.Rule(this, "ScanCompletedRule", {
+            eventBus,
+            eventPattern: {
+                source: ["costscrunch.receipts"],
+                detailType: ["ReceiptScanCompleted"],
+            },
+            targets: [new targets.LambdaFunction(notificationsLambda, {
+                deadLetterQueue: notificationsDlq,
+                maxEventAge: Duration.hours(2),
+                retryAttempts: 3,
+            })],
+        });
+
+        new events.Rule(this, "ExpenseApprovedRule", {
+            eventBus,
+            eventPattern: {
+                source: ["costscrunch.expenses"],
+                detailType: ["ExpenseStatusChanged"],
+                detail: { status: ["approved", "rejected"] },
+            },
+            targets: [new targets.LambdaFunction(notificationsLambda)],
         });
     }
 }
