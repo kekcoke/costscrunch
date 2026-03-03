@@ -105,5 +105,28 @@ export class CostsCrunchStack extends Stack {
             },
         ],
         });
+
+        // ── S3 Buckets ────────────────────────────────────────────────
+        const receiptsBucket = new s3.Bucket(this, "ReceiptsBucket", {
+            bucketName: `${prefix}-receipts-${this.account} `,
+            encryption: s3.BucketEncryption.KMS_MANAGED,
+            encryptionKey: kmsKey,
+            versioned: true,
+            enforceSSL: true,
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            cors: [
+                {
+                    allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
+                    allowedOrigins: isProd ? [`https://${props.domainName}`] : ["*"],
+                    allowedHeaders: ["*"],
+                    maxAge: 3600,
+                },
+            ],
+            lifecycleRules: [
+                { transitions: [
+                    { storageClass: s3.StorageClass.INTELLIGENT_TIERING, transitionAfter: Duration.days(30) } ] },
+                    { expiration: Duration.days(365), noncurrentVersionExpiration: Duration.days(90) },
+                ],
+        });
     }
 }
