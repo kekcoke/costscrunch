@@ -394,5 +394,67 @@ export class CostsCrunchStack extends Stack {
             },
             targets: [new targets.LambdaFunction(notificationsLambda)],
         });
+
+        // ── WAF ─────────────────────────────────────────────────
+        const wafAcl = new wafv2.CfnWebACL(this, "WafAcl", {
+            name: `${prefix}-waf`,
+            scope: "CLOUDFRONT",
+            defaultAction: { allow: {} },
+            visibilityConfig: {
+                cloudWatchMetricsEnabled: true,
+                metricName: `${prefix}-waf-metric`,
+                sampledRequestsEnabled: true,
+            },
+            rules: [
+                {
+                    name: "AWSManagedRulesCommonRuleSet",
+                    priority: 1,
+                    overrideAction: { none: {} },
+                    visibilityConfig: { 
+                        cloudWatchMetricsEnabled: true, 
+                        metricName: "CommonRuleSet", 
+                        sampledRequestsEnabled: false 
+                    },
+                    statement: { 
+                        managedRuleGroupStatement: { 
+                            vendorName: "AWS", 
+                            name: "AWSManagedRulesCommonRuleSet" 
+                        } 
+                    },
+                },
+                {
+                    name: "AWSManagedRulesKnownBadInputsRuleSet",
+                    priority: 2,
+                    overrideAction: { none: {} },
+                    visibilityConfig: { 
+                        cloudWatchMetricsEnabled: true, 
+                        metricName: "BadInputs", 
+                        sampledRequestsEnabled: false 
+                    },
+                    statement: { 
+                        managedRuleGroupStatement: { 
+                            vendorName: "AWS", 
+                            name: "AWSManagedRulesKnownBadInputsRuleSet" 
+                        } 
+                    },
+                },
+                {
+                    name: "RateLimitPerIP",
+                    priority: 3,
+                    action: { block: {} },
+                    visibilityConfig: { 
+                        cloudWatchMetricsEnabled: true, 
+                        metricName: "RateLimit", 
+                        sampledRequestsEnabled: true 
+                    },
+                    statement: { 
+                        rateBasedStatement: { 
+                            limit: 2000, 
+                            aggregateKeyType: "IP" 
+                        } 
+                    },
+                },
+            ]
+        });
     }
 }
