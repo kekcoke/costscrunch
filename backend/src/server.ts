@@ -72,6 +72,14 @@ const lambdaAdapter = (handler: any, routeKeyPattern: string) =>
     }
   };
 
+// Routes
+app.get('/expenses', lambdaAdapter(expensesHandler, '/expenses'));
+app.post('/expenses', lambdaAdapter(expensesHandler, '/expenses'));
+app.get('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
+app.patch('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
+app.delete('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
+
+
 // Startup
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}. Environment: ${process.env.ENVIRONMENT}    `);
