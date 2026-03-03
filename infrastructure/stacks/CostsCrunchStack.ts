@@ -128,5 +128,11 @@ export class CostsCrunchStack extends Stack {
                     { expiration: Duration.days(365), noncurrentVersionExpiration: Duration.days(90) },
                 ],
         });
+
+        const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
+            bucketName: `${prefix}-assets-${this.account}`,
+            blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+        });
     }
 }
