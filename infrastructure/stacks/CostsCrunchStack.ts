@@ -287,5 +287,47 @@ export class CostsCrunchStack extends Stack {
             reservedConcurrentExecutions: isProd ? 500 : 50,
             environment: sharedEnv,
         };
+
+        // ── Lambda Functions ─────────────────────────────────────────────────────
+        const expensesLambda = new NodejsFunction(this, "ExpensesLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/expenses/index.ts",
+            functionName: `${prefix}-expenses`,
+            environment: { ...sharedEnv },
+        });
+
+        const groupsLambda = new NodejsFunction(this, "GroupsLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/groups/index.ts",
+            functionName: `${prefix}-groups`,
+            environment: { ...sharedEnv },
+        });
+
+        const receiptsLambda = new NodejsFunction(this, "ReceiptsLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/receipts/index.ts",
+            functionName: `${prefix}-receipts`,
+            timeout: Duration.seconds(300), // Textract can take time
+            memorySize: 1024,
+            environment: { ...sharedEnv },
+        });
+
+        const analyticsLambda = new NodejsFunction(this, "AnalyticsLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/analytics/index.ts",
+            functionName: `${prefix}-analytics`,
+            environment: { ...sharedEnv },
+        });
+
+        const notificationsLambda = new NodejsFunction(this, "NotificationsLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/notifications/index.ts",
+            functionName: `${prefix}-notifications`,
+            environment: {
+                ...sharedEnv,
+                FROM_EMAIL: "noreply@costscrunch.com",
+                PINPOINT_APP_ID: ssm.StringParameter.valueForStringParameter(this, `/${prefix}/pinpoint-app-id`),
+            },
+        });
     }
 }
