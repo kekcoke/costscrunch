@@ -213,5 +213,30 @@ export class CostsCrunchStack extends Stack {
             cacheSubnetGroupName: redisSubnetGroup.cacheSubnetGroupName!,
             securityGroupIds: [redisSg.securityGroupId],
         });
-    }
+
+        // ── SQS Queues ───────────────────────────────────────────────────────────
+        const scanDlq = new sqs.Queue(this, "ScanDlq", {
+            queueName: `${prefix}-scan-dlq`,
+            retentionPeriod: Duration.days(14),
+            encryption: sqs.QueueEncryption.KMS,
+            encryptionMasterKey: kmsKey,
+        });
+
+        const notificationsDlq = new sqs.Queue(this, "NotifDlq", {
+            queueName: `${prefix}-notif-dlq`,
+            retentionPeriod: Duration.days(14),
+            encryption: sqs.QueueEncryption.KMS,
+            encryptionMasterKey: kmsKey,
+        });
+
+        const notificationsQueue = new sqs.Queue(this, "NotifQueue", {
+            queueName: `${prefix}-notifications.fifo`,
+            fifo: true,
+            contentBasedDeduplication: true,
+            visibilityTimeout: Duration.seconds(60),
+            deadLetterQueue: { queue: notificationsDlq, maxReceiveCount: 3 },
+            encryption: sqs.QueueEncryption.KMS,
+            encryptionMasterKey: kmsKey,
+        });
+        }
 }
