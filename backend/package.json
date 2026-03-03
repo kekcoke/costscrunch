@@ -13,7 +13,7 @@
     "test:watch": "jest --watch",
     "lint": "eslint . --ext .ts --max-warnings 0",
     "lint:fix": "eslint . --ext .ts --fix",
-    "dev": "tsx src/server.ts",
+    "dev": "npx tsx watch src/server.ts",
     "dev:sam": "sam local start-api --port 4000 --env-vars env.local.json",
     "clean": "rm -rf dist .esbuild"
   },

@@ -1,11 +1,9 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-
-import { handler as expensesHandler } from '../lambdas/expenses/index';
-import { handler as groupsHandler } from '../lambdas/groups/index';
-import { handler as receiptsHandler } from '../lambdas/receipts/index';
-import { handler as analyticsHandler } from '../lambdas/analytics/index';
+import { handler as expensesHandler } from '../lambdas/expenses/index.js';
+import { handler as groupsHandler } from '../lambdas/groups.js';
+import { handler as analyticsHandler } from '../lambdas/analytics.js';
 import { ulid } from 'ulid';
 
 const app = express();

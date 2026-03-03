@@ -10,11 +10,12 @@ import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import middy from "@middy/core";
+import type { Request as MiddyRequest } from "@middy/core";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
   Expense, ExpenseSummary, GetExpensesQuery,
-} from "../../shared/models/types";
+} from "../../shared/models/types.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
@@ -246,7 +247,7 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
 
 export const handler = middy(rawHandler)
   .use({
-    onError: async (request) => {
+    onError: async (request: MiddyRequest) => {
       const { error } = request;
       logger.error("Unhandled error", { error });
       metrics.addMetric("HandlerError", MetricUnit.Count, 1);
