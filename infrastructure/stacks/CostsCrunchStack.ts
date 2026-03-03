@@ -78,5 +78,32 @@ export class CostsCrunchStack extends Stack {
                 subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             });
         }
+
+        // ── DynamoDB Single Table ────────────────────────────────────────────────
+        const table = new dynamodb.TableV2(this, "MainTable", {
+        tableName: `${prefix}-main`,
+        partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+        sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+        billing: dynamodb.Billing.onDemand(),
+        encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
+        pointInTimeRecovery: true,
+        deletionProtection: isProd,
+        timeToLiveAttribute: "ttl",
+        removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+        // Global Table replicas for prod
+        replicas: isProd ? [{ region: "us-west-2" }] : [],
+        globalSecondaryIndexes: [
+            {
+            indexName: "GSI1",
+            partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
+            sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
+            },
+            {
+            indexName: "GSI2",
+            partitionKey: { name: "gsi2pk", type: dynamodb.AttributeType.STRING },
+            sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
+            },
+        ],
+        });
     }
 }
