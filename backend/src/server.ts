@@ -6,6 +6,7 @@ import { handler as expensesHandler } from '../lambdas/expenses/index';
 import { handler as groupsHandler } from '../lambdas/groups/index';
 import { handler as receiptsHandler } from '../lambdas/receipts/index';
 import { handler as analyticsHandler } from '../lambdas/analytics/index';
+import { ulid } from 'ulid';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,6 +20,57 @@ process.env.LOG_LEVEL = 'debug';
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// Lambda adapter for API Gateway V2 Proxy Events and Middleware
+const lambdaAdapter = (handler: any, routeKeyPattern: string) => 
+  async (req: Request, res: Response) => {
+    const requestId = ulid();
+    
+    // Construct the event object to match what API Gateway V2 sends to Lambda
+    const event = {
+      version: "2.0",
+      routeKey: `${req.method} ${routeKeyPattern}`,
+      rawPath: req.path,
+      headers: {
+        ...req.headers,
+        "x-request-id": requestId,
+      },
+      queryStringParameters: Object.keys(req.query).length ? req.query : undefined,
+      pathParameters: req.params,
+      body: JSON.stringify(req.body),
+      isBase64Encoded: false,
+      requestContext: {
+        http: {
+          method: req.method,
+          path: req.path,
+        },
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: "local-user-uuid-123", // Simulated Cognito sub
+              email: "dev-user@example.com",
+              "cognito:groups": "pro,admins", // Aligned with getAuth() logic
+            }
+          }
+        },
+        requestId,
+      }
+    };
+
+    try {
+      // Invoke the actual handler exported from your Lambda index.ts
+      const result = await handler(event, { awsRequestId: requestId });
+      
+      const responseBody = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
+      
+      res.status(result.statusCode || 200)
+         .set(result.headers || {})
+         .json(responseBody);
+    } catch (error: any) {
+      console.error(`[Local Server Error - ${requestId}]:`, error);
+      res.status(500).json({ error: "Internal Server Error", message: error.message });
+    }
+  };
 
 // Startup
 app.listen(PORT, () => {
