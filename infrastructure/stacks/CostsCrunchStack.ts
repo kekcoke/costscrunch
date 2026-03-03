@@ -53,8 +53,9 @@ export class CostsCrunchStack extends Stack {
             maxAzs: 2,
             natGateways: 1,
             subnetConfiguration: [
-                { name: "Public", subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
-                { name: "Private", subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
+                { name: "public", subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+                { name: "private", subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
+                { name: "isolated", subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 28 },
             ],
             gatewayEndpoints: {
                 S3: { service: ec2.GatewayVpcEndpointAwsService.S3 },
@@ -188,5 +189,29 @@ export class CostsCrunchStack extends Stack {
         new cognito.CfnUserPoolGroup(this, "BusinessGroup", { userPoolId: userPool.userPoolId, groupName: "business", precedence: 3 });
         new cognito.CfnUserPoolGroup(this, "ProGroup", { userPoolId: userPool.userPoolId, groupName: "pro", precedence: 4 });
         new cognito.CfnUserPoolGroup(this, "FreeGroup", { userPoolId: userPool.userPoolId, groupName: "free", precedence: 5 });
+
+        // ── ElastiCache Redis ────────────────────────────────────────────────────
+        const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, "RedisSubnets", {
+            cacheSubnetGroupName: `${prefix}-redis-subnets`,
+            description: "Subnet group for Redis cluster",
+            subnetIds: vpc.isolatedSubnets.map(s => s.subnetId),                
+        });
+
+        const redisSg = new ec2.SecurityGroup(this, "RedisSg", { vpc, description: "Redis SG" });
+
+        // upgrade prod to at least cache.t4g.small for better performance
+        const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
+            replicationGroupDescription: `${prefix} Redis`,
+            cacheNodeType: isProd ? "cache.t2.micro" : "cache.t2.micro",
+            engine: "redis",
+            engineVersion: "7.0",
+            numCacheClusters: 1,
+            automaticFailoverEnabled: isProd,
+            multiAzEnabled: true,
+            atRestEncryptionEnabled: true,
+            transitEncryptionEnabled: true,
+            cacheSubnetGroupName: redisSubnetGroup.cacheSubnetGroupName!,
+            securityGroupIds: [redisSg.securityGroupId],
+        });
     }
 }
