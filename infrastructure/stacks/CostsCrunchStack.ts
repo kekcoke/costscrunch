@@ -191,6 +191,7 @@ export class CostsCrunchStack extends Stack {
         new cognito.CfnUserPoolGroup(this, "FreeGroup", { userPoolId: userPool.userPoolId, groupName: "free", precedence: 5 });
 
         // ── ElastiCache Redis ────────────────────────────────────────────────────
+        // https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html
         const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, "RedisSubnets", {
             cacheSubnetGroupName: `${prefix}-redis-subnets`,
             description: "Subnet group for Redis cluster",
@@ -252,5 +253,39 @@ export class CostsCrunchStack extends Stack {
                 source: ["costscrunch.expenses", "costscrunch.users", "costscrunch.billing"],
             }
         });
+
+        // ── Lambda Layer (Powertools) ──────────────────────────────────────────────────────────
+        // https://docs.aws.amazon.com/powertools/typescript/latest/getting-started/lambda-layers/#lookup-layer-arn-via-aws-ssm-parameter-store
+        const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
+            this, "PowertoolsLayer",
+            `arn:aws:lambda:${this.region}:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:latest`
+        );
+
+        // ── Lambda Shared Environment ────────────────────────────────────────────
+        const sharedEnv = {
+            TABLE_NAME: table.tableName,
+            EVENT_BUS_NAME: eventBus.eventBusName,
+            RECEIPTS_BUCKET: receiptsBucket.bucketName,
+            REDIS_HOST: redis.attrPrimaryEndPointAddress,
+            REDIS_PORT: redis.attrPrimaryEndPointPort,
+            USER_POOL_ID: userPool.userPoolId,
+            USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+            POWERTOOLS_SERVICE_NAME: "costscrunch",
+            LOG_LEVEL: isProd ? "INFO" : "DEBUG",
+            ENVIRONMENT: environment,
+        };
+
+        const sharedLambdaProps: Partial<lambda.FunctionProps> = {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            memorySize: 1024,
+            timeout: Duration.seconds(29),
+            tracing: lambda.Tracing.ACTIVE,
+            layers: [powertoolsLayer],
+            vpc,
+            vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+            logRetention: isProd ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_WEEK,
+            reservedConcurrentExecutions: isProd ? 500 : 50,
+            environment: sharedEnv,
+        };
     }
 }
