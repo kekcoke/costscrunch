@@ -27,3 +27,25 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
+export interface CostsCrunchStackProps extends StackProps {
+  environment: "dev" | "staging" | "prod";
+  domainName?: string;
+}
+
+export class CostsCrunchStack extends Stack {
+    constructor(scope: Construct, id: string, props: CostsCrunchStackProps) {
+        super(scope, id, props);
+
+        const { environment } = props;
+        const isProd = environment === "prod";
+        const prefix = `costscrunch-${environment}`;
+
+        // ── KMS Key ─────────────────────────────────────────────────────────────
+        const kmsKey = new kms.Key(this, "CostsCrunchKey", {
+            alias: `${prefix}-main`,
+            enableKeyRotation: true,
+            description: "Primary KMS encryption key",
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+        });
+    }
+}
