@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CostsCrunch — Lambda backend (Node.js 20 / TypeScript)",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsc --noEmit && npm run bundle",
     "bundle": "node scripts/bundle.mjs",
@@ -13,7 +13,7 @@
     "test:watch": "jest --watch",
     "lint": "eslint . --ext .ts --max-warnings 0",
     "lint:fix": "eslint . --ext .ts --fix",
-    "dev": "nodemon --exec ts-node --esm src/server.ts --watch src --ext ts",
+    "dev": "tsx src/server.ts",
     "dev:sam": "sam local start-api --port 4000 --env-vars env.local.json",
     "clean": "rm -rf dist .esbuild"
   },
