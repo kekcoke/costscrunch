@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "CostsCrunch — Lambda backend (Node.js 20 / TypeScript)",
   "private": true,
+  "type": "commonjs",
   "scripts": {
     "build": "tsc --noEmit && npm run bundle",
     "bundle": "node scripts/bundle.mjs",
