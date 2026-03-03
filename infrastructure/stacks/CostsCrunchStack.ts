@@ -1,4 +1,4 @@
-// ─── SpendLens — AWS CDK Infrastructure Stack ────────────────────────────────
+// ─── Costscrunch — AWS CDK Infrastructure Stack ────────────────────────────────
 // Deploys: Cognito, DynamoDB, S3, API Gateway, Lambda Functions,
 //          ElastiCache, CloudFront, WAF, EventBridge, SNS/Pinpoint
 
@@ -134,5 +134,59 @@ export class CostsCrunchStack extends Stack {
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
+
+        // ── Cognito User Pool ────────────────────────────────────────────────
+        const userPool = new cognito.UserPool(this, "UserPool", {
+            userPoolName: `${prefix}-users`,
+            selfSignUpEnabled: true,
+            signInAliases: { email: true },
+            autoVerify: { email: true },
+            mfa: isProd ? cognito.Mfa.REQUIRED : cognito.Mfa.OFF,
+            mfaSecondFactor: { sms: true, otp: true },
+            passwordPolicy: {
+                minLength: 8,
+                requireLowercase: true,
+                requireUppercase: true,
+                requireDigits: true,
+                requireSymbols: true,
+                tempPasswordValidity: Duration.minutes(30),
+            },
+            accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+            standardAttributes: {
+                email: { required: true, mutable: false },
+                fullname: { required: true, mutable: true },
+            },
+            customAttributes: {
+                plan: new cognito.StringAttribute({ mutable: true }),
+                orgId: new cognito.StringAttribute({ mutable: true }),
+            },
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            standardThreatProtectionMode: cognito.StandardThreatProtectionMode.FULL_FUNCTION,
+        });
+
+        const userPoolClient = userPool.addClient("WebClient", {
+            userPoolClientName: `${prefix}-web`,
+            authFlows: {
+                userSrp: true,
+                userPassword: false, // disable plain password flow
+            },
+            oAuth: {
+                flows: { authorizationCodeGrant: true },
+                scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],
+                callbackUrls: isProd ? ["https://app.costscrunch.io/callback"] : ["http://localhost:3000/callback"],
+                logoutUrls: isProd ? ["https://app.costscrunch.io/logout"] : ["http://localhost:3000/logout"],
+            },
+            accessTokenValidity: Duration.minutes(15),
+            refreshTokenValidity: Duration.days(30),
+            preventUserExistenceErrors: true,
+            enableTokenRevocation: true,
+        });
+
+        // Cognito groups
+        new cognito.CfnUserPoolGroup(this, "AdminGroup", { userPoolId: userPool.userPoolId, groupName: "admins", precedence: 1 });
+        new cognito.CfnUserPoolGroup(this, "SupportGroup", { userPoolId: userPool.userPoolId, groupName: "support", precedence: 2 });
+        new cognito.CfnUserPoolGroup(this, "BusinessGroup", { userPoolId: userPool.userPoolId, groupName: "business", precedence: 3 });
+        new cognito.CfnUserPoolGroup(this, "ProGroup", { userPoolId: userPool.userPoolId, groupName: "pro", precedence: 4 });
+        new cognito.CfnUserPoolGroup(this, "FreeGroup", { userPoolId: userPool.userPoolId, groupName: "free", precedence: 5 });
     }
 }
