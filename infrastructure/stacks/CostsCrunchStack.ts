@@ -505,5 +505,36 @@ export class CostsCrunchStack extends Stack {
         // Analytics
         addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
+
+        // ── CloudFront Distribution ──────────────────────────────────────────────
+        const distribution = new cloudfront.Distribution(this, "CfDistribution", {
+            comment: `${prefix} CDN`,
+            defaultBehavior: {
+                origin: new origins.S3Origin(assetsBucket),
+                viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+            },
+            additionalBehaviors: {
+                "/api/*": {
+                origin: new origins.HttpOrigin(`${api.apiId}.execute-api.${this.region}.amazonaws.com`),
+                viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+                cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+                originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+                },
+            },
+            webAclId: wafAcl.attrArn,
+            minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+            httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+            });
+
+        // ── Outputs ───────────────────────────────────────────────────────────────
+        new CfnOutput(this, "ApiUrl", { value: api.url!, exportName: `${prefix}-api-url` });
+        new CfnOutput(this, "CdnUrl", { value: `https://${distribution.distributionDomainName}`, exportName: `${prefix}-cdn-url` });
+        new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId, exportName: `${prefix}-user-pool-id` });
+        new CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId, exportName: `${prefix}-client-id` });
+        new CfnOutput(this, "TableName", { value: table.tableName, exportName: `${prefix}-table` });
+        new CfnOutput(this, "ReceiptsBucket", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` })
     }
 }
