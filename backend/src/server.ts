@@ -20,3 +20,7 @@ process.env.LOG_LEVEL = 'debug';
 app.use(cors());
 app.use(bodyParser.json());
 
+// Startup
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}. Environment: ${process.env.ENVIRONMENT}    `);
+});
