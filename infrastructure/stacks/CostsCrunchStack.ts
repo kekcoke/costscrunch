@@ -238,5 +238,19 @@ export class CostsCrunchStack extends Stack {
             encryption: sqs.QueueEncryption.KMS,
             encryptionMasterKey: kmsKey,
         });
-        }
+
+        // ── EventBridge ──────────────────────────────────────────────────────────
+        const eventBus = new events.EventBus(this, "EventBus", {
+                eventBusName: `${prefix}-events`,
+        });
+
+        const eventArchive = new events.Archive(this, "EventArchive", {
+            archiveName: `${prefix}-archive`,
+            sourceEventBus: eventBus,
+            retention: Duration.days(30),
+            eventPattern: {
+                source: ["costscrunch.expenses", "costscrunch.users", "costscrunch.billing"],
+            }
+        });
+    }
 }
