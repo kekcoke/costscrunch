@@ -118,7 +118,7 @@ export class CostsCrunchStack extends Stack {
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
-                    allowedOrigins: isProd ? [`https://${props.domainName}`] : ["*"],
+                    allowedOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
                     allowedHeaders: ["*"],
                     maxAge: 3600,
                 },
@@ -456,5 +456,54 @@ export class CostsCrunchStack extends Stack {
                 },
             ]
         });
+
+        // ── API Gateway HTTP API ─────────────────────────────────────────────────
+        const authorizer = new apigwv2Authorizers.HttpUserPoolAuthorizer("CognitoAuthorizer", userPool, {
+            authorizerName: `${prefix}-authorizer`,
+            identitySource: ["$request.header.Authorization"],
+        });
+
+        const api = new apigwv2.HttpApi(this, "Api", {
+            apiName: `${prefix}-api`,
+            corsPreflight: {
+                allowOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
+                allowMethods: [apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST, apigwv2.CorsHttpMethod.PUT, apigwv2.CorsHttpMethod.DELETE],
+                allowHeaders: ["Authorization", "Content-Type", "X-Idempotency-Key"],
+                maxAge: Duration.hours(24),
+            }
+        });
+
+        // Helper to add authenticated routes
+        const addRoute = (method: apigwv2.HttpMethod, path: string, fn: lambda.Function) => {
+            api.addRoutes({
+                path, methods: [method],
+                integration: new apigwv2Integrations.HttpLambdaIntegration(`${fn.functionName}-${method}`, fn),
+                authorizer,
+            });
+        };
+
+        // Expense routes
+        addRoute(apigwv2.HttpMethod.GET, "/expenses", expensesLambda);
+        addRoute(apigwv2.HttpMethod.POST, "/expenses", expensesLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/expenses/{id}", expensesLambda);
+        addRoute(apigwv2.HttpMethod.PATCH, "/expenses/{id}", expensesLambda);
+        addRoute(apigwv2.HttpMethod.DELETE, "/expenses/{id}", expensesLambda);
+
+        // Group routes
+        addRoute(apigwv2.HttpMethod.GET, "/groups", groupsLambda);
+        addRoute(apigwv2.HttpMethod.POST, "/groups", groupsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/groups/{id}", groupsLambda);
+        addRoute(apigwv2.HttpMethod.PATCH, "/groups/{id}", groupsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/groups/{id}/balances", groupsLambda);
+        addRoute(apigwv2.HttpMethod.POST, "/groups/{id}/members", groupsLambda);
+        addRoute(apigwv2.HttpMethod.DELETE, "/groups/{id}/members/{userId}", groupsLambda);
+
+        // Receipt upload
+        addRoute(apigwv2.HttpMethod.POST, "/receipts/upload-url", receiptsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/receipts/{expenseId}/scan", receiptsLambda);
+
+        // Analytics
+        addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
     }
 }
