@@ -123,6 +123,25 @@ $AWS s3api put-bucket-lifecycle-configuration \
 
 echo "✅ Receipts bucket ready"
 
+# ── S3 — Assets Bucket ───────────────────────────────────────────────────────
+echo "📦 Creating S3 assets bucket: $BUCKET_ASSETS"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_ASSETS" \
+    --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
+
+# Block all public access (matches CDK publicReadAccess: false + blockPublicAccess: BlockPublicAccess.BLOCK_ALL)
+$AWS s3api put-public-access-block \
+    --bucket "$BUCKET_ASSETS" \
+    --public-access-block-configuration '{
+      "BlockPublicAcls": true,
+      "IgnorePublicAcls": true,
+      "BlockPublicPolicy": true,
+      "RestrictPublicBuckets": true
+    }' \
+    --no-cli-pager 2>/dev/null || true
+
+echo "✅ Assets bucket ready"
+
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity"
 $AWS ses verify-email-identity \
