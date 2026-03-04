@@ -142,6 +142,32 @@ $AWS s3api put-public-access-block \
 
 echo "✅ Assets bucket ready"
 
+# ── Cognito User Pool ─────────────────────────────────────────────────────────
+echo "📦 Creating Cognito User Pool: ${PREFIX}-users"
+USER_POOL_ID=$($AWS cognito-idp create-user-pool \
+  --pool-name "${PREFIX}-users" \
+  --policies '{
+    "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "TemporaryPasswordValidityDays": 1
+    }
+  }' \
+  --auto-verified-attributes email \
+  --username-attributes email \
+  --account-recovery-setting '{
+    "RecoveryMechanisms": [{"Priority": 1, "Name": "verified_email"}]
+  }' \
+  --no-cli-pager 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['UserPool']['Id'])" 2>/dev/null \
+  || $AWS cognito-idp list-user-pools --max-results 10 --no-cli-pager 2>/dev/null \
+     | python3 -c "import sys,json; pools=[p for p in json.load(sys.stdin)['UserPools'] if '${PREFIX}-users' in p['Name']]; print(pools[0]['Id'] if pools else 'unknown')" 2>/dev/null)
+
+echo "  ↳ User Pool ID: $USER_POOL_ID"
+
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity"
 $AWS ses verify-email-identity \
