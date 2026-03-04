@@ -231,15 +231,37 @@ echo "✅ EventBridge ready"
 
 # ── SQS ───────────────────────────────────────────────────────────────────────
 echo "📦 Creating SQS queues"
+
+# scan-dlq - standard queue used as DLQ for receipt scanning
 $AWS sqs create-queue \
-  --queue-name "costscrunch-dev-notifications.fifo" \
-  --attributes FifoQueue=true,ContentBasedDeduplication=true \
+  --queue-name "${PREFIX}-scan-dlq" \
+  --attributes MessageRetentionPeriod=1209600 \
   --no-cli-pager 2>/dev/null || true
 
+# notif-dlq — standard queue used as DLQ for notifications.fifo
 $AWS sqs create-queue \
-  --queue-name "costscrunch-dev-notifications-dlq.fifo" \
-  --attributes FifoQueue=true,ContentBasedDeduplication=true \
+  --queue-name "${PREFIX}-notif-dlq" \
+  --attributes MessageRetentionPeriod=1209600 \
   --no-cli-pager 2>/dev/null || true
+
+# Get DLQ ARNs (needed for Lambda setup)
+NOTIF_DLQ_ARN=$($AWS sqs get-queue-attributes \
+  --queue-url "http://localstack:4566/000000000000/${PREFIX}-notif-dlq" \
+  --attribute-names QueueArn \
+  --no-cli-pager 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['Attributes']['QueueArn'])" 2>/dev/null \
+  || echo "arn:aws:sqs:us-east-1:000000000000:${PREFIX}-notif-dlq")
+
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-notifications.fifo" \
+  --attributes \
+    FifoQueue=true \
+    ContentBasedDeduplication=true \
+    VisibilityTimeout=60 \
+    MessageRetentionPeriod=1209600 \
+    "RedrivePolicy={\"deadLetterTargetArn\":\"${NOTIF_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ SQS ready"
 
 # ── SNS ───────────────────────────────────────────────────────────────────────

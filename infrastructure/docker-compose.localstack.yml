@@ -20,7 +20,7 @@ services:
       - DEBUG=0
       - PERSISTENCE=1 # Persist data across restarts (dev-only)
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-} # Set in .env file for LocalStack Pro features
-      - DEFAULT_REGION=canada-central-1
+      - DEFAULT_REGION=us-east-1
       - ACCESS_KEY_ID=test
       - SECRET_ACCESS_KEY=test
       - HOSTNAME_EXTERNAL=localhost  # Allow host machine to access LocalStack services
@@ -48,7 +48,7 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      - DEFAULT_REGION=canada-central-1
+      - DEFAULT_REGION=us-east-1
       - ACCESS_KEY_ID=test
       - SECRET_ACCESS_KEY=test
       - ENDPOINT_URL=http://localstack:4566
