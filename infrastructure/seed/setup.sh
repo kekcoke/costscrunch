@@ -197,9 +197,9 @@ done
 echo "✅ Cognito ready"
 
 # ── SES ───────────────────────────────────────────────────────────────────────
-echo "📦 Verifying SES email identity"
+echo "📦 Verifying SES email identity: noreply@costscrunch.com"
 $AWS ses verify-email-identity \
-  --email-address "noreply@costscrunch.dev" \
+  --email-address "noreply@costscrunch.com" \
   --no-cli-pager 2>/dev/null || true
 echo "✅ SES ready"
 
@@ -208,6 +208,25 @@ echo "📦 Creating EventBridge bus: $EVENT_BUS"
 $AWS events create-event-bus \
   --name "$EVENT_BUS" \
   --no-cli-pager 2>/dev/null || echo "  ↳ Bus already exists, skipping"
+
+# Match EventBridge rules in CDK
+# Rules reference Lambda ARNs that won't exist locally — created as stubs with no targets, to be updated with real ARNs in Lambda setup 
+# LocalStack doesn't validate targets on rule creation, so we can create rules before lambdas.
+echo "  ↳ Creating EventBridge rules (stub targets)"
+$AWS events put-rule \
+  --name "${PREFIX}-scan-completed" \
+  --event-bus-name "$EVENT_BUS" \
+  --event-pattern '{"source":["costscrunch.receipts"],"detail-type":["ReceiptScanCompleted"]}' \
+  --state ENABLED \
+  --no-cli-pager 2>/dev/null || true
+
+$AWS events put-rule \
+  --name "${PREFIX}-expense-approved" \
+  --event-bus-name "$EVENT_BUS" \
+  --event-pattern '{"source":["costscrunch.expenses"],"detail-type":["ExpenseStatusChanged"],"detail":{"status":["approved","rejected"]}}' \
+  --state ENABLED \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ EventBridge ready"
 
 # ── SQS ───────────────────────────────────────────────────────────────────────
