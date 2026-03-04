@@ -16,7 +16,7 @@ const sharedConfig: Partial<Config> = {
   preset:          "ts-jest",
   testEnvironment: "node",
   moduleNameMapper: {
-    "^@shared/(.*)$": "<rootDir>/shared/$1",
+    "^@shared/(.*)$":  "<rootDir>/src/shared/$1",
     "^@helpers/(.*)$": "<rootDir>/__tests__/__helpers__/$1",
   },
   transform: {
@@ -41,8 +41,6 @@ const config: Config = {
       displayName:  "integration",
       testMatch:    ["**/__tests__/integration/**/*.test.ts"],
       setupFiles:   ["<rootDir>/__tests__/jest.setup.integration.ts"],
-      testTimeout:  30_000,   // LocalStack can be slow to respond
-      maxWorkers:   1,        // Run sequentially to avoid table conflicts
     },
   ],
 
@@ -54,6 +52,8 @@ const config: Config = {
   coverageThreshold: {
     global: { branches: 70, functions: 75, lines: 75, statements: 75 },
   },
+  maxWorkers: 1, // avoid LocalStack conflicts
+  testTimeout: 20000, // LocalStack can be slow to respond
 };
 
 export default config;
