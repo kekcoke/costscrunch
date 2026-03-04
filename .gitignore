@@ -22,8 +22,8 @@ out/
 .output/
 
 # Lambda bundles (esbuild output)
-backend/lambdas/**/dist/
-backend/lambdas/**/.esbuild/
+backend/src/lambdas/**/dist/
+backend/src/lambdas/**/.esbuild/
 backend/dist/
 
 # CDK synthesized output
