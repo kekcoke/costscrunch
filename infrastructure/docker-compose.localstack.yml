@@ -16,17 +16,19 @@ services:
     ports:
       - "4566:4566"  # Main LocalStack edge port/gateway
     environment:
-      - SERVICES=cloudfront,cognito,dynamodb,elasticache,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,textract,secretsmanager,ssm,wafv2 # Only start necessary services for faster startup
+      # Free tier services only — paid-tier services (cognito, elasticache,
+      # textract, bedrock) are excluded; attempting to start them errors out.
+      - SERVICES=dynamodb,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,secretsmanager,ssm
       - DEBUG=0
-      - PERSISTENCE=1 # Persist data across restarts (dev-only)
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-} # Set in .env file for LocalStack Pro features
+      - PERSISTENCE=1
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}
       - DEFAULT_REGION=us-east-1
       - ACCESS_KEY_ID=test
       - SECRET_ACCESS_KEY=test
-      - HOSTNAME_EXTERNAL=localhost  # Allow host machine to access LocalStack services
-      - EAGER_SERVICE_LOADING=1  # Load all services at startup for faster response times
-      - DATA_DIR=/var/lib/localstack  # Persist data across restarts
-      - DISABLE_CORS_HEADERS=0  # Disable CORS headers for easier local development
+      - HOSTNAME_EXTERNAL=localhost
+      - EAGER_SERVICE_LOADING=1
+      - DATA_DIR=/var/lib/localstack
+      - DISABLE_CORS_HEADERS=0
     volumes:
       - localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
@@ -51,11 +53,10 @@ services:
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - ENDPOINT_URL=http://localstack:4566
     volumes:
-      - ./seed:/seed  # Seed script to initialize LocalStack services
+      - ./seed:/seed
     entrypoint: ["/bin/bash", "/seed/setup.sh"]
-    restart: "no"  # Run once and exit
+    restart: "no"
   
 volumes:
   localstack-data:
