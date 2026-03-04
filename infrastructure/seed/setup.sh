@@ -267,25 +267,43 @@ echo "✅ SQS ready"
 # ── SNS ───────────────────────────────────────────────────────────────────────
 echo "📦 Creating SNS topic"
 $AWS sns create-topic \
-  --name "costscrunch-dev-notifications" \
+  --name "${PREFIX}-notifications" \
   --no-cli-pager 2>/dev/null || true
+
 echo "✅ SNS ready"
 
 # ── SSM Parameters ────────────────────────────────────────────────────────────
 echo "📦 Writing SSM parameters"
+
+# Core resource names (used by Lambda sharedEnv)
+$AWS ssm put-parameter --name "/${PREFIX//-dev//dev}/table-name"         --value "$TABLE"           --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/${PREFIX//-dev//dev}/receipts-bucket"    --value "$BUCKET_RECEIPTS" --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/${PREFIX//-dev//dev}/event-bus-name"     --value "$EVENT_BUS"       --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/${PREFIX//-dev//dev}/user-pool-id"       --value "$USER_POOL_ID"    --type String --overwrite --no-cli-pager 2>/dev/null || true
+
+# Pinpoint stub (referenced in notificationsLambda env)
 $AWS ssm put-parameter \
-  --name "/costscrunch/dev/table-name" \
-  --value "$TABLE" \
+  --name "/costscrunch/dev/pinpoint-app-id" \
+  --value "local-pinpoint-stub-000000" \
+  --type String \
+  --overwrite \
+  --no-cli-pager 2>/dev/null || true
+
+# Redis stub (ElastiCache not available in LocalStack free tier)
+$AWS ssm put-parameter \
+  --name "/costscrunch/dev/redis-host" \
+  --value "localhost" \
   --type String \
   --overwrite \
   --no-cli-pager 2>/dev/null || true
 
 $AWS ssm put-parameter \
-  --name "/costscrunch/dev/receipts-bucket" \
-  --value "$BUCKET" \
+  --name "/costscrunch/dev/redis-port" \
+  --value "6379" \
   --type String \
   --overwrite \
   --no-cli-pager 2>/dev/null || true
+
 echo "✅ SSM ready"
 
 # ── Seed test data ────────────────────────────────────────────────────────────
