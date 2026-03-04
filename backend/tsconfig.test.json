@@ -4,6 +4,8 @@
     "module": "CommonJS",
     "moduleResolution": "Node",
     "rootDir": ".",
+    "outDir": "./dist-test",
+    "composite": true,
     "strict": false,
     "types": ["node", "jest"],
     "paths": {
