@@ -1,0 +1,390 @@
+#!/usr/bin/env bash
+# ─── Costscrunch — LocalStack Resource Seed ────────────────────────────────────
+# Runs once after LocalStack is healthy.
+# Mirrors infrastructure defined in CostsCrunchStack.ts
+#
+# Requires: aws-cli, python3  (provided by Dockerfile.seed)
+#
+# Resources created:
+#   KMS key + alias, DynamoDB table + GSIs + TTL + PITR,
+#   S3 buckets (receipts + assets),
+#   Cognito MOCK — DynamoDB-backed substitute (Cognito is paid-tier only),
+#   SQS queues (scan-dlq, notif-dlq, notifications.fifo),
+#   EventBridge bus + rules, SNS topic, SSM parameters, seed test data
+#
+# ── LocalStack free tier limitations relevant to this stack ──────────────────
+# The following services used in CostsCrunchStack.ts are NOT available on the
+# free tier and are either stubbed or omitted entirely in this seed:
+#
+#   Cognito          — paid tier only; replaced with DynamoDB mock (see below)
+#   ElastiCache      — paid tier only; Redis stubbed via SSM placeholders
+#   Textract         — paid tier only; receipt scanning won't function locally
+#   WAFv2            — CRUD accepted but rules are NOT enforced (no-op)
+#   CloudFront       — basic distribution CRUD only; no real CDN behaviour
+#   Bedrock          — paid tier only; AI enrichment in receipts Lambda won't run
+#   Pinpoint         — paid tier only; push/SMS notifications won't fire
+#   IAM enforcement  — policies accepted but NOT enforced on free tier
+#   Persistence      — free tier has no durable state; seed must re-run on restart
+
+set -euo pipefail
+
+AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
+TABLE="costscrunch-dev-main"
+BUCKET_RECEIPTS="costscrunch-dev-receipts-000000000000"
+BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
+EVENT_BUS="costscrunch-dev-events"
+PREFIX="costscrunch-dev"
+
+echo "🔧 costscrunch LocalStack seed starting..."
+
+# ── KMS ───────────────────────────────────────────────────────────────────────
+echo "📦 Creating KMS key"
+KMS_KEY_ID=$($AWS kms create-key \
+  --description "Primary KMS encryption key (local stub)" \
+  --no-cli-pager \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+$AWS kms create-alias \
+  --alias-name "alias/${PREFIX}-main" \
+  --target-key-id "$KMS_KEY_ID" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ KMS alias already exists, skipping"
+
+echo "✅ KMS ready (key: $KMS_KEY_ID)"
+
+# ── DynamoDB ──────────────────────────────────────────────────────────────────
+echo "📦 Creating DynamoDB table: $TABLE"
+$AWS dynamodb create-table \
+  --table-name "$TABLE" \
+  --attribute-definitions \
+    AttributeName=pk,AttributeType=S \
+    AttributeName=sk,AttributeType=S \
+    AttributeName=gsi1pk,AttributeType=S \
+    AttributeName=gsi1sk,AttributeType=S \
+    AttributeName=gsi2pk,AttributeType=S \
+    AttributeName=gsi2sk,AttributeType=S \
+  --key-schema \
+    AttributeName=pk,KeyType=HASH \
+    AttributeName=sk,KeyType=RANGE \
+  --global-secondary-indexes \
+    '[
+      {
+        "IndexName": "GSI1",
+        "KeySchema": [{"AttributeName":"gsi1pk","KeyType":"HASH"},{"AttributeName":"gsi1sk","KeyType":"RANGE"}],
+        "Projection": {"ProjectionType":"ALL"}
+      },
+      {
+        "IndexName": "GSI2",
+        "KeySchema": [{"AttributeName":"gsi2pk","KeyType":"HASH"},{"AttributeName":"gsi2sk","KeyType":"RANGE"}],
+        "Projection": {"ProjectionType":"ALL"}
+      }
+    ]' \
+  --billing-mode PAY_PER_REQUEST \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Table already exists, skipping"
+
+# Enable TTL (attribute name: ttl — matches CDK timeToLiveAttribute)
+$AWS dynamodb update-time-to-live \
+  --table-name "$TABLE" \
+  --time-to-live-specification "Enabled=true,AttributeName=ttl" \
+  --no-cli-pager 2>/dev/null || true
+
+# Enable point-in-time recovery (matches CDK pointInTimeRecovery: true)
+$AWS dynamodb update-continuous-backups \
+  --table-name "$TABLE" \
+  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ DynamoDB ready"
+
+# ── S3 — Receipts Bucket ──────────────────────────────────────────────────────
+echo "📦 Creating S3 receipts bucket: $BUCKET_RECEIPTS"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_RECEIPTS" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
+
+# Enable versioning (matches CDK versioned: true)
+$AWS s3api put-bucket-versioning \
+  --bucket "$BUCKET_RECEIPTS" \
+  --versioning-configuration Status=Enabled \
+  --no-cli-pager 2>/dev/null || true
+
+# CORS: PUT + GET only, localhost:3000 only (matches CDK — no HEAD, no :5173)
+$AWS s3api put-bucket-cors \
+  --bucket "$BUCKET_RECEIPTS" \
+  --cors-configuration '{
+    "CORSRules": [{
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["PUT","GET"],
+      "AllowedOrigins": ["http://localhost:3000"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Lifecycle: transition to INTELLIGENT_TIERING after 30d; expire after 365d (matches CDK)
+$AWS s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET_RECEIPTS" \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "intelligent-tiering",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Transitions": [{"Days": 30, "StorageClass": "INTELLIGENT_TIERING"}]
+      },
+      {
+        "ID": "expiration",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Expiration": {"Days": 365},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
+      }
+    ]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Receipts bucket ready"
+
+# ── S3 — Assets Bucket ───────────────────────────────────────────────────────
+echo "📦 Creating S3 assets bucket: $BUCKET_ASSETS"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_ASSETS" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
+
+$AWS s3api put-public-access-block \
+  --bucket "$BUCKET_ASSETS" \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Assets bucket ready"
+
+# ── Cognito MOCK ─────────────────────────────────────────────────────────────
+# Cognito (cognito-idp) is a paid-tier LocalStack service.
+#
+# This mock stores auth state directly in the main DynamoDB table using the
+# same pk/sk/GSI conventions as the rest of the app. It is intentionally
+# minimal — just enough to unblock local Lambda development and seeded test
+# users. It does NOT implement token issuance, SRP, or OAuth flows.
+#
+# Mock entity layout in DynamoDB:
+#   User pool   pk=POOL#<id>          sk=POOL#<id>
+#   Client      pk=POOL#<id>          sk=CLIENT#<client-id>
+#   Group       pk=POOL#<id>          sk=GROUP#<name>
+#   User        pk=POOL#<id>          sk=USER#<sub>
+#               gsi1pk=EMAIL#<email>  gsi1sk=POOL#<id>   ← email lookup
+#
+# The app's Lambda code must guard Cognito calls with a MOCK_AUTH=true env
+# check and read user identity from the DynamoDB mock table instead.
+#
+# Stable IDs so SSM values are consistent across seed re-runs.
+MOCK_POOL_ID="local-pool-costscrunch-dev"
+MOCK_CLIENT_ID="local-client-costscrunch-dev-web"
+
+echo "📦 Seeding Cognito mock (DynamoDB-backed)"
+
+# User pool record
+$AWS dynamodb put-item \
+  --table-name "$TABLE" \
+  --item '{
+    "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "sk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "entityType": {"S": "COGNITO_POOL"},
+    "poolId":     {"S": "'"$MOCK_POOL_ID"'"},
+    "poolName":   {"S": "'"${PREFIX}-users"'"},
+    "createdAt":  {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Web client record
+$AWS dynamodb put-item \
+  --table-name "$TABLE" \
+  --item '{
+    "pk":           {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "sk":           {"S": "CLIENT#'"$MOCK_CLIENT_ID"'"},
+    "entityType":   {"S": "COGNITO_CLIENT"},
+    "clientId":     {"S": "'"$MOCK_CLIENT_ID"'"},
+    "clientName":   {"S": "'"${PREFIX}-web"'"},
+    "callbackUrls": {"L": [{"S": "http://localhost:3000/callback"}]},
+    "logoutUrls":   {"L": [{"S": "http://localhost:3000/logout"}]},
+    "createdAt":    {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Groups: admins/1, support/2, business/3, pro/4, free/5
+for GROUP_DEF in "admins:1" "support:2" "business:3" "pro:4" "free:5"; do
+  GROUP_NAME="${GROUP_DEF%%:*}"
+  PRECEDENCE="${GROUP_DEF##*:}"
+  $AWS dynamodb put-item \
+    --table-name "$TABLE" \
+    --item '{
+      "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+      "sk":         {"S": "GROUP#'"$GROUP_NAME"'"},
+      "entityType": {"S": "COGNITO_GROUP"},
+      "groupName":  {"S": "'"$GROUP_NAME"'"},
+      "precedence": {"N": "'"$PRECEDENCE"'"}
+    }' \
+    --no-cli-pager 2>/dev/null || true
+done
+
+# Seed test user — sub is stable so dependent records stay consistent
+MOCK_USER_SUB="00000000-0000-0000-0000-test-user-001"
+$AWS dynamodb put-item \
+  --table-name "$TABLE" \
+  --item '{
+    "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "sk":         {"S": "USER#'"$MOCK_USER_SUB"'"},
+    "gsi1pk":     {"S": "EMAIL#test@costscrunch.dev"},
+    "gsi1sk":     {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "entityType": {"S": "COGNITO_USER"},
+    "sub":        {"S": "'"$MOCK_USER_SUB"'"},
+    "email":      {"S": "test@costscrunch.dev"},
+    "name":       {"S": "Test User"},
+    "groups":     {"L": [{"S": "pro"}]},
+    "status":     {"S": "CONFIRMED"},
+    "enabled":    {"BOOL": true},
+    "createdAt":  {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "  ↳ Mock pool ID:   $MOCK_POOL_ID"
+echo "  ↳ Mock client ID: $MOCK_CLIENT_ID"
+echo "  ↳ Test user sub:  $MOCK_USER_SUB"
+echo "✅ Cognito mock ready"
+
+# ── SES ───────────────────────────────────────────────────────────────────────
+echo "📦 Verifying SES email identity: noreply@costscrunch.com"
+$AWS ses verify-email-identity \
+  --email-address "noreply@costscrunch.com" \
+  --no-cli-pager 2>/dev/null || true
+echo "✅ SES ready"
+
+# ── EventBridge ───────────────────────────────────────────────────────────────
+echo "📦 Creating EventBridge bus: $EVENT_BUS"
+$AWS events create-event-bus \
+  --name "$EVENT_BUS" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Bus already exists, skipping"
+
+# Match EventBridge rules in CDK
+# Rules reference Lambda ARNs that won't exist locally — created as stubs with no targets, to be updated with real ARNs in Lambda setup 
+# LocalStack doesn't validate targets on rule creation, so we can create rules before lambdas.
+echo "  ↳ Creating EventBridge rules (stub targets)"
+$AWS events put-rule \
+  --name "${PREFIX}-scan-completed" \
+  --event-bus-name "$EVENT_BUS" \
+  --event-pattern '{"source":["costscrunch.receipts"],"detail-type":["ReceiptScanCompleted"]}' \
+  --state ENABLED \
+  --no-cli-pager 2>/dev/null || true
+
+$AWS events put-rule \
+  --name "${PREFIX}-expense-approved" \
+  --event-bus-name "$EVENT_BUS" \
+  --event-pattern '{"source":["costscrunch.expenses"],"detail-type":["ExpenseStatusChanged"],"detail":{"status":["approved","rejected"]}}' \
+  --state ENABLED \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ EventBridge ready"
+
+# ── SQS Queues ────────────────────────────────────────────────────────────────
+echo "📦 Creating SQS queues"
+
+# scan-dlq - standard queue used as DLQ for receipt scanning
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-scan-dlq" \
+  --attributes MessageRetentionPeriod=1209600 \
+  --no-cli-pager 2>/dev/null || true
+
+# notif-dlq — standard queue used as DLQ for notifications.fifo
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-notif-dlq" \
+  --attributes MessageRetentionPeriod=1209600 \
+  --no-cli-pager 2>/dev/null || true
+
+# LocalStack SQS ARNs are deterministic — no need to fetch
+NOTIF_DLQ_ARN="arn:aws:sqs:us-east-1:000000000000:${PREFIX}-notif-dlq"
+
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-notifications.fifo" \
+  --attributes \
+    FifoQueue=true \
+    ContentBasedDeduplication=true \
+    VisibilityTimeout=60 \
+    MessageRetentionPeriod=1209600 \
+    "RedrivePolicy={\"deadLetterTargetArn\":\"${NOTIF_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ SQS ready"
+
+# ── SNS ───────────────────────────────────────────────────────────────────────
+echo "📦 Creating SNS topic"
+$AWS sns create-topic \
+  --name "${PREFIX}-notifications" \
+  --no-cli-pager 2>/dev/null || true
+echo "✅ SNS ready"
+
+# ── SSM Parameters ────────────────────────────────────────────────────────────
+echo "📦 Writing SSM parameters"
+
+$AWS ssm put-parameter --name "/costscrunch/dev/table-name"      --value "$TABLE"            --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS"  --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS"        --type String --overwrite --no-cli-pager 2>/dev/null || true
+# Cognito mock IDs in place of real pool/client IDs
+$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-id"    --value "$MOCK_POOL_ID"     --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-client-id" --value "$MOCK_CLIENT_ID" --type String --overwrite --no-cli-pager 2>/dev/null || true
+# Stubs for paid-tier services
+$AWS ssm put-parameter --name "/costscrunch/dev/pinpoint-app-id" --value "local-pinpoint-stub-000000" --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/redis-host"      --value "localhost"         --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/redis-port"      --value "6379"              --type String --overwrite --no-cli-pager 2>/dev/null || true
+
+echo "✅ SSM ready"
+
+# ── Seed test data ────────────────────────────────────────────────────────────
+echo "📦 Seeding test user profile"
+$AWS dynamodb put-item \
+  --table-name "$TABLE" \
+  --item '{
+    "pk":        {"S": "USER#test-user-001"},
+    "sk":        {"S": "PROFILE#test-user-001"},
+    "gsi1pk":    {"S": "EMAIL#test@costscrunch.dev"},
+    "gsi1sk":    {"S": "USER#test-user-001"},
+    "entityType":{"S": "USER"},
+    "userId":    {"S": "test-user-001"},
+    "cognitoSub":{"S": "00000000-0000-0000-0000-test-user-001"},
+    "email":     {"S": "test@costscrunch.dev"},
+    "name":      {"S": "Test User"},
+    "currency":  {"S": "USD"},
+    "timezone":  {"S": "America/New_York"},
+    "locale":    {"S": "en-US"},
+    "plan":      {"S": "pro"},
+    "notificationPrefs": {"M": {
+      "email":           {"BOOL": true},
+      "push":            {"BOOL": false},
+      "sms":             {"BOOL": false},
+      "digestFrequency": {"S": "weekly"}
+    }},
+    "createdAt":    {"S": "2026-01-01T00:00:00.000Z"},
+    "updatedAt":    {"S": "2026-01-01T00:00:00.000Z"},
+    "lastActiveAt": {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo ""
+echo "✅✅✅ LocalStack seed complete! Resources available at http://localhost:4566"
+echo ""
+echo "Resource summary:"
+echo "  DynamoDB table:    $TABLE"
+echo "  Receipts bucket:   $BUCKET_RECEIPTS"
+echo "  Assets bucket:     $BUCKET_ASSETS"
+echo "  EventBridge bus:   $EVENT_BUS"
+echo "  Cognito mock:"
+echo "    pool ID:         $MOCK_POOL_ID"
+echo "    client ID:       $MOCK_CLIENT_ID"
+echo "    test user sub:   $MOCK_USER_SUB"
+echo ""
+echo "Useful commands:"
+echo "  List tables:  aws --endpoint-url=http://localhost:4566 dynamodb list-tables"
+echo "  List buckets: aws --endpoint-url=http://localhost:4566 s3 ls"
+echo "  List queues:  aws --endpoint-url=http://localhost:4566 sqs list-queues"
+echo "  List buses:   aws --endpoint-url=http://localhost:4566 events list-event-buses"
+echo "  Scan table:   aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE"

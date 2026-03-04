@@ -166,7 +166,6 @@ k6-summary*.json
 
 
 # ─── Docker ───────────────────────────────────────────────────────────────────
-.dockerignore
 # (keep Dockerfile in version control, ignore local overrides)
 docker-compose.override.yml
 
