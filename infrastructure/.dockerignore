@@ -1,0 +1,29 @@
+# ─── .dockerignore ───────────────────────────────────────────────────────
+# This file exists purely to keep the context payload
+# sent to the Docker daemon minimal and to prevent accidental leaks.
+
+# ── Credentials & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+aws-credentials
+credentials
+
+# ── Backup / temp files ───────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.swp
+*.orig
+*~
+
+# ── Editor & OS noise ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Logs produced during local test runs of setup.sh ─────────────────────────
+*.log
