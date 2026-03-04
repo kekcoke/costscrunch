@@ -12,8 +12,8 @@
       "@shared/*": [
         "./src/shared/*"
       ],
-      "@helpers/*": [
-        "./__tests__/__helpers__/*"
+      "@lambdas/*": [
+        "./src/lambdas/*"
       ]
     }
   },

@@ -17,10 +17,16 @@ const sharedConfig: Partial<Config> = {
   testEnvironment: "node",
   moduleNameMapper: {
     "^@shared/(.*)$":  "<rootDir>/src/shared/$1",
-    "^@helpers/(.*)$": "<rootDir>/__tests__/__helpers__/$1",
+    "^@lambdas/(.*)$": "<rootDir>/src/lambdas/$1",
   },
   transform: {
-    "^.+\\.tsx?$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.test.json" }],
+    "^.+\\.tsx?$": [
+      "ts-jest",
+      {
+        tsconfig:        "<rootDir>/tsconfig.test.json",
+        isolatedModules: true,   // silences NodeNext hybrid-module WARN; speeds up transforms
+      },
+    ],
   },
 };
 
