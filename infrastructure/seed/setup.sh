@@ -7,10 +7,27 @@ set -euo pipefail
 
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
 TABLE="costscrunch-dev-main"
-BUCKET="costscrunch-dev-receipts-000000000000"
-EVENT_BUS="costscrunch-dev"
+BUCKET_RECEIPTS="costscrunch-dev-receipts-000000000000"
+BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
+EVENT_BUS="costscrunch-dev-events"
+PREFIX="costscrunch-dev"
 
 echo "🔧 costscrunch LocalStack seed starting..."
+
+# ── KMS (stub) ────────────────────────────────────────────────────────────────
+# LocalStack free tier returns a valid key ARN; alias mirrors CDK alias/${prefix}-main
+echo "📦 Creating KMS key"
+KMS_KEY_ID=$($AWS kms create-key \
+  --description "Primary KMS encryption key (local stub)" \
+  --no-cli-pager 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['KeyMetadata']['KeyId'])" 2>/dev/null || echo "local-kms-key")
+
+$AWS kms create-alias \
+  --alias-name "alias/${PREFIX}-main" \
+  --target-key-id "$KMS_KEY_ID" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ KMS alias already exists, skipping"
+
+echo "✅ KMS ready (key: $KMS_KEY_ID)"
 
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
 echo "📦 Creating DynamoDB table: $TABLE"
@@ -42,35 +59,69 @@ $AWS dynamodb create-table \
   --billing-mode PAY_PER_REQUEST \
   --no-cli-pager 2>/dev/null || echo "  ↳ Table already exists, skipping"
 
-# Enable TTL
+# Enable TTL (attribute name: ttl — matches CDK timeToLiveAttribute)
 $AWS dynamodb update-time-to-live \
   --table-name "$TABLE" \
   --time-to-live-specification "Enabled=true,AttributeName=ttl" \
   --no-cli-pager 2>/dev/null || true
 
+# Enable point-in-time recovery (matches CDK pointInTimeRecovery: true)
+$AWS dynamodb update-continuous-backups \
+  --table-name "$TABLE" \
+  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ DynamoDB ready"
 
-# ── S3 ────────────────────────────────────────────────────────────────────────
-echo "📦 Creating S3 bucket: $BUCKET"
+# ── S3 — Receipts Bucket ──────────────────────────────────────────────────────
+echo "📦 Creating S3 receipts bucket: $BUCKET_RECEIPTS"
 $AWS s3api create-bucket \
-  --bucket "$BUCKET" \
+  --bucket "$BUCKET_RECEIPTS" \
   --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
 
-# CORS for pre-signed uploads
+# Enable versioning (matches CDK versioned: true)
+$AWS s3api put-bucket-versioning \
+  --bucket "$BUCKET_RECEIPTS" \
+  --versioning-configuration Status=Enabled \
+  --no-cli-pager 2>/dev/null || true
+
+# CORS: PUT + GET only, localhost:3000 only (matches CDK — no HEAD, no :5173)
 $AWS s3api put-bucket-cors \
-  --bucket "$BUCKET" \
+  --bucket "$BUCKET_RECEIPTS" \
   --cors-configuration '{
     "CORSRules": [{
       "AllowedHeaders": ["*"],
-      "AllowedMethods": ["PUT","GET","HEAD"],
-      "AllowedOrigins": ["http://localhost:3000","http://localhost:5173"],
+      "AllowedMethods": ["PUT","GET"],
+      "AllowedOrigins": ["http://localhost:3000"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
   }' \
   --no-cli-pager 2>/dev/null || true
 
-echo "✅ S3 ready"
+# Lifecycle: transition to INTELLIGENT_TIERING after 30d; expire after 365d (matches CDK)
+$AWS s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET_RECEIPTS" \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "intelligent-tiering",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Transitions": [{"Days": 30, "StorageClass": "INTELLIGENT_TIERING"}]
+      },
+      {
+        "ID": "expiration",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Expiration": {"Days": 365},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
+      }
+    ]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Receipts bucket ready"
 
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity"
