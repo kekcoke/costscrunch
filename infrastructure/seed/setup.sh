@@ -168,6 +168,34 @@ USER_POOL_ID=$($AWS cognito-idp create-user-pool \
 
 echo "  ↳ User Pool ID: $USER_POOL_ID"
 
+# Web client (CDK Webclient - SRP flow, OAuth authorization code flow)
+echo "📦 Creating Cognito User Pool Client: ${PREFIX}-web-client"
+$AWS cognito-idp create-user-pool-client \
+  --user-pool-id "$USER_POOL_ID" \
+  --client-name "${PREFIX}-web" \
+  --no-generate-secret \
+  --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+  --access-token-validity 15 \
+  --refresh-token-validity 30 \
+  --token-validity-units '{"AccessToken":"minutes","RefreshToken":"days"}' \
+  --callback-urls '["http://localhost:3000/callback"]' \
+  --logout-urls '["http://localhost:3000/logout"]' \
+  --supported-identity-providers COGNITO \
+  --no-cli-pager 2>/dev/null || echo "  ↳ User pool client already exists, skipping"
+
+# Cognito groups (matches CDK: admins/1, support/2, business/3, pro/4, free/5)
+for GROUP_DEF in "admins:1" "support:2" "business:3" "pro:4" "free:5"; do
+  GROUP_NAME="${GROUP_DEF%%:*}"
+  PRECEDENCE="${GROUP_DEF##*:}"
+  $AWS cognito-idp create-group \
+    --user-pool-id "$USER_POOL_ID" \
+    --group-name "$GROUP_NAME" \
+    --precedence "$PRECEDENCE" \
+    --no-cli-pager 2>/dev/null || echo "  ↳ Group $GROUP_NAME already exists, skipping"
+done
+
+echo "✅ Cognito ready"
+
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity"
 $AWS ses verify-email-identity \
