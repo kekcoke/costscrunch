@@ -3,6 +3,18 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "types": ["node", "jest"]
-  }
+    "rootDir": ".",
+    "strict": false,
+    "types": ["node", "jest"],
+    "paths": {
+      "@shared/*": [
+        "./src/shared/*"
+      ],
+      "@helpers/*": [
+        "./__tests__/__helpers__/*"
+      ]
+    }
+  },
+  "include": ["src/**/*.ts", "__tests__/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
