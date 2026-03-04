@@ -20,7 +20,7 @@ const sharedConfig: Partial<Config> = {
     "^@helpers/(.*)$": "<rootDir>/__tests__/__helpers__/$1",
   },
   transform: {
-    "^.+\\.tsx?$": ["ts-jest", { tsconfig: { strict: false } }],
+    "^.+\\.tsx?$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.test.json" }],
   },
 };
 
@@ -47,8 +47,8 @@ const config: Config = {
   ],
 
   collectCoverageFrom: [
-    "lambdas/**/*.ts",
-    "shared/**/*.ts",
+    "src/lambdas/**/*.ts",
+    "src/shared/**/*.ts",
     "!**/*.d.ts",
   ],
   coverageThreshold: {
