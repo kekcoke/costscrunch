@@ -1,13 +1,13 @@
-version: "3.9"
-
 # ─── Costscrunch — LocalStack dev/test environment ─────────────────────────────
-# Services mocked: DynamoDB, S3, SES, SQS, SNS, EventBridge, Lambda, Textract, SSM, CloudFront, Cognito, ElastiCache, KMS, IAM, (CloudWatch) Logs, WAF
+# Services mocked: DynamoDB, S3, SES, SQS, SNS, EventBridge, Lambda, Textract,
+#                  SSM, CloudFront, Cognito, ElastiCache, KMS, IAM, Logs, WAF
 #
 # Usage:
+#   Build:  docker compose -f docker-compose.localstack.yml build
 #   Start:  docker compose -f docker-compose.localstack.yml up -d
 #   Stop:   docker compose -f docker-compose.localstack.yml down
 #   Logs:   docker compose -f docker-compose.localstack.yml logs -f localstack
-#   Reset:  docker compose -f docker-compose.localstack.yml down -v && up -d
+#   Reset:  docker compose -f docker-compose.localstack.yml down -v && docker compose -f docker-compose.localstack.yml up -d
 
 services:
   localstack:
@@ -30,7 +30,7 @@ services:
     volumes:
       - localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
+      # - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
       # - ./localstack/scripts:/etc/localstack/scripts  # Custom scripts for service setup
       # - ./localstack/config:/etc/localstack/config  # Custom config files for services
     healthcheck:
@@ -48,13 +48,13 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      - DEFAULT_REGION=us-east-1
-      - ACCESS_KEY_ID=test
-      - SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
       - ENDPOINT_URL=http://localstack:4566
     volumes:
-      - ./localstack/seed:/seed  # Seed scripts to initialize LocalStack services
-    entrypoint: ["bin/bash", "/seed/setup.sh"]
+      - ./seed:/seed  # Seed script to initialize LocalStack services
+    entrypoint: ["/bin/bash", "/seed/setup.sh"]
     restart: "no"  # Run once and exit
   
 volumes:
