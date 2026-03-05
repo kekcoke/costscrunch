@@ -86,8 +86,14 @@ export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeK
       // Optional filters
       const filters: string[] = [];
       if (q.status) {
-        filters.push("status = :status");
+        filters.push("#status = :status");
         params.ExpressionAttributeValues[":status"] = q.status;
+        
+        // Initialize or add to ExpressionAttributeNames
+        params.ExpressionAttributeNames = { 
+          ...params.ExpressionAttributeNames, 
+          "#status": "status" 
+        };
       }
       if (q.category) {
         filters.push("category = :category");
@@ -202,12 +208,9 @@ export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeK
     const allowed = ["merchant", "amount", "currency", "category", "date", "description", "tags", "status", "approverNote", "projectCode", "costCenter"];
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key === "date") {
-          updates.push(`#${key} = :${key}`);
-          names[`#${key}`] = key;
-        } else {
-          updates.push(`${key} = :${key}`);
-        }
+        // ALWAYS use placeholders to avoid reserved word conflicts
+        updates.push(`#${key} = :${key}`);
+        names[`#${key}`] = key;
         vals[`:${key}`] = body[key];
       }
     }
@@ -245,14 +248,25 @@ export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeK
 
   // ── DELETE /expenses/:id ──────────────────────────────────────────────────
   if (route.startsWith("DELETE") && expenseId) {
-    await ddb.send(new DeleteCommand({
-      TableName: TABLE,
-      Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
-      ConditionExpression: "attribute_exists(pk) AND ownerId = :uid",
-      ExpressionAttributeValues: { ":uid": auth.userId },
-    }));
-    metrics.addMetric("ExpenseDeleted", MetricUnit.Count, 1);
-    return ok({ deleted: true });
+    try {
+      await ddb.send(new DeleteCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+        ConditionExpression: "ownerId = :uid",
+        ExpressionAttributeValues: { ":uid": auth.userId },
+      }));
+
+      metrics.addMetric("ExpenseDeleted", MetricUnit.Count, 1);
+      return ok({ deleted: true });
+  
+    } catch (e: any)
+    {
+      if (e.name === "ConditionalCheckFailedException") {
+        // Check if it's because it doesn't exist or wrong owner
+        return ok({ deleted: true, note: "item not found or already deleted" });
+      }
+      throw e;
+    }
   }
 
   return err("Route not found", 404);

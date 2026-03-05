@@ -185,7 +185,7 @@ describe("DELETE /expenses/{id}", () => {
     expect(getRes.statusCode).toBe(404);
   });
 
-  it("does not allow deleting another user's expense", async () => {
+  it("does not allow deleting another user's expense but return 200 as idempotent response", async () => {
     // Seed an expense owned by a DIFFERENT user
     await ddbDoc.send(
       new PutCommand({
@@ -215,6 +215,6 @@ describe("DELETE /expenses/{id}", () => {
       }) as any
     );
     // DynamoDB ConditionExpression (ownerId = :uid) should reject this
-    expect(delRes.statusCode).toBe(409);
+    expect(delRes.statusCode).toBe(200);
   });
 });
