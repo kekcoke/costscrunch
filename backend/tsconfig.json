@@ -4,13 +4,23 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+        "paths": {
+      "@shared/*": [
+        "./src/shared/*"
+      ]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "__tests__"],
+  "references": [
+    {
+      "path": "./tsconfig.test.json"
+    }
+  ]
 }

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "outDir": "./dist-test",
+    "composite": true,
+    "isolatedModules": true,
+    "strict": false,
+    "types": ["node", "jest"],
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@lambdas/*": ["./src/lambdas/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "__tests__/**/*.ts", "jest.config.ts", "__tests__/__helpers__/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-test"]
+}

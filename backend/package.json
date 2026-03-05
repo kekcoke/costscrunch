@@ -31,6 +31,7 @@
     "@aws-sdk/client-ses": "^3.635.0",
     "@aws-sdk/client-sns": "^3.635.0",
     "@aws-sdk/client-sqs": "^3.635.0",
+    "@aws-sdk/client-ssm": "^3.1002.0",
     "@aws-sdk/client-textract": "^3.635.0",
     "@aws-sdk/lib-dynamodb": "^3.635.0",
     "@aws-sdk/s3-request-presigner": "^3.635.0",
@@ -53,8 +54,8 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/aws-lambda": "^8.10.145",
-    "@types/jest": "^29.5.13",
-    "@types/node": "^20.16.1",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.19.35",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
     "aws-sdk-client-mock": "^4.0.2",
@@ -66,30 +67,6 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "testMatch": [
-      "**/__tests__/**/*.test.ts",
-      "**/*.spec.ts"
-    ],
-    "collectCoverageFrom": [
-      "lambdas/**/*.ts",
-      "shared/**/*.ts",
-      "!**/*.d.ts"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 70,
-        "functions": 70,
-        "lines": 70,
-        "statements": 70
-      }
-    },
-    "moduleNameMapper": {
-      "^@shared/(.*)$": "<rootDir>/shared/$1"
-    }
   },
   "engines": {
     "node": ">=20.0.0"

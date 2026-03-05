@@ -9,8 +9,6 @@ import {
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
-import middy from "@middy/core";
-import type { Request as MiddyRequest } from "@middy/core";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
@@ -60,7 +58,7 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
+export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
   const auth = getAuth(event);
   const expenseId = event.pathParameters?.id;
@@ -88,8 +86,14 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
       // Optional filters
       const filters: string[] = [];
       if (q.status) {
-        filters.push("status = :status");
+        filters.push("#status = :status");
         params.ExpressionAttributeValues[":status"] = q.status;
+        
+        // Initialize or add to ExpressionAttributeNames
+        params.ExpressionAttributeNames = { 
+          ...params.ExpressionAttributeNames, 
+          "#status": "status" 
+        };
       }
       if (q.category) {
         filters.push("category = :category");
@@ -171,11 +175,18 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
       updatedAt: now,
     };
 
-    await ddb.send(new PutCommand({
-      TableName: TABLE,
-      Item: expense,
-      ConditionExpression: "attribute_not_exists(pk)",
-    }));
+    try {
+      await ddb.send(new PutCommand({
+        TableName: TABLE,
+        Item: expense,
+        ConditionExpression: "attribute_not_exists(pk)",
+      }));
+    } catch (e: any) {
+      if (e.name === "ConditionalCheckFailedException") {
+        return err("Expense already exists", 409);
+      }
+      throw e;
+    }
 
     metrics.addMetric("ExpenseCreated", MetricUnit.Count, 1);
     metrics.addMetric("ExpenseAmount", MetricUnit.NoUnit, body.amount);
@@ -197,12 +208,9 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
     const allowed = ["merchant", "amount", "currency", "category", "date", "description", "tags", "status", "approverNote", "projectCode", "costCenter"];
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key === "date") {
-          updates.push(`#${key} = :${key}`);
-          names[`#${key}`] = key;
-        } else {
-          updates.push(`${key} = :${key}`);
-        }
+        // ALWAYS use placeholders to avoid reserved word conflicts
+        updates.push(`#${key} = :${key}`);
+        names[`#${key}`] = key;
         vals[`:${key}`] = body[key];
       }
     }
@@ -216,15 +224,23 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
 
     updates.push("updatedAt = :updatedAt");
 
-    const result = await ddb.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
-      UpdateExpression: `SET ${updates.join(", ")}`,
-      ExpressionAttributeValues: vals,
-      ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
-      ConditionExpression: "attribute_exists(pk)",
-      ReturnValues: "ALL_NEW",
-    }));
+    let result;
+    try {
+      result = await ddb.send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+        UpdateExpression: `SET ${updates.join(", ")}`,
+        ExpressionAttributeValues: vals,
+        ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+        ConditionExpression: "attribute_exists(pk)",
+        ReturnValues: "ALL_NEW",
+      }));
+    } catch (e: any) {
+      if (e.name === "ConditionalCheckFailedException") {
+        return err("Expense not found", 409);
+      }
+      throw e;
+    }
 
     metrics.addMetric("ExpenseUpdated", MetricUnit.Count, 1);
     return ok(result.Attributes);
@@ -232,29 +248,26 @@ const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: st
 
   // ── DELETE /expenses/:id ──────────────────────────────────────────────────
   if (route.startsWith("DELETE") && expenseId) {
-    await ddb.send(new DeleteCommand({
-      TableName: TABLE,
-      Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
-      ConditionExpression: "attribute_exists(pk) AND ownerId = :uid",
-      ExpressionAttributeValues: { ":uid": auth.userId },
-    }));
-    metrics.addMetric("ExpenseDeleted", MetricUnit.Count, 1);
-    return ok({ deleted: true });
+    try {
+      await ddb.send(new DeleteCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+        ConditionExpression: "ownerId = :uid",
+        ExpressionAttributeValues: { ":uid": auth.userId },
+      }));
+
+      metrics.addMetric("ExpenseDeleted", MetricUnit.Count, 1);
+      return ok({ deleted: true });
+  
+    } catch (e: any)
+    {
+      if (e.name === "ConditionalCheckFailedException") {
+        // Check if it's because it doesn't exist or wrong owner
+        return ok({ deleted: true, note: "item not found or already deleted" });
+      }
+      throw e;
+    }
   }
 
   return err("Route not found", 404);
 };
-
-export const handler = middy(rawHandler)
-  .use({
-    onError: async (request: MiddyRequest) => {
-      const { error } = request;
-      logger.error("Unhandled error", { error });
-      metrics.addMetric("HandlerError", MetricUnit.Count, 1);
-      if ((error as any)?.name === "ConditionalCheckFailedException") {
-        request.response = err("Resource conflict or not found", 409);
-        return;
-      }
-      request.response = err("Internal server error", 500);
-    },
-  });

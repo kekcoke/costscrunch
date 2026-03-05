@@ -22,9 +22,9 @@ services:
       - DEBUG=0
       - PERSISTENCE=1
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}
-      - DEFAULT_REGION=us-east-1
-      - ACCESS_KEY_ID=test
-      - SECRET_ACCESS_KEY=test
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
       - HOSTNAME_EXTERNAL=localhost
       - EAGER_SERVICE_LOADING=1
       - DATA_DIR=/var/lib/localstack
@@ -50,7 +50,7 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
