@@ -54,7 +54,7 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
-      - ./localstack/seed:/seed  # Seed scripts to initialize LocalStack services
+      - ./seed:/seed  # Seed scripts to initialize LocalStack services
     entrypoint: ["/bin/bash", "/seed/setup.sh"]
     restart: "no"  # Run once and exit
   
