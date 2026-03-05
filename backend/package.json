@@ -68,38 +68,6 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "transform": {
-      "^.+\\.tsx?$": [
-        "ts-jest",
-        {
-          "tsconfig": "tsconfig.test.json"
-        }
-      ]
-    },
-    "testMatch": [
-      "**/__tests__/**/*.test.ts",
-      "**/*.spec.ts"
-    ],
-    "collectCoverageFrom": [
-      "lambdas/**/*.ts",
-      "shared/**/*.ts",
-      "!**/*.d.ts"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 70,
-        "functions": 70,
-        "lines": 70,
-        "statements": 70
-      }
-    },
-    "moduleNameMapper": {
-      "^@shared/(.*)$": "<rootDir>/shared/$1"
-    }
-  },
   "engines": {
     "node": ">=20.0.0"
   }
