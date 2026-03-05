@@ -17,7 +17,7 @@ const sharedConfig: Partial<Config> = {
   testEnvironment: "node",
   moduleNameMapper: {
     "^@shared/(.*)$":  "<rootDir>/src/shared/$1",
-    "^@lambdas/(.*)$": "<rootDir>/src/lambdas/$1",
+    "^@helpers/(.*)$": "<rootDir>/__tests__/__helpers__/$1",
   },
   transform: {
     "^.+\\.tsx?$": [
