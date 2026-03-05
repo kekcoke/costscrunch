@@ -14,6 +14,6 @@
       "@lambdas/*": ["./src/lambdas/*"]
     }
   },
-  "include": ["src/**/*.ts", "__tests__/**/*.ts", "jest.config.ts", "__helpers__/**/*.ts"],
+  "include": ["src/**/*.ts", "__tests__/**/*.ts", "jest.config.ts", "__tests__/__helpers__/**/*.ts"],
   "exclude": ["node_modules", "dist", "dist-test"]
 }

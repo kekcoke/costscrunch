@@ -19,7 +19,7 @@ import { SSMClient } from "@aws-sdk/client-ssm";
 
 // ─── LocalStack connection config ─────────────────────────────────────────────
 const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
-const REGION              = process.env.AWS_DEFAULT_REGION ?? "us-east-1";
+const REGION              = process.env.AWS_REGION ?? "us-east-1";
 
 const BASE_CONFIG = {
   endpoint:    LOCALSTACK_ENDPOINT,
