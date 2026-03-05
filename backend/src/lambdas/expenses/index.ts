@@ -60,7 +60,7 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
+export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
   const auth = getAuth(event);
   const expenseId = event.pathParameters?.id;
