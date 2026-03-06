@@ -52,3 +52,34 @@ export const SCAN_MOCK_RESULTS = [
   { merchant: "Marriott Hotel Chicago", amount: "342.00", category: "Travel",  date: "2026-02-27", notes: "1 night stay — Room 412",   confidence: 95 },
   { merchant: "Office Depot",           amount: "67.89",  category: "Office",  date: "2026-02-26", notes: "Paper, pens, stapler",       confidence: 91 },
 ];
+
+// ─── Page: Settings ───────────────────────────────────────────────────────────
+export const SETTINGS_SECTIONS = [
+  {
+    title: "Profile",
+    items: [
+      { label: "Name",     value: "Alex Johnson" },
+      { label: "Email",    value: "alex@acme.io" },
+      { label: "Currency", value: "USD ($)" },
+      { label: "Timezone", value: "America/New_York" },
+    ],
+  },
+  {
+    title: "Notifications",
+    items: [
+      { label: "Email on approval",       value: "✅ Enabled" },
+      { label: "Push on group expense",   value: "✅ Enabled" },
+      { label: "Weekly digest",           value: "✅ Enabled" },
+      { label: "Anomaly alerts",          value: "✅ Enabled" },
+    ],
+  },
+  {
+    title: "Integrations",
+    items: [
+      { label: "Slack",       value: "Connected ✅" },
+      { label: "Plaid",       value: "Not connected" },
+      { label: "QuickBooks",  value: "Connected ✅" },
+      { label: "Xero",        value: "Not connected" },
+    ],
+  },
+];

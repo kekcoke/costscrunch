@@ -40,3 +40,40 @@ export interface TopBarProps {
   onScan: () => void;
   onAdd: () => void;
 }
+
+// ─── Store / Hook Shapes ──────────────────────────────────────────────────────
+
+export interface ExpenseStoreState {
+  expenses: Expense[];
+  pending: Expense[];
+  myExpenses: Expense[];
+  filtered: Expense[];
+  filter: string;
+  search: string;
+  addExpense: (expense: Omit<Expense, "id">) => void;
+  setFilter: (filter: string) => void;
+  setSearch: (search: string) => void;
+}
+
+// ─── Constants / Config Shapes ────────────────────────────────────────────────
+
+export interface CategoryMeta {
+  icon: string;
+  color: string;
+}
+
+export interface NavItem {
+  id: string;
+  icon: string;
+  label: string;
+}
+
+export interface SettingsItem {
+  label: string;
+  value: string;
+}
+
+export interface SettingsSection {
+  title: string;
+  items: SettingsItem[];
+}
