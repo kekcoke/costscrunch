@@ -1,4 +1,4 @@
-export function toQueryString<T extends Record<string, unknown>>(params?: T): string {
+export function toQueryString<T extends object>(params?: T): string {
   if (!params) return "";
 
   const search = new URLSearchParams();

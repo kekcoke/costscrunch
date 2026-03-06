@@ -1,7 +1,8 @@
 // ─── SpendLens — Frontend API Service ────────────────────────────────────────
 // Wraps all backend calls with auth, error handling, retry logic
 
-import { fetchAuthSession } from "aws-amplify/auth";
+import { fetchAuthSession } from "@aws-amplify/auth";
+import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
   GetExpensesQuery, ExpenseSummary, InitiateUploadResponse,
@@ -32,16 +33,19 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public statusCode: number) {
+  public statusCode: number;
+
+  constructor(message: string, statusCode: number) {
     super(message);
     this.name = "ApiError";
+    this.statusCode = statusCode;
   }
 }
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 export const expensesApi = {
   list: (params?: GetExpensesQuery) => {
-    const qs = params ? "?" + new URLSearchParams(params as any).toString() : "";
+    const qs = toQueryString<GetExpensesQuery>(params);
     return apiFetch<{ items: Expense[]; nextToken: string | null; count: number }>(`/expenses${qs}`);
   },
 
@@ -98,7 +102,7 @@ export const receiptsApi = {
     onProgress?: (stage: "uploading" | "scanning" | "complete") => void
   ): Promise<{ expenseId: string; scanId: string; result?: ScanResult }> => {
     onProgress?.("uploading");
-    const { uploadUrl, s3Key, expenseId, scanId } = await receiptsApi.getUploadUrl(file);
+    const { uploadUrl, expenseId, scanId } = await receiptsApi.getUploadUrl(file);
     await receiptsApi.uploadToS3(uploadUrl, file);
 
     onProgress?.("scanning");
