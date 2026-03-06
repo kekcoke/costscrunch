@@ -2,19 +2,19 @@
 
 /**
  * Format a number as USD currency string.
- * @param {number} n
+ * @param {number} value
  * @returns {string}  e.g. "$1,204.33"
  */
-export const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+export const fmt = (value: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 
 /**
  * Format an ISO date string as "Feb 28".
- * @param {string} d  ISO date string e.g. "2026-02-28"
+ * @param {string} iso  ISO date string e.g. "2026-02-28"
  * @returns {string}
  */
-export const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+export const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 /**
  * Generate a lightweight unique ID for optimistic client-side records.
