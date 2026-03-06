@@ -1,6 +1,6 @@
 // ─── CostsCrunch — GroupsPage ─────────────────────────────────────────────────
 import { useExpenseStore } from "../stores/useExpenseStore";
-import { MOCK_GROUPS } from "../models/constants";
+import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
 
 export function GroupsPage() {

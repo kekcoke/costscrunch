@@ -1,7 +1,8 @@
 // ─── CostsCrunch — DashboardPage ─────────────────────────────────────────────
 import { useMemo } from "react";
 import { useExpenseStore } from "../stores/useExpenseStore";
-import { CATEGORIES, MOCK_GROUPS } from "../models/constants";
+import { CATEGORIES } from "../models/constants";
+import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt } from "../helpers/utils";
 import { StatCard, ExpenseRow, DonutChart } from "../components";
 

@@ -16,53 +16,53 @@ export interface Split {
 export interface Expense {
   id: string;
   ownerId: string;
-  groupId?: string; // Group context (null for personal)
+  groupId?: string | null; // Group context (null for personal)
   merchant: string;
-  description?: string;
+  description?: string | null;
   amount: number;
   currency: string;  // ISO-4217: "USD", "EUR", etc.
   exchangeRate?: number;
   amountUSD: number;
   category: string;
-  subcategory?: string;
+  subcategory?: string | null;
   tags: string[];
   date: string; // ISO-8601 date string: "YYYY-MM-DD"
 
   /** Workflow timestamps */
-  submittedAt?: string;
-  approvedAt?: string;
-  rejectedAt?: string;
-  reimbursedAt?: string;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
+  reimbursedAt?: string | null;
 
   /** Approval workflow */
   status: ExpenseStatus;
-  approverId?: string;
-  approverNote?: string;
+  approverId?: string | null;
+  approverNote?: string | null;
 
   /** Receipt info */
   receipt: boolean;
-  receiptKey?: string;
-  receiptUrl?: string;
+  receiptKey?: string | null;
+  receiptUrl?: string | null;
 
   /** Group splitting */
   splits?: Split[];
-  splitMethod?: string;
+  splitMethod?: string | null;
 
   /** Business metadata */
-  projectCode?: string;
-  costCenter?: string;
+  projectCode?: string | null;
+  costCenter?: string | null;
   billable?: boolean;
   reimbursable?: boolean;
 
   /** Policy flags */
-  policyViolation?: string;
+  policyViolation?: string | null;
 
   /** Metadata */
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | null;
   source: ExpenseSource;
-  addedBy?: string;
-  notes?: string;
+  addedBy?: string | null;
+  notes?: string | null;
 }
 
 export interface Group {
@@ -91,20 +91,20 @@ export interface CreateExpenseRequest {
   category: CategoryName;
   amount: number;
   date: string;
-  currency?: string;
-  notes?: string;
-  group?: string | null;
+  currency?: string | null;
+  notes?: string | null;
+  group?: string | null | null;
   receipt?: boolean;
 }
 
 export interface GetExpensesQuery {
   status?: ExpenseStatus;
   category?: CategoryName;
-  groupId?: string;
-  search?: string;
-  from?: string;
-  to?: string;
-  nextToken?: string;
+  groupId?: string | null;
+  search?: string | null;
+  from?: string | null;
+  to?: string | null;
+  nextToken?: string | null;
   limit?: number;
 }
 
