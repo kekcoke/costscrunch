@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import { handler as expensesHandler } from './lambdas/expenses/index.js';
+import { rawHandler as expensesHandler } from './lambdas/expenses/index.js';
 import { handler as groupsHandler } from './lambdas/groups/index.js';
 import { handler as analyticsHandler } from './lambdas/analytics/index.js';
 import { ulid } from 'ulid';
