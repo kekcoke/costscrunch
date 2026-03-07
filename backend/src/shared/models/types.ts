@@ -2,11 +2,11 @@
 // Single-table design pattern for all entities
 
 export type UserRole = "owner" | "admin" | "member" | "viewer";
+export type ExpenseSource = "manual" | "scan" | "bank_sync" | "api"
 export type ExpenseStatus = "draft" | "submitted" | "approved" | "rejected" | "reimbursed";
 export type EntityType = "PERSONAL" | "GROUP" | "BUSINESS";
 export type SplitMethod = "equal" | "exact" | "percentage" | "shares";
 export type NotificationChannel = "email" | "push" | "sms" | "slack";
-
 // ─── DynamoDB Single-Table Keys ───────────────────────────────────────────────
 // pk              | sk                    | entity
 // USER#userId     | PROFILE#userId        | User profile
@@ -117,7 +117,7 @@ export interface Expense {
   // Metadata
   createdAt: string;
   updatedAt: string;
-  source: "manual" | "scan" | "bank_sync" | "api";
+  source: ExpenseSource;
 }
 
 // ─── Split ────────────────────────────────────────────────────────────────────

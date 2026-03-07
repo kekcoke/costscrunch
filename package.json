@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CostsCrunch — Serverless Expense Tracker (Individual / Group / Business)",
   "private": true,
-  "workspaces": ["backend", "infrastructure"],
+  "workspaces": ["frontend", "backend", "infrastructure"],
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd frontend && npm run dev",
