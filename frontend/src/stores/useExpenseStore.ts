@@ -3,6 +3,8 @@
 // Wire the actions to real API calls (src/services/api.ts) when ready.
 
 import { create } from "zustand";
+import { createSelector } from "reselect";
+
 import { MOCK_EXPENSES } from "../mocks/expenses";
 import type { Expense } from "../models/types";
 import { tempId } from "../helpers/utils";
@@ -83,26 +85,34 @@ export const selectFilter   = (s: ExpenseStore) => s.filter;
 export const selectSearch   = (s: ExpenseStore) => s.search;
 
 /** Pending expenses — stable reference when expenses haven't changed. */
-export const selectPending = (s: ExpenseStore) =>
-  s.expenses.filter((e) => e.status === "pending");
+export const selectPending = createSelector(
+  (s: ExpenseStore) => s.expenses,
+  (expenses) => expenses.filter((e) => e.status === "pending")
+);
 
 /** Expenses added by the current user. */
-export const selectMyExpenses = (s: ExpenseStore) =>
-  s.expenses.filter((e) => e.addedBy === "You");
+export const selectMyExpenses = createSelector(
+  (s: ExpenseStore) => s.expenses,
+  (expenses) => expenses.filter((e) => e.addedBy === "You")
+);
 
 /** Filter + search applied. Use with `shallow` if consumed alongside other selectors. */
-export const selectFiltered = (s: ExpenseStore) => {
-  const { expenses, filter, search } = s;
-  const q = search.toLowerCase();
-  return expenses.filter((e) => {
-    const matchFilter = filter === "all" || e.status === filter;
-    const matchSearch =
-      !q ||
-      e.merchant.toLowerCase().includes(q) ||
-      e.category.toLowerCase().includes(q);
-    return matchFilter && matchSearch;
-  });
-};
+export const selectFiltered = createSelector(
+  (s: ExpenseStore) => s.expenses,
+  (s: ExpenseStore) => s.filter,
+  (s: ExpenseStore) => s.search,
+  (expenses, filter, search) => {
+    const q = search.toLowerCase();
+    return expenses.filter((e) => {
+      const matchFilter = filter === "all" || e.status === filter;
+      const matchSearch =
+        !q ||
+        e.merchant.toLowerCase().includes(q) ||
+        e.category.toLowerCase().includes(q);
+      return matchFilter && matchSearch;
+    });
+  }
+);
 
 /** Actions grouped — stable reference (Zustand never re-creates action fns). */
 export const selectActions = (s: ExpenseStore) => ({
