@@ -93,7 +93,7 @@ export function makeApiEvent(
         jwt: {
           claims: {
             sub:              userId,
-            email:            `${userId}@CostsCrunch.dev`,
+            email:            `${userId}@costscrunch.dev`,
             "cognito:groups": "",
           },
         },
