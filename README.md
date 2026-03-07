@@ -43,7 +43,7 @@
 │   ├── __tests__/
 │   │   ├── .DS_Store
 │   │   ├── __helpers__/
-│   │   │   └── localstack-client.ts
+│   │   │   └── localstack-client.ts                  # localstack mock environment
 │   │   ├── integration/
 │   │   │   └── expenses.integration.test.ts
 │   │   ├── jest.setup.integration.ts
@@ -55,7 +55,7 @@
 │   ├── jest.config.ts
 │   ├── package.json
 │   ├── src/
-│   │   ├── lambdas/
+│   │   ├── lambdas/                                  # lambda handlers
 │   │   │   ├── .DS_Store
 │   │   │   ├── analytics/
 │   │   │   │   └── index.ts
@@ -67,7 +67,7 @@
 │   │   │   │   └── index.ts
 │   │   │   └── receipts/
 │   │   │       └── index.ts
-│   │   ├── server.ts
+│   │   ├── server.ts                                 # backend app configuration
 │   │   └── shared/
 │   │       └── models/
 │   │           └── types.ts
