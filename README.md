@@ -67,69 +67,78 @@
 │   │   │   │   └── index.ts
 │   │   │   └── receipts/
 │   │   │       └── index.ts
-│   │   ├── server.ts                                 # backend app configuration
+│   │   ├── server.ts        
 │   │   └── shared/
 │   │       └── models/
 │   │           └── types.ts
 │   ├── tsconfig.json
 │   └── tsconfig.test.json
-└── frontend/
-    ├── .DS_Store
-    ├── .gitignore
-    ├── README.md
-    ├── eslint.config.js
-    ├── index.html
+├── frontend/
+│   ├── .DS_Store
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── public/
+│   │   └── vite.svg
+│   ├── src/
+│   │   ├── .DS_Store
+│   │   ├── App.css
+│   │   ├── App.tsx
+│   │   ├── assets/
+│   │   │   └── react.svg
+│   │   ├── components/
+│   │   │   ├── donutChart.tsx
+│   │   │   ├── expenseRow.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── scanModal.tsx
+│   │   │   ├── sideBar.tsx
+│   │   │   ├── statCard.tsx
+│   │   │   └── topBar.tsx
+│   │   ├── constants/
+│   │   ├── helpers/
+│   │   │   ├── expense/
+│   │   │   │   └── createExpenseFromForm.ts
+│   │   │   ├── queryString.ts
+│   │   │   └── utils.ts
+│   │   ├── index.css
+│   │   ├── index.html
+│   │   ├── main.tsx                                  # Entrypoint
+│   │   ├── mocks/                                    # Mock data
+│   │   │   ├── expenses.ts
+│   │   │   ├── groups.ts
+│   │   │   └── results.ts
+│   │   ├── models/                                   # Type, schema, constant definitions
+│   │   │   ├── constants.ts
+│   │   │   ├── expense.ts
+│   │   │   ├── interfaceProps.ts
+│   │   │   ├── scanForm.ts
+│   │   │   └── types.ts
+│   │   ├── pages/                                    # Route-level pages
+│   │   │   ├── analytics.tsx
+│   │   │   ├── dashboard.tsx
+│   │   │   ├── expenses.tsx
+│   │   │   ├── groups.tsx
+│   │   │   ├── index.tsx
+│   │   │   └── settings.tsx
+│   │   ├── services/
+│   │   │   └── api.ts                                 # Type-safe API client with Amplify auth
+│   │   └── stores/                                    # Zustand state management
+│   │       └── useExpenseStore.ts
+│   ├── tsconfig.app.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+└── infrastructure/
+    ├── .dockerignore
+    ├── docker-compose.localstack.yml                  # compose file localstack and seeding
+    ├── localstack/
+    │   └── dev/
+    │       └── seed-setup.sh                          # seeds localstack according CostsCruncStack specs
     ├── package.json
-    ├── public/
-    │   └── vite.svg
-    ├── src/
-    │   ├── .DS_Store
-    │   ├── App.css
-    │   ├── App.tsx
-    │   ├── assets/
-    │   │   └── react.svg
-    │   ├── components/
-    │   │   ├── donutChart.tsx
-    │   │   ├── expenseRow.tsx
-    │   │   ├── index.ts
-    │   │   ├── scanModal.tsx
-    │   │   ├── sideBar.tsx
-    │   │   ├── statCard.tsx
-    │   │   └── topBar.tsx
-    │   ├── constants/
-    │   ├── helpers/
-    │   │   ├── expense/
-    │   │   │   └── createExpenseFromForm.ts
-    │   │   ├── queryString.ts
-    │   │   └── utils.ts
-    │   ├── index.css
-    │   ├── index.html
-    │   ├── main.tsx                                  # Entrypoint
-    │   ├── mocks/                                    # Mock data
-    │   │   ├── expenses.ts
-    │   │   ├── groups.ts
-    │   │   └── results.ts
-    │   ├── models/                                   # Type, schema, constant definitions
-    │   │   ├── constants.ts
-    │   │   ├── expense.ts
-    │   │   ├── interfaceProps.ts
-    │   │   ├── scanForm.ts
-    │   │   └── types.ts
-    │   ├── pages/                                    # Route-level pages
-    │   │   ├── analytics.tsx
-    │   │   ├── dashboard.tsx
-    │   │   ├── expenses.tsx
-    │   │   ├── groups.tsx
-    │   │   ├── index.tsx
-    │   │   └── settings.tsx
-    │   ├── services/
-    │   │   └── api.ts                                 # Type-safe API client with Amplify auth
-    │   └── stores/                                    # Zustand state management
-    │       └── useExpenseStore.ts
-    ├── tsconfig.app.json
-    ├── tsconfig.json
-    ├── tsconfig.node.json
-    └── vite.config.ts
+    └── stacks/
+        └── CostsCrunchStack.ts                        # cloud infra blueprint
 ```
 
 ---
