@@ -17,6 +17,7 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1",
     "reselect": "^5.1.1",
+    "use-sync-external-store": "^1.6.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

@@ -8,6 +8,8 @@ import { createSelector } from "reselect";
 import { MOCK_EXPENSES } from "../mocks/expenses";
 import type { Expense } from "../models/types";
 import { tempId } from "../helpers/utils";
+import { useStoreWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 
 export type ExpenseFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -131,11 +133,13 @@ export const selectActions = (s: ExpenseStore) => ({
 //   const { filter, search, setFilter, setSearch } = useFilterControls();
 
 export const useFilterControls = () =>
-  useExpenseStore(
-    (s) => ({
-      filter:    s.filter,
-      search:    s.search,
-      setFilter: s.setFilter,
-      setSearch: s.setSearch,
-    }),
-  );
+  useExpenseStoreEq((s) => ({
+    filter:    s.filter,
+    search:    s.search,
+    setFilter: s.setFilter,
+    setSearch: s.setSearch,
+  }));
+
+export const useExpenseStoreEq = <T>(
+  selector: (state: ExpenseStore) => T
+) => useStoreWithEqualityFn(useExpenseStore, selector, shallow);
