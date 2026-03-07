@@ -14,7 +14,8 @@
       "@testing-library/jest-dom/vitest"
     ],
     "skipLibCheck": true,
-        "paths": {
+    "paths": {
+      "~/*": ["./*"],
       "@shared/*": [
         "./src/shared/*"
       ]
