@@ -1,16 +1,18 @@
 import { useMemo } from "react";
-import { useExpenseStore } from "../stores/useExpenseStore";
+import {
+  useExpenseStore,
+  selectFiltered,
+  useFilterControls,
+} from "../stores/useExpenseStore";
+import type { ExpenseFilter } from "../stores/useExpenseStore";
 import { fmt } from "../helpers/utils";
 import { ExpenseRow } from "../components";
 
-const FILTERS = ["all", "pending", "approved", "rejected"] as const;
+const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 
 export function ExpensesPage() {
-  const filter = useExpenseStore((s) => s.filter);
-  const search = useExpenseStore((s) => s.search);
-  const filtered = useExpenseStore((s) => s.filtered);
-  const setFilter = useExpenseStore((s) => s.setFilter);
-  const setSearch = useExpenseStore((s) => s.setSearch);
+  const { filter, search, setFilter, setSearch } = useFilterControls();
+  const filtered = useExpenseStore(selectFiltered);
 
   const totalFiltered = useMemo(
     () => filtered.reduce((s, e) => s + e.amount, 0),

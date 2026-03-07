@@ -1,10 +1,23 @@
 // ─── CostsCrunch — GroupsPage ─────────────────────────────────────────────────
-import { useExpenseStore } from "../stores/useExpenseStore";
+import { useMemo } from "react";
+import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
 import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
+import type { Expense } from "../models/types";
 
 export function GroupsPage() {
-  const expenses = useExpenseStore((s) => s.expenses);
+  const expenses = useExpenseStore(selectExpenses);
+
+  // Index expenses by groupId once per expenses change rather than re-filtering
+  // inside every group's render pass.
+  const expensesByGroup = useMemo(() => {
+    const map: Record<string, Expense[]> = {};
+    for (const e of expenses) {
+      if (!e.groupId) continue;
+      (map[e.groupId] ??= []).push(e);
+    }
+    return map;
+  }, [expenses]);
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
@@ -21,7 +34,7 @@ export function GroupsPage() {
                   {fmt(g.total)}
                 </div>
               </div>
-          </div>
+            </div>
             <div style={{ padding: "20px" }}>
               <div style={{ marginBottom: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>
@@ -35,7 +48,7 @@ export function GroupsPage() {
                   {((g.myShare / g.total) * 100).toFixed(0)}% of group total
                 </div>
               </div>
-              {expenses.filter((e) => e.groupId === g.id).slice(0, 3).map((e) => (
+              {(expensesByGroup[g.id] ?? []).slice(0, 3).map((e) => (
                 <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--color-surface-2)" }}>
                   <div>
                     <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{e.merchant}</div>

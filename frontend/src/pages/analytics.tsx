@@ -1,6 +1,6 @@
 // ─── CostsCrunch — AnalyticsPage ─────────────────────────────────────────────
 import { useMemo } from "react";
-import { useExpenseStore } from "../stores/useExpenseStore";
+import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
 import { CATEGORIES } from "../models/constants";
 import { fmt } from "../helpers/utils";
 import { DonutChart } from "../components";
@@ -9,7 +9,7 @@ const TREND_MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb"] as const;
 const TREND_HISTORICAL = [2100, 3400, 4800, 2900]; // all except current month
 
 export function AnalyticsPage() {
-  const expenses = useExpenseStore((s) => s.expenses);
+  const expenses = useExpenseStore(selectExpenses);
 
   const totalMonth = useMemo(
     () => expenses.reduce((s, e) => s + e.amount, 0),

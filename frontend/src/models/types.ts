@@ -5,28 +5,29 @@
 export type ExpenseStatus = "approved" | "pending" | "rejected" | "draft";
 export type CategoryName = "Groceries" | "Travel" | "Software" | "Meals" | "Office" | "Equipment" | "Other";
 export type ExpenseSource = "manual" | "scan" | "bank_sync" | "api";
+
 export interface Split {
-    userId: string;
-    amount: number;
-    percentage?: number;
-    shares: number;
-    settledAt: string;
+  userId: string;
+  amount: number;
+  percentage?: number;
+  shares: number;
+  settledAt: string;
 }
 
 export interface Expense {
   id: string;
   ownerId: string;
-  groupId?: string | null; // Group context (null for personal)
+  groupId?: string | null;       // Group context (null for personal)
   merchant: string;
   description?: string | null;
   amount: number;
-  currency: string;  // ISO-4217: "USD", "EUR", etc.
+  currency: string;              // ISO-4217: "USD", "EUR", etc.
   exchangeRate?: number;
   amountUSD: number;
   category: string;
   subcategory?: string | null;
   tags: string[];
-  date: string; // ISO-8601 date string: "YYYY-MM-DD"
+  date: string;                  // ISO-8601 date string: "YYYY-MM-DD"
 
   /** Workflow timestamps */
   submittedAt?: string | null;
@@ -71,7 +72,7 @@ export interface Group {
   members: number;
   total: number;
   myShare: number;
-  color: string;         // hex color for UI
+  color: string;                 // hex color for UI
 }
 
 export interface ScanResult {
@@ -93,7 +94,7 @@ export interface CreateExpenseRequest {
   date: string;
   currency?: string | null;
   notes?: string | null;
-  group?: string | null | null;
+  group?: string | null;         // was `string | null | null` — duplicate null removed
   receipt?: boolean;
 }
 

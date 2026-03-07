@@ -1,10 +1,13 @@
 // ─── CostsCrunch — ExpenseRow Component ──────────────────────────────────────
 import { CATEGORIES, STATUS_COLORS } from "../models/constants";
-import { fmt, fmtDate } from "../helpers/utils";
+import { createKeyValidator, fmt, fmtDate } from "../helpers/utils";
 import type { ExpenseRowProps } from "../models/interfaceProps";
 
 export default function ExpenseRow({ expense, delay = 0 }: ExpenseRowProps) {
-  const cat = CATEGORIES[expense.category] ?? CATEGORIES.Other;
+  const isValidCategory = createKeyValidator(CATEGORIES, 'CATEGORIES');
+  const cat = isValidCategory(expense.category) 
+    ? CATEGORIES[expense.category] 
+    : CATEGORIES.Other;
 
   return (
     <div
@@ -44,8 +47,8 @@ export default function ExpenseRow({ expense, delay = 0 }: ExpenseRowProps) {
         </div>
         <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "2px", display: "flex", gap: "10px" }}>
           <span>{fmtDate(expense.date)}</span>
-          {expense.group && (
-            <span style={{ color: "var(--color-indigo)" }}>• {expense.group}</span>
+          {expense?.groupId && (
+            <span style={{ color: "var(--color-indigo)" }}>• {expense.groupId}</span>
           )}
           {expense.addedBy !== "You" && <span>• {expense.addedBy}</span>}
         </div>

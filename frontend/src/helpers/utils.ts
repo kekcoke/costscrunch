@@ -31,3 +31,17 @@ export const tempId = () => `tmp_${Date.now()}_${Math.random().toString(36).slic
  * @returns {number}
  */
 export const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+export function createKeyValidator<T extends object>(obj: T, objectName: string = 'object') {
+  return function(key: unknown): key is keyof T {
+    if (typeof key !== 'string' && typeof key !== 'number' && typeof key !== 'symbol') {
+      console.warn(`Key must be a string, number, or symbol, got ${typeof key}`);
+      return false;
+    }
+    const isValid = key in obj;
+    if (!isValid) {
+      console.warn(`Key "${String(key)}" not found in ${objectName}`);
+    }
+    return isValid;
+  };
+}

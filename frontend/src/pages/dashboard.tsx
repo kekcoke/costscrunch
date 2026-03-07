@@ -1,15 +1,20 @@
 // ─── CostsCrunch — DashboardPage ─────────────────────────────────────────────
 import { useMemo } from "react";
-import { useExpenseStore } from "../stores/useExpenseStore";
+import {
+  useExpenseStore,
+  selectExpenses,
+  selectPending,
+  selectMyExpenses,
+} from "../stores/useExpenseStore";
 import { CATEGORIES } from "../models/constants";
 import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt } from "../helpers/utils";
 import { StatCard, ExpenseRow, DonutChart } from "../components";
 
 export function DashboardPage() {
-  const expenses   = useExpenseStore((s) => s.expenses);
-  const pending    = useExpenseStore((s) => s.pending);
-  const myExpenses = useExpenseStore((s) => s.myExpenses);
+  const expenses   = useExpenseStore(selectExpenses);
+  const pending    = useExpenseStore(selectPending);
+  const myExpenses = useExpenseStore(selectMyExpenses);
 
   const totalMonth = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const myTotal    = useMemo(() => myExpenses.reduce((s, e) => s + e.amount, 0), [myExpenses]);
@@ -27,10 +32,10 @@ export function DashboardPage() {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "28px" }}>
-        <StatCard label="Month Total"    value={fmt(totalMonth)} sub="↑ 12% vs last month"                delay={0} />
-        <StatCard label="My Expenses"    value={fmt(myTotal)}    sub={`${myExpenses.length} transactions`} accent="#0ea5e9" delay={0.05} />
-        <StatCard label="Pending Review" value={pending.length}  sub={`${fmt(pendingAmt)} to approve`}    accent="#f59e0b" delay={0.1} />
-        <StatCard label="Active Groups"  value={MOCK_GROUPS.length} sub="3 shared budgets"                accent="#10b981" delay={0.15} />
+        <StatCard label="Month Total"    value={fmt(totalMonth)}          sub="↑ 12% vs last month"                  delay={0} />
+        <StatCard label="My Expenses"    value={fmt(myTotal)}             sub={`${myExpenses.length} transactions`}  accent="#0ea5e9" delay={0.05} />
+        <StatCard label="Pending Review" value={String(pending.length)}   sub={`${fmt(pendingAmt)} to approve`}      accent="#f59e0b" delay={0.1} />
+        <StatCard label="Active Groups"  value={String(MOCK_GROUPS.length)} sub="3 shared budgets"                   accent="#10b981" delay={0.15} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "20px", marginBottom: "28px" }}>

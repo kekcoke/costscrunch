@@ -3,7 +3,7 @@
 // All data lives in useExpenseStore. All UI lives in components/ and pages/.
 
 import { useState } from "react";
-import { useExpenseStore } from "./stores/useExpenseStore";
+import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
 import { Sidebar, TopBar, ScanModal } from "./components";
 import {
   DashboardPage,
@@ -30,7 +30,7 @@ export default function App() {
   const [showScan,  setShowScan]  = useState(false);
 
   const addExpense = useExpenseStore((s) => s.addExpense);
-  const pending    = useExpenseStore((s) => s.pending);
+  const pending    = useExpenseStore(selectPending);
 
   const PageComponent = PAGES[activeTab] ?? DashboardPage;
 
@@ -46,9 +46,9 @@ export default function App() {
       addedBy:   "You",
       groupId:    "",
       notes:      "",
-      ownerId:    "", 
-      amountUSD:  0, 
-      tags: [""], 
+      ownerId:    "",
+      amountUSD:  0,
+      tags: [""],
       createdAt: new Date().toISOString(),
       source: "manual" as ExpenseSource
     });

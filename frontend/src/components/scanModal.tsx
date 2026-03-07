@@ -1,50 +1,29 @@
 // ─── CostsCrunch — ScanModal Component ───────────────────────────────────────
 import { useState, useRef } from "react";
-import { CATEGORIES, SCAN_MOCK_RESULTS } from "../models/constants";
+import { CATEGORIES } from "../models/constants";
+import { SCAN_MOCK_RESULTS } from './../mocks/results'
 import type { ScanModalProps } from "../models/interfaceProps";
 import type { CategoryName } from "../models/types";
+import { type ScanForm, type ScanStage, EMPTY_FORM, FIELD_DEFS } from "../models/scan";
+import { createExpenseFromForm } from "./../helpers/expense/createExpenseFromForm";
 
-type ScanStage = "idle" | "uploading" | "scanning" | "result" | "manual";
 
-interface ScanForm {
-  merchant: string;
-  amount:   string;
-  category: CategoryName;
-  date:     string;
-  notes:    string;
-}
-
-const FIELD_DEFS: Array<{
-  key: keyof Omit<ScanForm, "category">;
-  label: string;
-  type: string;
-  placeholder?: string;
-}> = [
-  { key: "merchant", label: "Merchant",     type: "text",   placeholder: "e.g. Starbucks" },
-  { key: "amount",   label: "Amount (USD)", type: "number", placeholder: "0.00" },
-  { key: "date",     label: "Date",         type: "date" },
-  { key: "notes",    label: "Notes",        type: "text",   placeholder: "Optional description" },
-];
-
-const EMPTY_FORM: ScanForm = {
-  merchant: "",
-  amount:   "",
-  category: "Other",
-  date:     new Date().toISOString().slice(0, 10),
-  notes:    "",
-};
-
-export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
+export default function ScanModal({ onClose, onAdd, userId = "user1", userName = "You" }: ScanModalProps & { userId?: string; userName?: string }) {
   const [stage,       setStage]       = useState<ScanStage>("idle");
   const [dragging,    setDragging]    = useState(false);
   const [scannedData, setScannedData] = useState<(typeof SCAN_MOCK_RESULTS)[number] | null>(null);
   const [form,        setForm]        = useState<ScanForm>(EMPTY_FORM);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const simulateScan = (_file: File) => {
-    void _file; // temporary fix
+  const simulateScan = (file: File) => {
+    setSelectedFile(file);
     setStage("uploading");
+    
+    // Simulate upload delay
     setTimeout(() => setStage("scanning"), 900);
+    
+    // Simulate scan completion
     setTimeout(() => {
       const result = SCAN_MOCK_RESULTS[Math.floor(Math.random() * SCAN_MOCK_RESULTS.length)];
       setScannedData(result);
@@ -63,36 +42,80 @@ export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) simulateScan(file);
+    if (file) {
+      // Validate file type and size
+      if (!file.type.match(/image.*|application.pdf/)) {
+        alert("Please upload an image or PDF file");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert("File size must be less than 10MB");
+        return;
+      }
+      simulateScan(file);
+    }
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) simulateScan(file);
+    if (file) {
+      // Validate file type and size
+      if (!file.type.match(/image.*|application\/pdf/)) {
+        alert("Please upload an image or PDF file");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert("File size must be less than 10MB");
+        return;
+      }
+      simulateScan(file);
+    }
   };
 
   const openFilePicker = () => fileRef.current?.click();
 
   const handleSubmit = () => {
-    onAdd({
-      merchant:  form.merchant,
-      amount:    parseFloat(form.amount) || 0,
-      category:  form.category,
-      date:      form.date,
-      notes:     form.notes,
-      status:    "pending",
-      receipt:   stage === "result",
-      addedBy:   "You",
-      group:     null,
-      currency:  "USD",
-    });
+    // Validate form before submission
+    if (!form.merchant.trim()) {
+      alert("Merchant is required");
+      return;
+    }
+    if (!form.amount || parseFloat(form.amount) <= 0) {
+      alert("Valid amount is required");
+      return;
+    }
+    if (!form.date) {
+      alert("Date is required");
+      return;
+    }
+
+    // Create expense object using helper function
+    const expenseData = createExpenseFromForm(form, stage, userId, userName);
+    
+    // Pass to parent component
+    onAdd(expenseData);
     onClose();
+  };
+
+  const handleManualEntry = () => {
+    setStage("manual");
+    setForm(EMPTY_FORM);
+  };
+
+  const resetToIdle = () => {
+    setStage("idle");
+    setScannedData(null);
+    setForm(EMPTY_FORM);
+    setSelectedFile(null);
+    if (fileRef.current) {
+      fileRef.current.value = ''; // Clear file input
+    }
   };
 
   const stageSubtitle: Record<ScanStage, string> = {
     idle:      "Upload image or PDF — AI extracts the data",
-    uploading: "Uploading to S3...",
-    scanning:  "Textract + Claude analyzing receipt...",
+    uploading: "⬆️ Uploading securely to S3...",
+    scanning:  "🤖 AWS Textract + AI analyzing receipt...",
     result:    `Confidence: ${scannedData?.confidence ?? "—"}% — verify and save`,
     manual:    "Enter expense details manually",
   };
@@ -123,23 +146,38 @@ export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
         <div style={{ padding: "24px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 700, color: "var(--color-text)" }}>
-              {stage === "result" ? "✅ Receipt Scanned" : "📷 Scan Receipt"}
+              {stage === "result" ? "✅ Receipt Scanned" : stage === "manual" ? "✏️ Manual Entry" : "📷 Scan Receipt"}
             </div>
             <div style={{ fontSize: "12px", color: "#64748b", marginTop: "3px" }}>
               {stageSubtitle[stage]}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "#1e3048", border: "none", color: "#64748b",
-              width: "32px", height: "32px", borderRadius: "8px",
-              cursor: "pointer", fontSize: "16px",
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {(stage === "result" || stage === "manual") && (
+              <button
+                onClick={resetToIdle}
+                aria-label="New Scan"
+                style={{
+                  background: "#1e3048", border: "none", color: "#64748b",
+                  width: "32px", height: "32px", borderRadius: "8px",
+                  cursor: "pointer", fontSize: "16px",
+                }}
+              >
+                ↺
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: "#1e3048", border: "none", color: "#64748b",
+                width: "32px", height: "32px", borderRadius: "8px",
+                cursor: "pointer", fontSize: "16px",
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: "24px 28px 28px" }}>
@@ -179,7 +217,7 @@ export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
                 />
               </div>
               <button
-                onClick={() => setStage("manual")}
+                onClick={handleManualEntry}
                 style={{
                   width: "100%", background: "transparent",
                   border: "1px solid #1e3048", color: "#64748b",
@@ -203,6 +241,12 @@ export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
                   margin: "0 auto 20px",
                 }}
               />
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
               <div style={{ color: "#94a3b8", fontSize: "14px" }}>
                 {stage === "uploading" ? "⬆️ Uploading securely to S3..." : "🤖 AWS Textract + AI parsing..."}
               </div>
@@ -237,6 +281,11 @@ export default function ScanModal({ onClose, onAdd }: ScanModalProps) {
                 >
                   <span aria-hidden>✓</span>
                   AI extracted {Object.values(form).filter(Boolean).length} fields — review before saving
+                  {selectedFile && (
+                    <span style={{ marginLeft: "auto", fontSize: "10px", color: "#64748b" }}>
+                      {selectedFile.name}
+                    </span>
+                  )}
                 </div>
               )}
 
