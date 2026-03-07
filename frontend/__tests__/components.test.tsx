@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { useExpenseStore } from "./../src/stores/useExpenseStore";
+import { selectFiltered, useExpenseStore } from "./../src/stores/useExpenseStore";
 import StatCard   from "../src/components/StatCard";
 import ExpenseRow from "../src/components/ExpenseRow";
 import DonutChart from "../src/components/DonutChart";
@@ -182,18 +182,7 @@ describe("useExpenseStore", () => {
     const store = useExpenseStore.getState();
     const before = store.expenses.length;
 
-    store.addExpense({
-      merchant: "Test",
-      amount: 50,
-      currency: "USD",
-      date: "2026-02-01",
-      category: "Other",
-      status: "pending",
-      receipt: false,
-      addedBy: "You",
-      group: null,
-      notes: "",
-    });
+    store.addExpense(MOCK_EXPENSES[0]);
 
     expect(useExpenseStore.getState().expenses.length).toBe(before + 1);
   });
@@ -205,13 +194,24 @@ describe("useExpenseStore", () => {
   });
 
   it("setSearch updates the search state and filters results", () => {
+    // Ensure filter is "all" (default) and search is cleared
     useExpenseStore.getState().setFilter("all");
     useExpenseStore.getState().setSearch("Starbucks");
-    const filtered = useExpenseStore.getState().filter;
+
+    // Get the filtered expenses using the selector
+    const state = useExpenseStore.getState();
+    const filtered =selectFiltered(state);
     
-    expect(filtered.every((e: any) =>
-      e.merchant.toLowerCase().includes("starbucks") ||
-      e.category.toLowerCase().includes("starbucks")
-    )).toBe(true);
+    // Verify all filtered items match search params
+    expect( 
+      filtered.every(
+        e => 
+          e.merchant.toLowerCase().includes("starbucks") ||
+          e.category.toLowerCase().includes("starbucks")
+      )
+    ).toBe(true);
+
+    // Verify that the search state itself is updated
+    expect(state.search).toBe("Starbucks");
   });
 });
