@@ -254,9 +254,9 @@ echo "  ↳ Test user sub:  $MOCK_USER_SUB"
 echo "✅ Cognito mock ready"
 
 # ── SES ───────────────────────────────────────────────────────────────────────
-echo "📦 Verifying SES email identity: noreply@costscrunch.com"
+echo "📦 Verifying SES email identity: noreply@costscrunch.dev"
 $AWS ses verify-email-identity \
-  --email-address "noreply@costscrunch.com" \
+  --email-address "noreply@costscrunch.dev" \
   --no-cli-pager 2>/dev/null || true
 echo "✅ SES ready"
 
