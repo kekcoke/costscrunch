@@ -50,10 +50,10 @@ export const eb  = new EventBridgeClient(BASE_CONFIG);
 export const ssm = new SSMClient(BASE_CONFIG);
 
 // ─── Constants matching the seed script ───────────────────────────────────────
-export const TABLE_NAME  = process.env.TABLE_NAME  ?? "spendlens-dev-main";
-export const BUCKET_NAME = process.env.BUCKET_NAME ?? "spendlens-dev-receipts-000000000000";
-export const EVENT_BUS   = process.env.EVENT_BUS_NAME ?? "spendlens-dev";
-export const FROM_EMAIL  = "noreply@spendlens.dev";
+export const TABLE_NAME  = process.env.TABLE_NAME  ?? "costscrunch-dev-main";
+export const BUCKET_NAME = process.env.BUCKET_NAME ?? "costscrunch-dev-receipts-000000000000";
+export const EVENT_BUS   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev";
+export const FROM_EMAIL  = "noreply@costscrunch.dev";
 
 // ─── Test data helpers ────────────────────────────────────────────────────────
 export const TEST_USER_ID  = "test-user-001";
@@ -93,7 +93,7 @@ export function makeApiEvent(
         jwt: {
           claims: {
             sub:              userId,
-            email:            `${userId}@spendlens.dev`,
+            email:            `${userId}@CostsCrunch.dev`,
             "cognito:groups": "",
           },
         },

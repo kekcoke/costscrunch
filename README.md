@@ -261,12 +261,12 @@ RECEIPTS_BUCKET=costscrunch-prod-receipts-{account}
 REDIS_HOST=...elasticache.amazonaws.com
 REDIS_PORT=6379
 USER_POOL_ID=us-east-1_xxxxxxxx
-FROM_EMAIL=noreply@costscrunch.io
+FROM_EMAIL=noreply@costscrunch.com
 ENVIRONMENT=prod
 LOG_LEVEL=INFO
 
 # Frontend (Vite env)
-VITE_API_URL=https://api.costscrunch.io
+VITE_API_URL=https://api.costscrunch.com
 VITE_USER_POOL_ID=us-east-1_xxxxxxxx
 VITE_USER_POOL_CLIENT_ID=xxxxxxxxxx
 VITE_REGION=us-east-1
