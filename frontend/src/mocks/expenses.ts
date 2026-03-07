@@ -132,7 +132,7 @@ export const MOCK_EXPENSES: Expense[] = [
 
     createdAt: "2026-02-25T08:00:00Z",
     updatedAt: "2026-02-26T11:30:00Z",
-    source: "email",
+    source: "scan",
     addedBy: "Sarah K.",
     notes: "Feb cloud infra"
   },
