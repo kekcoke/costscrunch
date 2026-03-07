@@ -1,4 +1,4 @@
-// ─── SpendLens — Global State (Zustand) ──────────────────────────────────────
+// ─── CostsCrunch — Global State (Zustand) ──────────────────────────────────────
 // Replaces useState({ expenses, filter, search, tab }) scattered in App.jsx.
 // Wire the actions to real API calls (src/services/api.ts) when ready.
 

@@ -1,4 +1,4 @@
-import type { ScanForm, ScanStage } from "../../models/scan";
+import type { ScanForm, ScanStage } from "../../models/scanForm";
 import type { Expense } from "../../models/types";
 
 

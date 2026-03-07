@@ -36,44 +36,100 @@
 ---
 
 ## Repository Structure
-
 ```
-costscrunch/
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx              # Main React SPA (dashboard, expenses, groups, analytics)
-│   │   ├── services/
-│   │   │   └── api.ts           # Type-safe API client with Amplify auth
-│   │   ├── components/          # Reusable UI components
-│   │   ├── pages/               # Route-level pages
-│   │   ├── hooks/               # Custom React hooks
-│   │   └── store/               # Zustand state management
-│   └── package.json
-│
+./
 ├── backend/
-│   ├── src
+│   ├── .DS_Store
+│   ├── __tests__/
+│   │   ├── .DS_Store
+│   │   ├── __helpers__/
+│   │   │   └── localstack-client.ts
+│   │   ├── integration/
+│   │   │   └── expenses.integration.test.ts
+│   │   ├── jest.setup.integration.ts
+│   │   ├── jest.setup.unit.ts
+│   │   └── unit/
+│   │       ├── analytics.unit.test.ts
+│   │       ├── expenses.unit.test.ts
+│   │       └── groups.unit.test.ts
+│   ├── jest.config.ts
+│   ├── package.json
+│   ├── src/
 │   │   ├── lambdas/
-│   │   │   ├── expenses/index.ts    # CRUD + approval workflow
-│   │   │   ├── groups/index.ts      # Groups + splits + debt minimization
-│   │   │   ├── receipts/index.ts    # S3 → Textract → Claude AI pipeline
-│   │   │   ├── analytics/index.ts   # Aggregations + trends
-│   │   │   └── notifications/index.ts  # SES email + Pinpoint push
+│   │   │   ├── .DS_Store
+│   │   │   ├── analytics/
+│   │   │   │   └── index.ts
+│   │   │   ├── expenses/
+│   │   │   │   └── index.ts
+│   │   │   ├── groups/
+│   │   │   │   └── index.ts
+│   │   │   ├── notifications/
+│   │   │   │   └── index.ts
+│   │   │   └── receipts/
+│   │   │       └── index.ts
+│   │   ├── server.ts
 │   │   └── shared/
-│   │       └── models/types.ts      # All TypeScript types + DynamoDB key patterns
-│   └── package.json
-│   └── tsconfig.json
-│
-├── infrastructure/
-│   └── stacks/
-│   │   └── CostsCrunchStack.ts    # Full AWS CDK v2 stack
-│.  └── package.json
-│
-└── .github/
-│   └── workflows/
-│       └── deploy.yml           # CI/CD: test → SAST → staging → prod
-└── package.json
-└── .gitignore
-└── README.md
+│   │       └── models/
+│   │           └── types.ts
+│   ├── tsconfig.json
+│   └── tsconfig.test.json
+└── frontend/
+    ├── .DS_Store
+    ├── .gitignore
+    ├── README.md
+    ├── eslint.config.js
+    ├── index.html
+    ├── package.json
+    ├── public/
+    │   └── vite.svg
+    ├── src/
+    │   ├── .DS_Store
+    │   ├── App.css
+    │   ├── App.tsx
+    │   ├── assets/
+    │   │   └── react.svg
+    │   ├── components/
+    │   │   ├── donutChart.tsx
+    │   │   ├── expenseRow.tsx
+    │   │   ├── index.ts
+    │   │   ├── scanModal.tsx
+    │   │   ├── sideBar.tsx
+    │   │   ├── statCard.tsx
+    │   │   └── topBar.tsx
+    │   ├── constants/
+    │   ├── helpers/
+    │   │   ├── expense/
+    │   │   │   └── createExpenseFromForm.ts
+    │   │   ├── queryString.ts
+    │   │   └── utils.ts
+    │   ├── index.css
+    │   ├── index.html
+    │   ├── main.tsx                                  # Entrypoint
+    │   ├── mocks/                                    # Mock data
+    │   │   ├── expenses.ts
+    │   │   ├── groups.ts
+    │   │   └── results.ts
+    │   ├── models/                                   # Type, schema, constant definitions
+    │   │   ├── constants.ts
+    │   │   ├── expense.ts
+    │   │   ├── interfaceProps.ts
+    │   │   ├── scanForm.ts
+    │   │   └── types.ts
+    │   ├── pages/                                    # Route-level pages
+    │   │   ├── analytics.tsx
+    │   │   ├── dashboard.tsx
+    │   │   ├── expenses.tsx
+    │   │   ├── groups.tsx
+    │   │   ├── index.tsx
+    │   │   └── settings.tsx
+    │   ├── services/
+    │   │   └── api.ts                                 # Type-safe API client with Amplify auth
+    │   └── stores/                                    # Zustand state management
+    │       └── useExpenseStore.ts
+    ├── tsconfig.app.json
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    └── vite.config.ts
 ```
 
 ---

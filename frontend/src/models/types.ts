@@ -1,5 +1,5 @@
 // ─── CostsCrunch — Shared Domain Types ───────────────────────────────────────
-// Single source of truth for all domain models used across frontend.
+// Single source of truth for most domain models used across frontend.
 // Backend should export matching types from backend/src/shared/models/types.ts.
 
 export type ExpenseStatus = "approved" | "pending" | "rejected" | "draft";

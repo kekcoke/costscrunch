@@ -4,7 +4,7 @@ import { CATEGORIES } from "../models/constants";
 import { SCAN_MOCK_RESULTS } from './../mocks/results'
 import type { ScanModalProps } from "../models/interfaceProps";
 import type { CategoryName } from "../models/types";
-import { type ScanForm, type ScanStage, EMPTY_FORM, FIELD_DEFS } from "../models/scan";
+import { type ScanForm, type ScanStage, EMPTY_FORM, FIELD_DEFS } from "../models/scanForm";
 import { createExpenseFromForm } from "./../helpers/expense/createExpenseFromForm";
 
 
