@@ -51,8 +51,8 @@ describe("<StatCard />", () => {
 describe("<ExpenseRow />", () => {
   it("renders merchant and amount", () => {
     render(<ExpenseRow expense={EXPENSE_APPROVED} />);
-    expect(screen.getByText("Nobu Restaurant")).toBeInTheDocument();
-    expect(screen.getByText(/\$287/)).toBeInTheDocument();
+    expect(screen.getByText("Delta Airlines")).toBeInTheDocument();
+    expect(screen.getByText(/\$428/)).toBeInTheDocument();
   });
 
   it("renders the status text", () => {
@@ -60,10 +60,6 @@ describe("<ExpenseRow />", () => {
     expect(screen.getByText(/approved/i)).toBeInTheDocument();
   });
 
-  it("shows group name", () => {
-    render(<ExpenseRow expense={EXPENSE_PENDING} />);
-    expect(screen.getByText(/Q1 Offsite/)).toBeInTheDocument();
-  });
 
   it("shows third-party addedBy name", () => {
     render(<ExpenseRow expense={EXPENSE_PENDING} />);

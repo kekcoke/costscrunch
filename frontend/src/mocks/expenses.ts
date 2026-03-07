@@ -96,7 +96,9 @@ export const MOCK_EXPENSES: Expense[] = [
     splits: [
       { userId: "user1", amount: 214, percentage: 50, settledAt: "", shares: 1 },
       { userId: "user2", amount: 214, percentage: 50, settledAt: "", shares: 1 }
-    ]
+    ],
+    receipt: true,
+    status: "approved"
   }),
 
   createMockExpense({
