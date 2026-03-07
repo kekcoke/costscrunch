@@ -133,12 +133,14 @@ export const selectActions = (s: ExpenseStore) => ({
 //   const { filter, search, setFilter, setSearch } = useFilterControls();
 
 export const useFilterControls = () =>
-  useExpenseStoreEq((s) => ({
-    filter:    s.filter,
-    search:    s.search,
-    setFilter: s.setFilter,
-    setSearch: s.setSearch,
-  }));
+  useExpenseStoreEq(
+    (s) => ({
+      filter:    s.filter,
+      search:    s.search,
+      setFilter: s.setFilter,
+      setSearch: s.setSearch,
+    }),
+  );
 
 export const useExpenseStoreEq = <T>(
   selector: (state: ExpenseStore) => T
