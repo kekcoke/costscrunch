@@ -20,7 +20,7 @@ export default defineConfig(() => ({
       "/api": {
         target: "http://localhost:4000",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/api/, ""),
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
@@ -44,9 +44,9 @@ export default defineConfig(() => ({
 
   // Vitest config (co-located so `vite` and `vitest` share the same config)
   test: {
-    globals:     true,
+    globals:      true,
     environment: "jsdom",
-    setupFiles:  "./src/test/setup.js",
+    setupFiles:  ".__tests__/setup.ts", // ensure this file exists or change to .js
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
