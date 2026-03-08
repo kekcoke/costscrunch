@@ -27,3 +27,30 @@ Thumbs.db
 
 # ── Logs produced during local test runs of setup.sh ─────────────────────────
 *.log
+
+
+# ── AI ─────────────────────────
+# AI runtime artifacts
+ai/cache/
+ai/tmp/
+ai/runs/
+ai/outputs/
+ai/logs/
+
+# Embeddings / vector DB
+ai/embeddings/
+
+# Secrets
+ai/secrets/
+ai/.env
+ai/.env.*
+
+# Local models
+ai/models/
+
+# Experiments
+ai/experiments/
+
+# Dev notes
+ai/**/*.draft.md
+ai/**/*.scratch.md

@@ -38,6 +38,13 @@
 ## Repository Structure
 ```
 ./
+├── ai/
+│   ├── adapters/
+│   ├── references/
+│   │   └── REFERENCES.md
+│   ├── skills/
+│   │   └── SKILLS.md
+│   └── system/
 ├── backend/
 │   ├── .DS_Store
 │   ├── __tests__/
@@ -77,6 +84,10 @@
 │   ├── .DS_Store
 │   ├── .gitignore
 │   ├── README.md
+│   ├── __tests__/
+│   │   ├── .DS_Store
+│   │   ├── components.test.tsx
+│   │   └── setup.ts
 │   ├── eslint.config.js
 │   ├── index.html
 │   ├── package.json
