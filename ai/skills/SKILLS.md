@@ -10,6 +10,13 @@
 
 **Repo layout:**
 costscrunch/
+├── ai/
+│   ├── adapters/
+│   ├── references/
+│   │   └── REFERENCES.md
+│   ├── skills/
+│   │   └── SKILLS.md
+│   └── system/
 ├── backend/
 │   ├── .DS_Store
 │   ├── __tests__/
