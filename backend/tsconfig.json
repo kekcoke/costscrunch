@@ -8,9 +8,14 @@
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
-    "types": ["node"],
+    "types": [
+      "node", 
+      "vitest", 
+      "@testing-library/jest-dom/vitest"
+    ],
     "skipLibCheck": true,
-        "paths": {
+    "paths": {
+      "~/*": ["./*"],
       "@shared/*": [
         "./src/shared/*"
       ]
