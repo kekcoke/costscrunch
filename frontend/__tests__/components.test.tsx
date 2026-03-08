@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { selectFiltered, useExpenseStore } from "./../src/stores/useExpenseStore";
@@ -154,21 +154,31 @@ describe("<ScanModal />", () => {
 
   it("transitions through scan stages after file drop", async () => {
     render(<ScanModal onClose={onClose} onAdd={onAdd} />);
-    const dropZone = screen.getByRole("button", { name: "" });
+    
+    // Use the visible text to find the drop zone
+    const dropZone = screen.getByText(/Drop receipt image or PDF/i);
     const file = new File(["data"], "receipt.png", { type: "image/png" });
 
     fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
 
+    // Wait for the first status message
     expect(await screen.findByText(/Uploading securely/i)).toBeInTheDocument();
 
-    await act(() => { vi.advanceTimersByTime(900); });
-    expect(screen.getByText(/Textract/i)).toBeInTheDocument();
+    // Advance timers and wait for the next status
+    await act(async () => {
+      vi.advanceTimersByTime(900);
+      // Allow React to re-render
+      await Promise.resolve();
+    });
+    await expect(screen.findByText(/Textract/i)).resolves.toBeInTheDocument();
 
-    await act(() => { vi.advanceTimersByTime(2000); });
-    await waitFor(() =>
-      expect(screen.getByText(/Receipt Scanned/i)).toBeInTheDocument()
-    );
-  });
+    // Advance again and wait for completion
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+      await Promise.resolve();
+    });
+    await expect(screen.findByText(/Receipt Scanned/i)).resolves.toBeInTheDocument();
+  }, 10000);
 });
 
 // ── Zustand store integration ─────────────────────────────────────────────────
