@@ -219,3 +219,19 @@ coverage/
 .vite-node/
 vitest.config.*.timestamp*
 vite.config.*.timestamp*
+
+# ─── Vitest ──────────────────────────────────────────────────────────
+ai/cache/
+ai/logs/
+ai/runs/
+ai/outputs/
+
+# Secrets
+ai/secrets/
+ai/.env
+
+# Temp
+ai/tmp/
+
+# Embeddings
+ai/embeddings/
