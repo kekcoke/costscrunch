@@ -16,6 +16,7 @@ import { SQSClient } from "@aws-sdk/client-sqs";
 import { SNSClient } from "@aws-sdk/client-sns";
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { SSMClient } from "@aws-sdk/client-ssm";
+import { APIGatewayProxyEventV2 } from "aws-lambda/trigger/api-gateway-proxy.js";
 
 // ─── LocalStack connection config ─────────────────────────────────────────────
 const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
@@ -66,46 +67,54 @@ export function makeApiEvent(
     routeKey: string;
     method: string;
     path: string;
-    headers: object | null;
+    headers: Record<string, string>;
     body: object | null;
     pathParameters: Record<string, string>;
     queryStringParameters: Record<string, string>;
     userId: string;
   }> = {}
-) {
+): APIGatewayProxyEventV2 {
   const userId = overrides.userId ?? TEST_USER_ID;
+  
+  // Return a type-cast object that satisfies the interface
   return {
-    version:        "2.0",
-    routeKey:       overrides.routeKey ?? "GET /expenses",
-    rawPath:        overrides.path ?? "/expenses",
+    version: "2.0",
+    routeKey: overrides.routeKey ?? "GET /expenses",
+    rawPath: overrides.path ?? "/expenses",
     rawQueryString: "",
-    headers:        { },
-    body:           overrides.body ? JSON.stringify(overrides.body) : null,
-    pathParameters: overrides.pathParameters ?? {},
-    queryStringParameters: overrides.queryStringParameters ?? {},
+    headers: overrides.headers ?? {},
+    body: overrides.body ? JSON.stringify(overrides.body) : null,
+    pathParameters: overrides.pathParameters,
+    queryStringParameters: overrides.queryStringParameters,
     requestContext: {
-      http: {  method: overrides.method ?? "GET", path: overrides.path ?? "/", protocol: "HTTP/1.1", sourceIp: "0.0.0.0", userAgent: "..." },
-      accountId:  "000000000000",
-      apiId:      "test-api",
+      http: {
+        method: overrides.method ?? "GET",
+        path: overrides.path ?? "/",
+        protocol: "HTTP/1.1",
+        sourceIp: "0.0.0.0",
+        userAgent: "vitest",
+      },
+      accountId: "000000000000",
+      apiId: "test-api",
       domainName: "test.execute-api.us-east-1.amazonaws.com",
       domainPrefix: "test.execute-api",
-      requestId:  "test-request-id",
-      routeKey: "ANY /",
+      requestId: "test-request-id",
+      routeKey: overrides.routeKey ?? "ANY /",
       stage: "test",
       time: "01/Jan/2021:00:00:00 +0000",
       timeEpoch: 1609459200000,
       authorizer: {
         jwt: {
           claims: {
-            sub:              userId,
-            email:            `${userId}@costscrunch.dev`,
-            "cognito:groups": "",
+            sub: userId,
+            email: `${userId}@costscrunch.dev`,
           },
+          scopes: [],
         },
       },
-    },
+    } as any, // Cast specific nested parts to avoid deep interface mismatches
     isBase64Encoded: false,
-  };
+  } as unknown as APIGatewayProxyEventV2;
 }
 
 /** Wait for LocalStack to be fully ready */
