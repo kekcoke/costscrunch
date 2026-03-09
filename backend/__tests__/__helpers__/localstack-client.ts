@@ -66,6 +66,7 @@ export function makeApiEvent(
     routeKey: string;
     method: string;
     path: string;
+    headers: object | null;
     body: object | null;
     pathParameters: Record<string, string>;
     queryStringParameters: Record<string, string>;
@@ -78,17 +79,21 @@ export function makeApiEvent(
     routeKey:       overrides.routeKey ?? "GET /expenses",
     rawPath:        overrides.path ?? "/expenses",
     rawQueryString: "",
+    headers:        { },
     body:           overrides.body ? JSON.stringify(overrides.body) : null,
     pathParameters: overrides.pathParameters ?? {},
     queryStringParameters: overrides.queryStringParameters ?? {},
     requestContext: {
+      http: {  method: overrides.method ?? "GET", path: overrides.path ?? "/", protocol: "HTTP/1.1", sourceIp: "0.0.0.0", userAgent: "..." },
       accountId:  "000000000000",
       apiId:      "test-api",
       domainName: "test.execute-api.us-east-1.amazonaws.com",
-      http:       { method: overrides.method ?? "GET", path: overrides.path ?? "/expenses" },
+      domainPrefix: "test.execute-api",
       requestId:  "test-request-id",
-      stage:      "$default",
-      time:       new Date().toISOString(),
+      routeKey: "ANY /",
+      stage: "test",
+      time: "01/Jan/2021:00:00:00 +0000",
+      timeEpoch: 1609459200000,
       authorizer: {
         jwt: {
           claims: {
