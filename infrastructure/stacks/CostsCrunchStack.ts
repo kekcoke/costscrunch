@@ -351,7 +351,7 @@ export class CostsCrunchStack extends Stack {
         // Bedrock permissions for AI enrichment
         receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
             actions: ["bedrock:InvokeModel"],
-            resources: [`arn:aws:bedrock:ca-central-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`],
+            resources: [`arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`],
         }));
 
         // KMS permissions
