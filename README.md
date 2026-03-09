@@ -180,11 +180,11 @@
 ```
 User uploads file
       ↓
-[Frontend] GET /receipts/upload-url
+[Frontend] POST /receipts/upload-url
       ↓
-[API] Lambda generates S3 pre-signed PUT URL (15 min TTL)
+[API] Lambda generates S3 create signed POST URL 
       ↓
-[Frontend] PUT directly to S3 (no Lambda in the path = cheap + fast)
+[Frontend] POST directly to S3 (no Lambda in the path = cheap + fast)
       ↓
 [S3 Event] Triggers receipts Lambda
       ↓
