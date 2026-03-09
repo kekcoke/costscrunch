@@ -3,6 +3,7 @@
 // Pipeline: S3 → Textract → Claude (Bedrock) → DynamoDB update → EventBridge
 
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import {
   TextractClient,
   StartExpenseAnalysisCommand,
@@ -26,7 +27,7 @@ import {
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
-import type { S3Event } from "aws-lambda";
+import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
 import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types";
 
@@ -40,6 +41,7 @@ const eb = new EventBridgeClient({});
 const TABLE = process.env.TABLE_NAME!;
 const EVENT_BUS = process.env.EVENT_BUS_NAME!;
 const BEDROCK_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0";
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const logger = new Logger({ serviceName: "receipts" });
 const tracer = new Tracer({ serviceName: "receipts" });
@@ -158,8 +160,71 @@ Respond with valid JSON only. No explanation.`;
   return JSON.parse(text);
 }
 
+// ─── Event-shape type guards ──────────────────────────────────────────────────
+function isApiGatewayEvent(event: unknown): event is APIGatewayProxyEventV2 {
+  return typeof (event as APIGatewayProxyEventV2).routeKey === "string";
+}
+
+function isS3Event(event: unknown): event is S3Event {
+  const e = event as S3Event;
+  return Array.isArray(e.Records) && e.Records[0]?.eventSource === "aws:s3";
+}
+
+// ─── Sub-handler: Generate Pre-signed POST ────────────────────────────────────
+const ok = (body: unknown) => ({ statusCode: 200, body: JSON.stringify(body) });
+const err = (msg: string, code = 400) => ({ statusCode: code, body: JSON.stringify({ error: msg }) });
+
+async function handleUploadUrl(event: APIGatewayProxyEventV2) {
+  const body = JSON.parse(event.body || "{}");
+  const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string | undefined;
+  if (!userId) return err("Unauthorized", 401);
+
+  const allowedMimes = ["image/jpeg", "image/png", "application/pdf"];
+  if (!allowedMimes.includes(body.contentType)) {
+    return err("Invalid file type. Allowed: JPG, PNG, PDF");
+  }
+
+  const expenseId = ulid();
+  const scanId = ulid();
+  const key = `receipts/${userId}/${expenseId}/${scanId}/${body.filename}`;
+
+  const { url, fields } = await createPresignedPost(s3, {
+    Bucket: process.env.RECEIPTS_BUCKET!,
+    Key: key,
+    Conditions: [
+      ["content-length-range", 1, MAX_FILE_SIZE],
+      ["eq", "$Content-Type", body.contentType],
+    ],
+    Fields: {
+      "Content-Type": body.contentType,
+      "x-amz-meta-userid": userId,
+      "x-amz-meta-expenseid": expenseId,
+    },
+    Expires: 900, // 15 mins
+  });
+
+  return ok({ url, fields, key, expenseId, scanId });
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (event: S3Event) => {
+export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
+  // ─── Route by event shape ──────────────────────────────────────────────────
+  if (isApiGatewayEvent(event)) {
+    if (event.routeKey === "POST /receipts/upload-url") {
+      try {
+        return await handleUploadUrl(event);
+      } catch {
+        return err("Failed to generate upload URL", 500);
+      }
+    }
+    return err("Not found", 404);
+  }
+
+  if (!isS3Event(event)) {
+    logger.error("Unrecognised event shape", { event });
+    return err("Unknown event type", 400);
+  }
+  // ─── S3 pipeline ──────────────────────────────────────────────────────────
   const startMs = Date.now();
 
   for (const record of event.Records) {
