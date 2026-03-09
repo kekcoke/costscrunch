@@ -39,6 +39,7 @@ export class CostsCrunchStack extends Stack {
         const { environment } = props;
         const isProd = environment === "prod";
         const prefix = `costscrunch-${environment}`;
+        const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
 
         // ── KMS Key ─────────────────────────────────────────────────────────────
         const kmsKey = new kms.Key(this, "CostsCrunchKey", {
@@ -351,7 +352,7 @@ export class CostsCrunchStack extends Stack {
         // Bedrock permissions for AI enrichment
         receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
             actions: ["bedrock:InvokeModel"],
-            resources: [`arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`],
+            resources: [`arn:aws:bedrock:${this.region}::${BEDROCK_MODEL_ID}`],
         }));
 
         // KMS permissions
