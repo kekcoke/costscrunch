@@ -9,7 +9,7 @@
   ],
   "jest.runMode": "watch",
   "jest.debugMode": true,
-  "jest.jestCommandLine": "npx jest --config backend/jest.config.ts",
+  "jest.jestCommandLine": "npx jest --config backend/vitest.config.ts",
   "jest.nodeEnv": {
     "NODE_PATH": "backend/node_modules"
   }

@@ -25,13 +25,13 @@ costscrunch/
 │   │   │   └── localstack-client.ts                  ← Setup mock cloud environment
 │   │   ├── integration/                              ← Integration tests
 │   │   │   └── expenses.integration.test.ts
-│   │   ├── jest.setup.integration.ts
-│   │   ├── jest.setup.unit.ts
+│   │   ├── vitest.setup.integration.ts
+│   │   ├── vitest.setup.unit.ts
 │   │   └── unit/                                     ← Unit tests
 │   │       ├── analytics.unit.test.ts
 │   │       ├── expenses.unit.test.ts
 │   │       └── groups.unit.test.ts
-│   ├── jest.config.ts
+│   ├── vitest.config.ts
 │   ├── package.json
 │   ├── src/
 │   │   ├── lambdas/                                  ← lambda handlers

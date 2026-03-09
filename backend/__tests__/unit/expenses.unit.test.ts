@@ -20,7 +20,7 @@ import {
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
 // Import AFTER mocking so the module-level client is intercepted
-import { rawHandler as handler } from "../../src/lambdas/expenses/index";
+import { rawHandler as handler } from "../../src/lambdas/expenses/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function makeEvent(overrides: Record<string, unknown> = {}) {

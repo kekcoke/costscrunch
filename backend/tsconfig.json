@@ -8,17 +8,15 @@
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "types": [
       "node", 
-      "vitest", 
+      "vitest/globals", 
       "@testing-library/jest-dom/vitest"
     ],
-    "skipLibCheck": true,
     "paths": {
-      "~/*": ["./*"],
-      "@shared/*": [
-        "./src/shared/*"
-      ]
+      "@shared/*": ["./src/shared/*"],
+      "@lambdas/*": ["./src/lambdas/*"] // Added to match tsconfig.test.json
     }
   },
   "include": ["src/**/*"],
