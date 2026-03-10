@@ -7,7 +7,6 @@
  */
 
 import { mockClient } from "aws-sdk-client-mock";
-import "aws-sdk-client-mock-jest";
 import {
   DynamoDBDocumentClient,
   GetCommand,

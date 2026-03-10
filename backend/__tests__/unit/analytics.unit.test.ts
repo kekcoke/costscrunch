@@ -6,7 +6,6 @@
 
 
 import { mockClient } from "aws-sdk-client-mock";
-import "aws-sdk-client-mock-jest";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
