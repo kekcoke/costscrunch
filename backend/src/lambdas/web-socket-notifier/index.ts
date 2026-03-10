@@ -163,4 +163,9 @@ export const handler = async (
   // Partial errors are non-fatal — at least some tabs received the message.
   // Full failure (errors === connectionIds.length) will re-throw on the next
   // settled rejection, caught implicitly by Lambda retry / DLQ.
+
+  if (errors > 0 && errors === connectionIds.length) {
+    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
+    throw firstRejection.reason;
+  }
 };

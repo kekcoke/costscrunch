@@ -32,6 +32,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { EventBridgeEvent } from "aws-lambda";
+import { Logger } from "../__mocks__/@aws-lambda-powertools/logger.js";
+import { Metrics, mockMetrics } from "../__mocks__/@aws-lambda-powertools/metrics.js";
 
 // ─── Shared spy instances (hoisted — exist before module evaluation) ──────────
 const { apiGwSend, ddbDocSend, ddbDocFrom } = vi.hoisted(() => ({
@@ -46,7 +48,7 @@ vi.mock("@aws-sdk/client-apigatewaymanagementapi", () => {
   // reference is used both when the handler does `instanceof GoneException`
   // and when tests do `new GoneException()` after importing from this mock.
   class GoneException extends Error {
-    readonly $fault  = "client" as const;
+    readonly $fault = "client" as const;
     readonly $metadata = {};
     constructor(message = "GoneException") {
       super(message);
@@ -56,10 +58,12 @@ vi.mock("@aws-sdk/client-apigatewaymanagementapi", () => {
   }
 
   return {
-    ApiGatewayManagementApiClient: vi.fn().mockImplementation(function() {
-      send: apiGwSend
+    ApiGatewayManagementApiClient: vi.fn().mockImplementation(function () {
+      return { send: apiGwSend };
     }),
-    PostToConnectionCommand: vi.fn((args) => ({ _tag: "PostToConnection", input: args })),
+    PostToConnectionCommand: vi.fn(function (args) { 
+      return { _tag: "PostToConnection", input: args }; 
+    }),
     GoneException,
   };
 });
@@ -76,29 +80,18 @@ vi.mock("@aws-sdk/lib-dynamodb", () => {
   ddbDocFrom.mockReturnValue({ send: ddbDocSend });
   return {
     DynamoDBDocumentClient: { from: ddbDocFrom },
-    QueryCommand:  vi.fn((args) => ({ _tag: "Query",  input: args })),
-    DeleteCommand: vi.fn((args) => ({ _tag: "Delete", input: args })),
+    QueryCommand: vi.fn(function (args) { 
+      return { _tag: "Query", input: args }; 
+    }),
+    DeleteCommand: vi.fn(function (args) { 
+      return { _tag: "Delete", input: args }; 
+    }),
   };
 });
-
-vi.mock("@aws-lambda-powertools/logger", () => ({
-  Logger: vi.fn(() => ({
-    info:       vi.fn(),
-    warn:       vi.fn(),
-    error:      vi.fn(),
-    appendKeys: vi.fn(),
-  })),
-}));
-
-vi.mock("@aws-lambda-powertools/metrics", () => ({
-  Metrics:    vi.fn(() => ({ addMetric: vi.fn() })),
-  MetricUnit: { Count: "Count" },
-}));
 
 // ─── Imports — always after vi.mock() registrations ──────────────────────────
 import {
   PostToConnectionCommand,
-  DeleteCommand as _DeleteCommandUnused, // imported for side-effect (mock registration)
   GoneException,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 import { QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
@@ -182,7 +175,13 @@ function getPostedPayload(callIndex = 0): Record<string, unknown> {
 // ═══════════════════════════════════════════════════════════════════════════════
 // getConnectionIds — DynamoDB query
 // ═══════════════════════════════════════════════════════════════════════════════
-describe("getConnectionIds", () => {
+describe("getConnectionIds", () => { 
+  // env var stubbed from vite.config.ts as global var.
+  afterEach(() => {
+    // Clean up environment variables after tests
+    vi.unstubAllEnvs(); 
+  });
+
   it("queries CONN_TABLE_NAME with WS_CONN#{userId} pk", async () => {
     wireConnections([]);
 

@@ -23,6 +23,10 @@ export default defineConfig({
     // Register apis globally
     globals: true,
 
+    env: {
+      CONN_TABLE_NAME: "test-table-connections"
+    },
+
     // --- Unit project ---
     // Run vitest with --project=unit or --project=integration to isolate suites.
     // Each project gets its own name, include glob, and setupFiles — mirroring

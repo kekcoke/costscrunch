@@ -55,15 +55,18 @@ vi.mock("@aws-sdk/client-textract", () => ({
     return { send: textractSend };
   }),
   // Store input so assertions can inspect what was passed to GetExpenseAnalysis
-  GetExpenseAnalysisCommand: vi.fn((args) => ({ _tag: "GetExpenseAnalysis", input: args })),
+  GetExpenseAnalysisCommand: vi.fn(function(args) {
+    return { _tag: "GetExpenseAnalysis", input: args }
+  })
 }));
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
   BedrockRuntimeClient: vi.fn().mockImplementation(function () {
-
+    return { send: bedrockSend };
   }),
-  // BedrockRuntimeClient: vi.fn(() => ({ send: bedrockSend })),
-  InvokeModelCommand:   vi.fn((args) => ({ _tag: "InvokeModel", input: args })),
+  InvokeModelCommand: vi.fn(function (args) {
+    return { _tag: "InvokeModel", input: args };
+  }),
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
@@ -73,17 +76,14 @@ vi.mock("@aws-sdk/client-dynamodb", () => ({
 }));
 
 vi.mock("@aws-sdk/lib-dynamodb", () => ({
-  // Static factory — always returns the same object so ddbDocSend is the only
-  // .send spy in existence for this module
   DynamoDBDocumentClient: {
-    from: vi.fn(() => ({ send: ddbDocSend })),
+    from: vi.fn().mockImplementation(function () {
+      return { send: ddbDocSend };
+    }),
   },
-  UpdateCommand: vi.fn((args) => ({ _tag: "Update", input: args })),
-}));
-
-vi.mock("@aws-sdk/client-eventbridge", () => ({
-  EventBridgeClient: vi.fn(() => ({ send: ebSend })),
-  PutEventsCommand:  vi.fn((args) => ({ _tag: "PutEvents", input: args })),
+  UpdateCommand: vi.fn(function(args){
+    return { _tag: "GetExpenseAnalysis", input: args };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
@@ -104,17 +104,28 @@ vi.mock("@aws-lambda-powertools/tracer", () => ({
 }));
 
 vi.mock("@aws-lambda-powertools/metrics", () => ({
-  Metrics:    vi.fn(() => ({ addMetric: vi.fn() })),
+  Metrics:    vi.fn(function() {
+    return { addMetric: vi.fn() }
+  }),
   MetricUnit: { Count: "Count", Milliseconds: "Milliseconds", NoUnit: "NoUnit" },
+}));
+
+vi.mock("@aws-sdk/client-eventbridge", () => ({
+  EventBridgeClient: vi.fn().mockImplementation(function () {
+    return { send: ebSend };          // closes over the hoisted ebSend spy ✅
+  }),
+  PutEventsCommand: vi.fn(function(args) {
+    return { _tag: "PutEvents", input: args };
+  }),
 }));
 
 // ─── Imports — always after vi.mock() registrations ──────────────────────────
 import { UpdateCommand }   from "@aws-sdk/lib-dynamodb";
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
-
 import { handler } from "../../src/lambdas/sns-webhook/index.js";
 import { TABLE_NAME, EVENT_BUS, TEST_USER_ID } from "../__helpers__/localstack-client.js"
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
+import { mockLogger } from "../__mocks__/@aws-lambda-powertools/logger.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const EXPENSE_ID   = "exp-unit-001";

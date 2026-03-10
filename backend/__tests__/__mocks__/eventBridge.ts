@@ -1,23 +1,21 @@
 // __mocks__/@aws-sdk/client-eventbridge.ts
 import { vi } from 'vitest';
 
-// Mock instance of EventBridgeClient with spyable send method
-export const mockEventBridgeClient = {
-  send: vi.fn(),
-  // Add other methods if needed (e.g., middlewareStack, config)
-};
+const hoisted = vi.hoisted(() => {
+  const mockEventBridgeSend = vi.fn().mockResolvedValue({});
+  const EventBridgeClient = vi.fn().mockImplementation(() => ({
+    send: mockEventBridgeSend,
+  }));
+  const PutEventsCommand = vi.fn().mockImplementation((input) => input);
 
-// Mock the EventBridgeClient constructor to return the mock instance
-export const EventBridgeClient = vi.fn().mockImplementation(() => mockEventBridgeClient);
+  return { mockEventBridgeSend, EventBridgeClient, PutEventsCommand };
+});
 
-// Mock PutEventsCommand – can be used to verify command construction
-export const PutEventsCommand = vi.fn().mockImplementation((input) => ({
-  // Return a command-like object; you can also store the input for later assertions
-  input,
-  // Optionally include a command name property
-  constructor: { name: 'PutEventsCommand' },
+export const mockEventBridgeSend = hoisted.mockEventBridgeSend;
+export const EventBridgeClient = hoisted.EventBridgeClient;
+export const PutEventsCommand = hoisted.PutEventsCommand;
+
+vi.mock('@aws-sdk/client-eventbridge', () => ({
+  EventBridgeClient: hoisted.EventBridgeClient,
+  PutEventsCommand: hoisted.PutEventsCommand,
 }));
-
-// If you use other commands, add them similarly:
-// export const PutRuleCommand = vi.fn().mockImplementation((input) => ({ input, constructor: { name: 'PutRuleCommand' } }));
-// export const PutTargetsCommand = vi.fn().mockImplementation((input) => ({ input, constructor: { name: 'PutTargetsCommand' } }));
