@@ -182,23 +182,59 @@ User uploads file
       ↓
 [Frontend] POST /receipts/upload-url
       ↓
-[API] Lambda generates S3 create signed POST URL 
+[API] receipts Lambda (index.ts) generates S3 presigned POST URL
       ↓
-[Frontend] POST directly to S3 (no Lambda in the path = cheap + fast)
+[Frontend] POST directly to S3 (no Lambda in path = cheap + fast)
       ↓
-[S3 Event] Triggers receipts Lambda
+[S3 Event] Triggers receipts Lambda (index.ts)
       ↓
-[Lambda] AWS Textract StartExpenseAnalysis → polls for completion
+[Lambda] Writes scan record to DynamoDB  →  status: "processing"
       ↓
-[Lambda] Parses: merchant, amount, date, tax, line items
+[Lambda] StartExpenseAnalysis (async) with SNS NotificationChannel + JobTag
+      ↓
+    Lambda returns immediately — no polling, no timeout risk
+      ↓
+         ╔══════════════════════════════════╗
+         ║  Textract processes file (10–90s) ║
+         ╚══════════════════════════════════╝
+      ↓
+[SNS] textract-completion topic receives job completion notification
+      ↓
+[sns-webhook Lambda] Triggered by SNS
+      ↓
+[Lambda] GetExpenseAnalysis (instant — job already done)
+      ↓
+[Lambda] Parses: merchant, amount, date, tax, tip, line items
       ↓
 [Lambda] Claude 3 Haiku (Bedrock) → category + confidence + policy flags
+             ↓ (on Bedrock failure)
+         [Fallback] guessCategory() keyword matching → confidence: 85
       ↓
-[DynamoDB] Updates expense record + scan result
+[DynamoDB] Updates scan record  →  status: "completed"
+[DynamoDB] Back-fills expense record  →  merchant, amount, category (if_not_exists)
       ↓
-[EventBridge] Emits ReceiptScanCompleted event
+[EventBridge] Emits ReceiptScanCompleted
       ↓
-[Notifications Lambda] Sends email/push to user
+      ├──────────────────────────────────────────────┐
+      ↓                                              ↓
+[Notifications Lambda]                    [ws-notifier Lambda]
+Sends email / push / Pinpoint             Looks up connectionId(s) in
+to user                                   DynamoDB connections table
+                                                     ↓
+                                          [API Gateway WebSocket]
+                                          POST @connections → browser
+                                                     ↓
+                                    ┌────────────────┴────────────────┐
+                                    ↓                                 ↓
+                             [WebSocket message]               [Timeout / error]
+                             RECEIPT_SCAN_COMPLETED            fallbackHttpGet()
+                             resolves watchScanResult()        GET /receipts/{id}/scan
+                                    ↓                                 ↓
+                                    └─────────────┬───────────────────┘
+                                                  ↓
+                                    [Frontend] UI updated with
+                                    merchant, amount, category,
+                                    confidence, policy flags
 ```
 
 **Supported inputs:** JPG, PNG, HEIC, PDF  
