@@ -12,94 +12,116 @@
  *   • guessCategory   — keyword fallback when Claude is unavailable
  **/
 
-const setup = async () => {
-  const vitest = await import('vitest');
-  // Use vitest functions here, e.g., vitest.beforeAll(...)
-};
-setup();
-
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { APIGatewayProxyEventV2, S3Event } from "aws-lambda";
-
 // ─── AWS SDK mocks — must be hoisted before the handler import ─────────────────
+// --- Hoist all mock spies ---
+const {
+  mockTextractSend,
+  mockBedrockSend,
+  mockDynamoDbSend,
+  mockEventBridgeSend,
+  mockS3Send,
+  mockCreatePresignedPost,
+} = vi.hoisted(() => ({
+  mockTextractSend: vi.fn(),
+  mockBedrockSend: vi.fn(),
+  mockDynamoDbSend: vi.fn().mockResolvedValue({}),
+  mockEventBridgeSend: vi.fn().mockResolvedValue({}),
+  mockS3Send: vi.fn().mockResolvedValue({}),
+  mockCreatePresignedPost: vi.fn(),
+}));
+
 vi.mock("@aws-sdk/s3-presigned-post", () => ({
   createPresignedPost: vi.fn(),
 }));
 
 vi.mock("@aws-sdk/client-s3", () => {
   return {
-    S3Client: vi.fn().mockImplementation(() => ({
-      send: vi.fn(),
-    })),
-    GetObjectCommand: vi.fn(),
+    // Use a standard function so it has a [[Construct]] slot
+    S3Client: vi.fn().mockImplementation(function() {
+      return {
+        send: mockS3Send
+      };
+    }),
+    GetObjectCommand: vi.fn().mockImplementation(function(args) { 
+      return args; 
+    }),
   };
 });
 
-vi.mock("@aws-sdk/client-textract", () => ({
-  TextractClient: vi.fn().mockImplementation(() => ({ 
-    send: vi.fn() 
-  })),
-  StartExpenseAnalysisCommand: vi.fn(),
-  GetExpenseAnalysisCommand: vi.fn(),
-}));
+vi.mock("@aws-sdk/client-textract", () => {
+  return {
+    TextractClient: vi.fn().mockImplementation(function() {
+      return {
+        send: mockTextractSend
+      };
+    }),
+    StartExpenseAnalysisCommand: vi.fn().mockImplementation(function(args) {
+      return args;
+    }),
+  };
+})
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
   BedrockRuntimeClient: vi.fn().mockImplementation(() => ({ 
-    send: vi.fn() 
+    send: mockBedrockSend 
   })),
   InvokeModelCommand: vi.fn(),
 }));
-vi.mock("@aws-sdk/lib-dynamodb", () => ({
-  DynamoDBDocumentClient: { from: vi.fn(() => ({ send: vi.fn() })) },
-  UpdateCommand: vi.fn(),
-  PutCommand: vi.fn(),
-}));
 
-vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn(() => ({})),
-}));
+// Mock the Base Client (used with 'new')
+vi.mock("@aws-sdk/client-dynamodb", () => {
+  return {
+    DynamoDBClient: vi.fn().mockImplementation(function() {
+      return {}; // The base client object
+    }),
+  };
+});
 
-vi.mock("@aws-sdk/client-eventbridge", () => ({
-  EventBridgeClient: vi.fn(() => ({ send: vi.fn() })),
-  PutEventsCommand: vi.fn(),
-}));
+// Mock the Document Client (used with '.from()')
+vi.mock("@aws-sdk/lib-dynamodb", () => {
+  return {
+    DynamoDBDocumentClient: {
+      from: vi.fn().mockImplementation(() => ({
+        send: mockDynamoDbSend,
+      })),
+    },
+    PutCommand: vi.fn().mockImplementation((args) => args),
+    UpdateCommand: vi.fn().mockImplementation((args) => args),
+  };
+});
 
-vi.mock("@aws-lambda-powertools/logger", () => ({
-  Logger: vi.fn(() => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    appendKeys: vi.fn(),
-  })),
-}));
+vi.mock("@aws-sdk/client-eventbridge", () => {
+  return {
+    EventBridgeClient: vi.fn().mockImplementation(function () {
+      return {
+        send: mockEventBridgeSend,
+      };
+    }),
+    PutEventsCommand: vi.fn().mockImplementation((input) => ({ input })),
+  };
+});
 
-vi.mock("@aws-lambda-powertools/tracer", () => ({
-  Tracer: vi.fn(() => ({
-    getSegment: vi.fn(() => ({
-      addNewSubsegment: vi.fn(() => ({ close: vi.fn() })),
-    })),
-  })),
-}));
+import { Tracer, Metrics, Logger } from "../__mocks__/@aws-lambda-powertools/index.js";
+import { EventBridgeClient, mockEventBridgeClient } from "../__mocks__/eventBridge.js"
 
-vi.mock("@aws-lambda-powertools/metrics", () => ({
-  Metrics: vi.fn(() => ({ addMetric: vi.fn() })),
-  MetricUnit: { Count: "Count", Milliseconds: "Milliseconds", NoUnit: "NoUnit" },
-}));
 
 // ulid produces deterministic values — first two calls seeded, rest fallback
-vi.mock("ulid", () => ({
-  ulid: vi
-    .fn()
-    .mockReturnValueOnce("EXPENSE-ULID-001")
-    .mockReturnValueOnce("SCAN-ULID-001")
-    .mockImplementation(() => "ULID-FALLBACK"),
-}));
+vi.mock("ulid", () => {
+  return {
+    ulid: vi
+      .fn()
+      .mockReturnValueOnce("EXPENSE-ULID-001")
+      .mockReturnValueOnce("SCAN-ULID-001")
+      .mockImplementation(() => "ULID-FALLBACK"),
+  };
+});
 
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { APIGatewayProxyEventV2, S3Event } from "aws-lambda";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { TextractClient } from "@aws-sdk/client-textract";
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
-import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 
 import { handler } from "../../src/lambdas/receipts/index.js";
 
@@ -405,8 +427,13 @@ describe("guessCategory — keyword matching", () => {
   // Textract returns the given merchant; Bedrock throws every time.
 
   async function runWithMerchant(vendorName: string) {
-    vi.mocked(TextractClient).mock.results[0]!.value.send = vi
-      .fn()
+
+    mockTextractSend.mockReset();
+    mockBedrockSend.mockReset();
+    mockDynamoDbSend.mockReset();
+
+    // Set up the sequence of Textract responses (start, get, maybe another get)
+    mockTextractSend
       .mockResolvedValueOnce({ JobId: "job-1" })
       .mockResolvedValueOnce({
         JobStatus: "SUCCEEDED",
@@ -431,16 +458,12 @@ describe("guessCategory — keyword matching", () => {
         ],
       });
 
-    vi.mocked(BedrockRuntimeClient).mock.results[0]!.value.send = vi
-      .fn()
-      .mockRejectedValue(new Error("Bedrock unavailable"));
+    // Bedrock always throws
+    mockBedrockSend.mockRejectedValue(new Error("Bedrock unavailable"));
 
-    vi.mocked(DynamoDBDocumentClient.from).mock.results[0]!.value.send = vi
-      .fn()
-      .mockResolvedValue({});
-    vi.mocked(EventBridgeClient).mock.results[0]!.value.send = vi
-      .fn()
-      .mockResolvedValue({});
+    // DynamoDB and EventBridge succeed trivially
+    mockDynamoDbSend.mockResolvedValue({});
+    mockEventBridgeSend.mockResolvedValue({});
 
     await handler(makeS3Event());
 
