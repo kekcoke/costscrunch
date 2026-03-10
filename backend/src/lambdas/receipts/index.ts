@@ -97,7 +97,7 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
   if (process.env.DEBUG_EVENT === "true") {
     console.log("FULL_EVENT_DEBUG:", JSON.stringify(event, null, 2));
   }
-  
+
   // ─── Route by event shape ──────────────────────────────────────────────────
   if (isApiGatewayEvent(event)) {
     if (event.routeKey === "POST /receipts/upload-url") {
@@ -114,6 +114,7 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
     logger.error("Unrecognised event shape", { event });
     return err("Unknown event type", 400);
   }
+
   // ─── S3 initiation pipeline ───────────────────────────────────────────────
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
@@ -148,7 +149,7 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
       ttl:           Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30-day TTL
     };
     await ddb.send(new PutCommand({ TableName: TABLE, Item: scanRecord }));
-  logger.info("Scan record created", { status: "processing" });
+    logger.info("Scan record created", { status: "processing" });
 
     // ── 3. Start async Textract job with SNS notification on completion.
     //       Textract calls the SNS topic when done; sns-webhook.ts handles the rest.
@@ -166,6 +167,7 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
     );
 
     if (!JobId) throw new Error("Textract did not return a JobId");
+
     logger.info("Textract job started", { JobId });
     metrics.addMetric("TextractJobStarted", MetricUnit.Count, 1);
   }

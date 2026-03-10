@@ -81,8 +81,8 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
       send: mockDynamoDbSend,
     })),
   },
-  PutCommand:    vi.fn().mockImplementation((args) => args),
-  UpdateCommand: vi.fn().mockImplementation((args) => args),
+  PutCommand:    vi.fn().mockImplementation(function (args) { return args; }),
+  UpdateCommand: vi.fn().mockImplementation(function (args) { return args; })
 }));
 
 // ulid — first two calls return deterministic IDs; subsequent calls fall back.
@@ -122,8 +122,6 @@ beforeEach(() => {
   process.env.RECEIPTS_BUCKET        = BUCKET_NAME;
   process.env.TABLE_NAME             = TABLE_NAME;
   process.env.EVENT_BUS_NAME         = EVENT_BUS;
-  process.env.TEXTRACT_SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:000000000000:test-topic";
-  process.env.TEXTRACT_ROLE_ARN      = "arn:aws:iam::000000000000:role/test-role";
 });
 
 afterEach(() => {
@@ -359,7 +357,7 @@ describe("S3 handler — key validation", () => {
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.DocumentLocation?.S3Object).toMatchObject({
       Bucket: BUCKET_NAME,
-      Name:   key,
+      Name:   key, 
     });
   });
 
@@ -368,8 +366,8 @@ describe("S3 handler — key validation", () => {
 
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.NotificationChannel).toMatchObject({
-      SNSTopicArn: "arn:aws:sns:us-east-1:000000000000:test-topic",
-      RoleArn:     "arn:aws:iam::000000000000:role/test-role",
+      SNSTopicArn: "arn:aws:sns:us-east-1:123:test-topic",
+      RoleArn:     "arn:aws:iam::123:role/test-role",
     });
   });
 
