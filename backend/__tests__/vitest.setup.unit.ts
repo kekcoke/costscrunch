@@ -17,3 +17,5 @@ process.env.POWERTOOLS_METRICS_NAMESPACE = "Costscrunch/Test";
 process.env.LOG_LEVEL           = "SILENT";
 process.env.TEXTRACT_SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:123:test-topic";
 process.env.TEXTRACT_ROLE_ARN      = "arn:aws:iam::123:role/test-role";
+process.env.DEBUG_EVENT        = "true"
+process.env.WEBSOCKET_ENDPOINT = "wss://costscrunch.com/socket"
