@@ -55,9 +55,9 @@ vi.mock("@aws-sdk/client-textract", () => ({
     return { send: textractSend };
   }),
   // Store input so assertions can inspect what was passed to GetExpenseAnalysis
-  GetExpenseAnalysisCommand: vi.fn(function(args) {
-    return { _tag: "GetExpenseAnalysis", input: args }
-  })
+  GetExpenseAnalysisCommand: vi.fn(function (args) 
+    { return { _tag: "GetExpenseAnalysis", input: args }; 
+  }),
 }));
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
@@ -87,25 +87,29 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
 }));
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
-  Logger: vi.fn(() => ({
-    info:       vi.fn(),
-    warn:       vi.fn(),
-    error:      vi.fn(),
-    appendKeys: vi.fn(),
-  })),
+  Logger: vi.fn(function () {
+    return {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      appendKeys: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/tracer", () => ({
-  Tracer: vi.fn(() => ({
-    getSegment: vi.fn(() => ({
-      addNewSubsegment: vi.fn(() => ({ close: vi.fn() })),
-    })),
-  })),
+  Tracer: vi.fn(function () {
+    return {
+      getSegment: vi.fn(() => ({
+        addNewSubsegment: vi.fn(() => ({ close: vi.fn() })),
+      })),
+    };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/metrics", () => ({
-  Metrics:    vi.fn(function() {
-    return { addMetric: vi.fn() }
+  Metrics: vi.fn(function () {
+    return { addMetric: vi.fn() };
   }),
   MetricUnit: { Count: "Count", Milliseconds: "Milliseconds", NoUnit: "NoUnit" },
 }));
@@ -125,7 +129,6 @@ import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import { handler } from "../../src/lambdas/sns-webhook/index.js";
 import { TABLE_NAME, EVENT_BUS, TEST_USER_ID } from "../__helpers__/localstack-client.js"
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
-import { mockLogger } from "../__mocks__/@aws-lambda-powertools/logger.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const EXPENSE_ID   = "exp-unit-001";

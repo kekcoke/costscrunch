@@ -130,9 +130,10 @@ function guessCategory(
   merchant: string,
   lineItems: string[]
 ): { category: string; confidence: number } {
-  const text = [merchant, ...lineItems].join(" ").toLowerCase();
+  const text = [merchant, ...lineItems].join(" ");
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(kw => text.includes(kw))) {
+    // \b ensures we only match whole words. 'i' makes it case-insensitive.
+    if (keywords.some(kw => new RegExp(`\\b${kw}\\b`, "i").test(text))) {
       return { category, confidence: 85 };
     }
   }
