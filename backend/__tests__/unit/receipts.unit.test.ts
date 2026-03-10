@@ -1,132 +1,112 @@
 /**
- * analytics.unit.test.ts
+ * receipts.unit.test.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Unit tests for backend/src/lambdas/receipts/index.ts
- * Env vars are provided by jest.setup.unit.ts (no LocalStack required
+ * Env vars are provided by vitest.setup.unit.ts (no LocalStack required).
  * All AWS SDK clients are vi-mocked; nothing leaves the process.
  *
  * Coverage:
  *   • Router          — event-shape dispatch (API GW / S3 / unknown)
  *   • handleUploadUrl — auth, MIME validation, presign params, response shape
  *   • S3 key parsing  — prefix guard, segment count, PDF MIME detection
- *   • guessCategory   — keyword fallback when Claude is unavailable
+ *
+ * NOTE: guessCategory / Bedrock / EventBridge tests have been removed.
+ *       index.ts owns only the S3-initiation pipeline (write DDB record +
+ *       start Textract job). Category inference lives in sns-webhook.ts and
+ *       should be tested there.
  **/
 
-// ─── AWS SDK mocks — must be hoisted before the handler import ─────────────────
-// --- Hoist all mock spies ---
+// ─── Hoisted spies ────────────────────────────────────────────────────────────
+// vi.hoisted() runs before ANY module is evaluated, so these refs are safe to
+// close over inside the vi.mock() factory functions below.
 const {
   mockTextractSend,
-  mockBedrockSend,
   mockDynamoDbSend,
-  mockEventBridgeSend,
   mockS3Send,
   mockCreatePresignedPost,
 } = vi.hoisted(() => ({
-  mockTextractSend: vi.fn(),
-  mockBedrockSend: vi.fn(),
-  mockDynamoDbSend: vi.fn().mockResolvedValue({}),
-  mockEventBridgeSend: vi.fn().mockResolvedValue({}),
-  mockS3Send: vi.fn().mockResolvedValue({}),
-  mockCreatePresignedPost: vi.fn(),
+  mockTextractSend:       vi.fn().mockResolvedValue({ JobId: "textract-job-123" }),
+  mockDynamoDbSend:       vi.fn().mockResolvedValue({}),
+  mockS3Send:             vi.fn().mockResolvedValue({}),
+  mockCreatePresignedPost: vi.fn().mockResolvedValue({
+    url:    "https://s3.amazonaws.com/bucket",
+    fields: {},
+  }),
 }));
+
+// ─── AWS SDK mocks ────────────────────────────────────────────────────────────
+// All vi.mock() calls are hoisted by Vitest to the top of the compiled output,
+// so they always run before the handler import regardless of where they appear
+// in source. The factory closures reference the hoisted spies above.
 
 vi.mock("@aws-sdk/s3-presigned-post", () => ({
-  createPresignedPost: vi.fn(),
+  // Wire to the hoisted spy so vi.mocked(createPresignedPost) and
+  // mockCreatePresignedPost refer to the exact same function object.
+  createPresignedPost: mockCreatePresignedPost,
 }));
 
-vi.mock("@aws-sdk/client-s3", () => {
-  return {
-    // Use a standard function so it has a [[Construct]] slot
-    S3Client: vi.fn().mockImplementation(function() {
-      return {
-        send: mockS3Send
-      };
-    }),
-    GetObjectCommand: vi.fn().mockImplementation(function(args) { 
-      return args; 
-    }),
-  };
-});
-
-vi.mock("@aws-sdk/client-textract", () => {
-  return {
-    TextractClient: vi.fn().mockImplementation(function() {
-      return {
-        send: mockTextractSend
-      };
-    }),
-    StartExpenseAnalysisCommand: vi.fn().mockImplementation(function(args) {
-      return args;
-    }),
-  };
-})
-
-vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
-  BedrockRuntimeClient: vi.fn().mockImplementation(() => ({ 
-    send: mockBedrockSend 
-  })),
-  InvokeModelCommand: vi.fn(),
+vi.mock("@aws-sdk/client-s3", () => ({
+  // Must be a regular function (not arrow) to support `new S3Client()`.
+  S3Client: vi.fn().mockImplementation(function () {
+    return { send: mockS3Send };
+  }),
+  GetObjectCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
 }));
 
-// Mock the Base Client (used with 'new')
-vi.mock("@aws-sdk/client-dynamodb", () => {
-  return {
-    DynamoDBClient: vi.fn().mockImplementation(function() {
-      return {}; // The base client object
-    }),
-  };
-});
+vi.mock("@aws-sdk/client-textract", () => ({
+  // Regular function required for `new TextractClient()`.
+  TextractClient: vi.fn().mockImplementation(function () {
+    return { send: mockTextractSend };
+  }),
+  StartExpenseAnalysisCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
+}));
 
-// Mock the Document Client (used with '.from()')
-vi.mock("@aws-sdk/lib-dynamodb", () => {
-  return {
-    DynamoDBDocumentClient: {
-      from: vi.fn().mockImplementation(() => ({
-        send: mockDynamoDbSend,
-      })),
-    },
-    PutCommand: vi.fn().mockImplementation((args) => args),
-    UpdateCommand: vi.fn().mockImplementation((args) => args),
-  };
-});
+// DynamoDBClient is instantiated with `new` and then passed to
+// DynamoDBDocumentClient.from(). Both must be mocked consistently.
+vi.mock("@aws-sdk/client-dynamodb", () => ({
+  DynamoDBClient: vi.fn().mockImplementation(function () {
+    return {}; // opaque base-client; only DynamoDBDocumentClient.send matters
+  }),
+}));
 
-vi.mock("@aws-sdk/client-eventbridge", () => {
-  return {
-    EventBridgeClient: vi.fn().mockImplementation(function () {
-      return {
-        send: mockEventBridgeSend,
-      };
-    }),
-    PutEventsCommand: vi.fn().mockImplementation((input) => ({ input })),
-  };
-});
+vi.mock("@aws-sdk/lib-dynamodb", () => ({
+  DynamoDBDocumentClient: {
+    // .from() is called at module load time; return an object whose .send is
+    // the shared hoisted spy so every test can assert on mockDynamoDbSend.
+    from: vi.fn().mockImplementation(() => ({
+      send: mockDynamoDbSend,
+    })),
+  },
+  PutCommand:    vi.fn().mockImplementation((args) => args),
+  UpdateCommand: vi.fn().mockImplementation((args) => args),
+}));
 
-import { Tracer, Metrics, Logger } from "../__mocks__/@aws-lambda-powertools/index.js";
-import { EventBridgeClient, mockEventBridgeClient } from "../__mocks__/eventBridge.js"
+// ulid — first two calls return deterministic IDs; subsequent calls fall back.
+vi.mock("ulid", () => ({
+  ulid: vi
+    .fn()
+    .mockReturnValueOnce("EXPENSE-ULID-001")
+    .mockReturnValueOnce("SCAN-ULID-001")
+    .mockImplementation(() => "ULID-FALLBACK"),
+}));
 
-
-// ulid produces deterministic values — first two calls seeded, rest fallback
-vi.mock("ulid", () => {
-  return {
-    ulid: vi
-      .fn()
-      .mockReturnValueOnce("EXPENSE-ULID-001")
-      .mockReturnValueOnce("SCAN-ULID-001")
-      .mockImplementation(() => "ULID-FALLBACK"),
-  };
-});
-
+// ─── Vitest + type imports ────────────────────────────────────────────────────
+// These must appear after vi.mock() blocks (or at the very least, Vitest's
+// transform will hoist the vi.mock calls above them automatically).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { APIGatewayProxyEventV2, S3Event } from "aws-lambda";
+import type { S3Event } from "aws-lambda";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
-import { DynamoDBDocumentClient, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { TextractClient } from "@aws-sdk/client-textract";
-import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { TextractClient, StartExpenseAnalysisCommand } from "@aws-sdk/client-textract";
 
+// ─── Subject under test ───────────────────────────────────────────────────────
 import { handler } from "../../src/lambdas/receipts/index.js";
 
-// Pull shared constants from localstack-client so names stay in sync across
-// the whole test suite even though we never actually connect to LocalStack here.
+// ─── Test helpers ─────────────────────────────────────────────────────────────
 import {
   makeApiEvent,
   TEST_USER_ID,
@@ -135,13 +115,13 @@ import {
   EVENT_BUS,
 } from "../__helpers__/localstack-client.js";
 
-// ─── Env — mirrors jest.setup.unit.ts values ──────────────────────────────────
-// jest.setup.unit.ts sets these globally; the beforeEach below re-asserts them
-// so this file is also runnable in isolation (e.g. vitest --reporter=verbose).
+// ─── Env setup ────────────────────────────────────────────────────────────────
+// Re-assert on every test so the suite is runnable in isolation
+// (vitest.setup.unit.ts may already set these globally).
 beforeEach(() => {
-  process.env.RECEIPTS_BUCKET  = BUCKET_NAME;
-  process.env.TABLE_NAME       = TABLE_NAME;
-  process.env.EVENT_BUS_NAME   = EVENT_BUS;
+  process.env.RECEIPTS_BUCKET        = BUCKET_NAME;
+  process.env.TABLE_NAME             = TABLE_NAME;
+  process.env.EVENT_BUS_NAME         = EVENT_BUS;
   process.env.TEXTRACT_SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:000000000000:test-topic";
   process.env.TEXTRACT_ROLE_ARN      = "arn:aws:iam::000000000000:role/test-role";
 });
@@ -150,7 +130,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// ─── Internal event factories ─────────────────────────────────────────────────
+// ─── Event factories ──────────────────────────────────────────────────────────
+
 /**
  * Wraps localstack-client's makeApiEvent with receipt-specific defaults.
  * Only pass overrides that differ from the happy-path POST /receipts/upload-url.
@@ -158,17 +139,17 @@ afterEach(() => {
 function makeUploadUrlEvent(
   overrides: Partial<{
     contentType: string;
-    filename: string;
-    userId: string;
-    headers: Record<string, string>;
+    filename:    string;
+    userId:      string;
+    headers:     Record<string, string>;
   }> = {}
 ) {
   const { contentType = "image/jpeg", filename = "receipt.jpg", ...rest } = overrides;
   return makeApiEvent({
     routeKey: "POST /receipts/upload-url",
-    method: "POST",
-    path: "/receipts/upload-url",
-    body: { contentType, filename },
+    method:   "POST",
+    path:     "/receipts/upload-url",
+    body:     { contentType, filename },
     ...rest,
   });
 }
@@ -178,14 +159,14 @@ function makeS3Event(keyOverride?: string): S3Event {
   return {
     Records: [
       {
-        eventSource:         "aws:s3",
-        eventName:           "ObjectCreated:Put",
-        awsRegion:           "us-east-1",
-        eventTime:           "2025-01-01T00:00:00.000Z",
-        eventVersion:        "2.1",
-        userIdentity:        { principalId: TEST_USER_ID },
-        requestParameters:   { sourceIPAddress: "1.2.3.4" },
-        responseElements:    { "x-amz-request-id": "req-1", "x-amz-id-2": "id2" },
+        eventSource:       "aws:s3",
+        eventName:         "ObjectCreated:Put",
+        awsRegion:         "us-east-1",
+        eventTime:         "2025-01-01T00:00:00.000Z",
+        eventVersion:      "2.1",
+        userIdentity:      { principalId: TEST_USER_ID },
+        requestParameters: { sourceIPAddress: "1.2.3.4" },
+        responseElements:  { "x-amz-request-id": "req-1", "x-amz-id-2": "id2" },
         s3: {
           s3SchemaVersion: "1.0",
           configurationId: "test",
@@ -206,81 +187,18 @@ function makeS3Event(keyOverride?: string): S3Event {
   };
 }
 
-// ─── Mock service helpers ─────────────────────────────────────────────────────
-function makeTextractSend(jobStatus: "SUCCEEDED" | "FAILED" = "SUCCEEDED") {
-  return vi
-    .fn()
-    .mockResolvedValueOnce({ JobId: "textract-job-123" }) // StartExpenseAnalysis
-    .mockResolvedValueOnce({                               // GetExpenseAnalysis poll
-      JobStatus:        jobStatus,
-      StatusMessage:    jobStatus === "FAILED" ? "Bad document" : undefined,
-      ExpenseDocuments: jobStatus === "SUCCEEDED" ? [mockExpenseDocument()] : [],
-    })
-    .mockResolvedValueOnce({                               // GetExpenseAnalysis results fetch
-      ExpenseDocuments: [mockExpenseDocument()],
-    });
-}
-
-function mockExpenseDocument() {
-  return {
-    SummaryFields: [
-      { Type: { Text: "VENDOR_NAME" },         ValueDetection: { Text: "Starbucks" } },
-      { Type: { Text: "TOTAL" },               ValueDetection: { Text: "$12.50" } },
-      { Type: { Text: "INVOICE_RECEIPT_DATE" }, ValueDetection: { Text: "2025-01-01" } },
-      { Type: { Text: "TAX" },                 ValueDetection: { Text: "$1.00" } },
-    ],
-    LineItemGroups: [
-      {
-        LineItems: [
-          {
-            LineItemExpenseFields: [
-              { Type: { Text: "ITEM" }, ValueDetection: { Text: "Latte" } },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function makeBedrockSend() {
-  const payload = {
-    category:      "Meals",
-    confidence:    92,
-    suggestedTags: ["coffee", "meals"],
-    policyFlags:   [],
-  };
-  const encoded = new TextEncoder().encode(
-    JSON.stringify({ content: [{ text: JSON.stringify(payload) }] })
-  );
-  return vi.fn().mockResolvedValue({ body: encoded });
-}
-
-
-// Convenience: wire all services for a successful S3 pipeline run
-function wireHappyPath() {
-  vi.mocked(TextractClient).mock.results[0]!.value.send = makeTextractSend();
-  vi.mocked(BedrockRuntimeClient).mock.results[0]!.value.send = makeBedrockSend();
-  vi.mocked(DynamoDBDocumentClient.from).mock.results[0]!.value.send = vi.fn().mockResolvedValue({});
-  vi.mocked(EventBridgeClient).mock.results[0]!.value.send = vi.fn().mockResolvedValue({});
-}
-
 // ─── UNIT: Router ─────────────────────────────────────────────────────────────
 describe("Router — event-shape dispatch", () => {
   it("routes POST /receipts/upload-url to handleUploadUrl", async () => {
-    vi.mocked(createPresignedPost).mockResolvedValue({
-      url:    "https://s3.amazonaws.com/bucket",
-      fields: {},
-    });
-
+    // mockCreatePresignedPost already has a default resolved value from vi.hoisted.
     const result = await handler(makeUploadUrlEvent());
     expect(result).toMatchObject({ statusCode: 200 });
   });
 
   it("returns 404 for an unmatched API Gateway routeKey", async () => {
     const result = await handler(
-      makeApiEvent({ routeKey: "GET /receipts", method: "GET", path: "/receipts", headers: { } })
-    ); 
+      makeApiEvent({ routeKey: "GET /receipts", method: "GET", path: "/receipts", headers: {} })
+    );
     expect(result).toMatchObject({ statusCode: 404 });
     expect(JSON.parse((result as any).body).error).toBe("Not found");
   });
@@ -295,8 +213,7 @@ describe("Router — event-shape dispatch", () => {
 // ─── UNIT: handleUploadUrl ────────────────────────────────────────────────────
 describe("handleUploadUrl", () => {
   it("returns 401 when JWT authorizer claims are absent", async () => {
-    const event = makeUploadUrlEvent({ userId: undefined as any });
-    // Simulate missing authorizer entirely
+    const event = makeUploadUrlEvent();
     (event.requestContext as any).authorizer = undefined;
 
     const result = await handler(event);
@@ -313,21 +230,16 @@ describe("handleUploadUrl", () => {
   it.each(["image/jpeg", "image/png", "application/pdf"])(
     "accepts allowed MIME type: %s",
     async (contentType) => {
-      vi.mocked(createPresignedPost).mockResolvedValue({
-        url: "https://s3.example.com",
-        fields: {},
-      });
-      const ext    = contentType === "application/pdf" ? "pdf" : "jpg";
+      const ext = contentType === "application/pdf" ? "pdf" : "jpg";
       const result = await handler(makeUploadUrlEvent({ contentType, filename: `receipt.${ext}` }));
       expect(result).toMatchObject({ statusCode: 200 });
     }
   );
 
   it("passes correct bucket, size-limit, and Content-Type conditions to createPresignedPost", async () => {
-    vi.mocked(createPresignedPost).mockResolvedValue({ url: "https://s3.example.com", fields: {} });
-
     await handler(makeUploadUrlEvent());
 
+    // createPresignedPost IS mockCreatePresignedPost — same function reference.
     expect(createPresignedPost).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -342,8 +254,6 @@ describe("handleUploadUrl", () => {
   });
 
   it("embeds userId in x-amz-meta-userid presign field", async () => {
-    vi.mocked(createPresignedPost).mockResolvedValue({ url: "https://s3.example.com", fields: {} });
-
     await handler(makeUploadUrlEvent());
 
     expect(createPresignedPost).toHaveBeenCalledWith(
@@ -355,7 +265,7 @@ describe("handleUploadUrl", () => {
   });
 
   it("response body contains url, fields, key, expenseId, and scanId", async () => {
-    vi.mocked(createPresignedPost).mockResolvedValue({
+    mockCreatePresignedPost.mockResolvedValueOnce({
       url:    "https://s3.amazonaws.com/bucket",
       fields: { policy: "abc" },
     });
@@ -373,8 +283,6 @@ describe("handleUploadUrl", () => {
   });
 
   it("key follows receipts/{userId}/{expenseId}/{scanId}/{filename} format", async () => {
-    vi.mocked(createPresignedPost).mockResolvedValue({ url: "https://s3.example.com", fields: {} });
-
     const result = await handler(makeUploadUrlEvent());
     const { key } = JSON.parse((result as any).body);
     const parts   = key.split("/");
@@ -386,7 +294,7 @@ describe("handleUploadUrl", () => {
   });
 
   it("returns 500 when createPresignedPost throws", async () => {
-    vi.mocked(createPresignedPost).mockRejectedValue(new Error("S3 unavailable"));
+    mockCreatePresignedPost.mockRejectedValueOnce(new Error("S3 unavailable"));
 
     const result = await handler(makeUploadUrlEvent());
     expect(result).toMatchObject({ statusCode: 500 });
@@ -394,24 +302,39 @@ describe("handleUploadUrl", () => {
   });
 });
 
-// ─── UNIT: S3 key parsing ─────────────────────────────────────────────────────
+// ─── UNIT: S3 initiation pipeline ────────────────────────────────────────────
 describe("S3 handler — key validation", () => {
   it("skips records whose key does not start with receipts/", async () => {
-    // No Textract call should be made — handler must not throw
     await expect(
       handler(makeS3Event(`uploads/${TEST_USER_ID}/file.jpg`))
     ).resolves.toBeUndefined();
+
+    // DDB and Textract must not be called for invalid keys.
+    expect(mockDynamoDbSend).not.toHaveBeenCalled();
+    expect(mockTextractSend).not.toHaveBeenCalled();
   });
 
   it("skips records with fewer than 5 key segments", async () => {
     await expect(
       handler(makeS3Event(`receipts/${TEST_USER_ID}/expense-001`))
     ).resolves.toBeUndefined();
+
+    expect(mockDynamoDbSend).not.toHaveBeenCalled();
+    expect(mockTextractSend).not.toHaveBeenCalled();
+  });
+
+  it("writes a DynamoDB scan record with status 'processing' for a valid key", async () => {
+    await handler(makeS3Event());
+
+    // PutCommand receives the item as its sole constructor argument (mocked as
+    // an identity function), so mock.calls[0][0] is the raw { TableName, Item }.
+    const putArg = vi.mocked(PutCommand).mock.calls[0]?.[0] as any;
+    expect(putArg?.Item?.status).toBe("processing");
+    expect(putArg?.Item?.userId).toBe(TEST_USER_ID);
+    expect(putArg?.TableName).toBe(TABLE_NAME);
   });
 
   it("resolves MIME type to application/pdf for .pdf keys", async () => {
-    wireHappyPath();
-
     await handler(
       makeS3Event(`receipts/${TEST_USER_ID}/exp-001/scan-001/receipt.pdf`)
     );
@@ -419,76 +342,43 @@ describe("S3 handler — key validation", () => {
     const putArg = vi.mocked(PutCommand).mock.calls[0]?.[0] as any;
     expect(putArg?.Item?.mimeType).toBe("application/pdf");
   });
-});
 
-// ─── UNIT: guessCategory keyword fallback ────────────────────────────────────
-describe("guessCategory — keyword matching", () => {
-  // Exercises the fallback branch that runs when Claude/Bedrock is unavailable.
-  // Textract returns the given merchant; Bedrock throws every time.
+  it("resolves MIME type to image/jpeg for non-pdf keys", async () => {
+    await handler(
+      makeS3Event(`receipts/${TEST_USER_ID}/exp-001/scan-001/receipt.jpg`)
+    );
 
-  async function runWithMerchant(vendorName: string) {
+    const putArg = vi.mocked(PutCommand).mock.calls[0]?.[0] as any;
+    expect(putArg?.Item?.mimeType).toBe("image/jpeg");
+  });
 
-    mockTextractSend.mockReset();
-    mockBedrockSend.mockReset();
-    mockDynamoDbSend.mockReset();
+  it("starts a Textract job with the correct bucket and key", async () => {
+    const key = `receipts/${TEST_USER_ID}/exp-001/scan-001/receipt.jpg`;
+    await handler(makeS3Event(key));
 
-    // Set up the sequence of Textract responses (start, get, maybe another get)
-    mockTextractSend
-      .mockResolvedValueOnce({ JobId: "job-1" })
-      .mockResolvedValueOnce({
-        JobStatus: "SUCCEEDED",
-        ExpenseDocuments: [
-          {
-            SummaryFields: [
-              { Type: { Text: "VENDOR_NAME" }, ValueDetection: { Text: vendorName } },
-              { Type: { Text: "TOTAL" },       ValueDetection: { Text: "$10.00" } },
-            ],
-            LineItemGroups: [],
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        ExpenseDocuments: [
-          {
-            SummaryFields: [
-              { Type: { Text: "VENDOR_NAME" }, ValueDetection: { Text: vendorName } },
-            ],
-            LineItemGroups: [],
-          },
-        ],
-      });
+    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
+    expect(startArg?.DocumentLocation?.S3Object).toMatchObject({
+      Bucket: BUCKET_NAME,
+      Name:   key,
+    });
+  });
 
-    // Bedrock always throws
-    mockBedrockSend.mockRejectedValue(new Error("Bedrock unavailable"));
-
-    // DynamoDB and EventBridge succeed trivially
-    mockDynamoDbSend.mockResolvedValue({});
-    mockEventBridgeSend.mockResolvedValue({});
-
+  it("passes SNS topic ARN and role ARN to Textract notification channel", async () => {
     await handler(makeS3Event());
 
-    const completedUpdate = vi
-      .mocked(UpdateCommand)
-      .mock.calls.find(
-        ([arg]: any[]) => arg.ExpressionAttributeValues?.[":status"] === "completed"
-      );
-    return (completedUpdate as any[])[0].ExpressionAttributeValues[":ai"] as {
-      category: string;
-      confidence: number;
-    };
-  }
+    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
+    expect(startArg?.NotificationChannel).toMatchObject({
+      SNSTopicArn: "arn:aws:sns:us-east-1:000000000000:test-topic",
+      RoleArn:     "arn:aws:iam::000000000000:role/test-role",
+    });
+  });
 
-  it.each([
-    ["Starbucks",    "Meals"],
-    ["Marriott",     "Travel"],
-    ["Whole Foods",  "Groceries"],
-    ["GitHub",       "Software"],
-    ["Staples",      "Office"],
-    ["Best Buy",     "Equipment"],
-    ["Unknown Corp", "Other"],
-  ])('merchant "%s" → category "%s"', async (vendor, expected) => {
-    const ai = await runWithMerchant(vendor);
-    expect(ai.category).toBe(expected);
-    expect(ai.confidence).toBe(expected === "Other" ? 50 : 85);
+  it("tags the Textract job with expenseId/scanId from the S3 key", async () => {
+    await handler(
+      makeS3Event(`receipts/${TEST_USER_ID}/expense-001/scan-001/receipt.jpg`)
+    );
+
+    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
+    expect(startArg?.JobTag).toBe("expense-001/scan-001");
   });
 });
