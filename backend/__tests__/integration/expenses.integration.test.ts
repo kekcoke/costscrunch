@@ -10,15 +10,15 @@
 import { PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import {
   ddbDoc,
-  TABLE_NAME,
+  TABLE_NAME_MAIN,
   TEST_USER_ID,
   makeApiEvent,
   cleanTable,
-} from "../__helpers__/localstack-client";
+} from "../__helpers__/localstack-client.js";
 
 console.log("DEBUG: Current Region Env:", process.env.AWS_REGION);
 // Re-point the Lambda's DDB client at LocalStack via env vars (set in jest.setup.integration.ts)
-import { rawHandler as handler } from "../../src/lambdas/expenses";
+import { rawHandler as handler } from "../../src/lambdas/expenses/index.js";
 
 const UID = TEST_USER_ID;
 
@@ -80,7 +80,7 @@ describe("GET /expenses — list from real DynamoDB", () => {
       { pk: `USER#${UID}`, sk: "EXPENSE#03", expenseId: "03", ownerId: UID, merchant: "AWS",       amount: 1200, amountUSD: 1200, currency: "USD", category: "Software", date: "2026-02-05", status: "approved", tags: [], entityContext: "PERSONAL", entityType: "EXPENSE", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), gsi1pk: "STATUS#approved", gsi1sk: "DATE#2026-02-05#03", gsi2pk: "CATEGORY#Software", gsi2sk: "DATE#2026-02-05#03" },
     ];
     for (const item of items) {
-      await ddbDoc.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
+      await ddbDoc.send(new PutCommand({ TableName: TABLE_NAME_MAIN, Item: item }));
     }
   });
 
@@ -189,7 +189,7 @@ describe("DELETE /expenses/{id}", () => {
     // Seed an expense owned by a DIFFERENT user
     await ddbDoc.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME_MAIN,
         Item: {
           pk: `USER#${UID}`,
           sk: "EXPENSE#OTHER-OWN",

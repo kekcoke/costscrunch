@@ -19,7 +19,7 @@ import type {
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
 });
-const TABLE = process.env.TABLE_NAME!;
+const TABLE = process.env.TABLE_NAME_MAIN!;
 
 // ─── Powertools ───────────────────────────────────────────────────────────────
 const logger = new Logger({ serviceName: "expenses" });

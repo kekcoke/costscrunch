@@ -4,55 +4,53 @@ import { resolve } from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      // Mirrors jest.config.ts moduleNameMapper entries
       "@shared": resolve(__dirname, "src/shared"),
+      "@config": resolve(__dirname, "__tests__/__config__"),
       "@helpers": resolve(__dirname, "__tests__/__helpers__"),
+      "@mocks": resolve(__dirname, "__tests__/__mocks__"),
     },
   },
 
   test: {
-    // NodeNext ESM — replaces ts-jest + extensionsToTreatAsEsm
     environment: "node",
 
-    // Equivalent to jest testTimeout: 20000
+    // Equivalent to jest testTimeout
     testTimeout: 20000,
 
-    // Equivalent to jest maxWorkers: 1
+    // Equivalent to jest maxWorkers
     maxWorkers: 1,
 
-    // Register apis globally
     globals: true,
 
-    env: {
-      CONN_TABLE_NAME: "test-table-connections"
-    },
+    // Global setup for all tests (loads .env.test)
+    // runs ONCE before workers, always honoured by projects
+    globalSetup: [resolve(__dirname, "__tests__/setup/setupTestEnv.ts")],
 
-    // --- Unit project ---
-    // Run vitest with --project=unit or --project=integration to isolate suites.
-    // Each project gets its own name, include glob, and setupFiles — mirroring
-    // jest's "projects" array without requiring workspace InlineConfig.
+    // --- Test projects ---
     projects: [
       {
         test: {
           name: "unit",
-          globals: true,
           include: ["**/__tests__/unit/**/*.test.ts"],
-          setupFiles: ["__tests__/vitest.setup.unit.ts"],
-          environment: "node",
+          globals: true,
+          setupFiles: [
+            resolve(__dirname, "__tests__/setup/vitest.setup.unit.ts"),
+          ],
         },
       },
       {
         test: {
           name: "integration",
-          globals: true,
           include: ["**/__tests__/integration/**/*.test.ts"],
-          setupFiles: ["__tests__/vitest.setup.integration.ts"],
-          environment: "node",
+          globals: true,
+          setupFiles: [
+            resolve(__dirname, "__tests__/setup/vitest.setup.integration.ts"),
+          ],
         },
       },
     ],
 
-    // --- Coverage (replaces collectCoverageFrom + coverageThreshold) ---
+    // --- Coverage ---
     coverage: {
       provider: "v8",
       include: [
@@ -70,4 +68,4 @@ export default defineConfig({
       },
     },
   },
-})
+});

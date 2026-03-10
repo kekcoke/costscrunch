@@ -8,7 +8,7 @@ import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import type { ApiEvent } from "../../shared/models/types";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const TABLE = process.env.TABLE_NAME!;
+const TABLE = process.env.TABLE_NAME_MAIN!;
 const logger = new Logger({ serviceName: "analytics" });
 const metrics = new Metrics({ namespace: "CostsCrunch" });
 

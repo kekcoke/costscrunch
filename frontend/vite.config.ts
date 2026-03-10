@@ -46,7 +46,7 @@ export default defineConfig(() => ({
   test: {
     globals:      true,
     environment: "jsdom",
-    setupFiles:  "__tests__/setup.ts", // ensure this file exists or change to .js
+    setupFiles:  "__tests__/setup/setupTestEnv.ts", // ensure this file exists or change to .js
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

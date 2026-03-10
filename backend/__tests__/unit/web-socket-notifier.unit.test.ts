@@ -97,15 +97,15 @@ import {
 import { QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 
 import { handler } from "../../src/lambdas/web-socket-notifier/index.js";
-import { TEST_USER_ID, TABLE_NAME } from "../__helpers__/localstack-client.js";
+import { TEST_USER_ID } from "../__helpers__/localstack-client.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CONN_TABLE = `${TABLE_NAME}-connections`;
+const TABLE_NAME_CONNECTIONS      = process.env.TABLE_NAME_CONNECTIONS;
+const TABLE_NAME_MAIN = process.env.TABLE_NAME_MAIN;
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 beforeEach(() => {
   process.env.WEBSOCKET_ENDPOINT = "https://abc123.execute-api.us-east-1.amazonaws.com/prod";
-  process.env.CONN_TABLE_NAME    = CONN_TABLE;
 
   // Reset spies to clean state then set safe defaults.
   apiGwSend.mockReset().mockResolvedValue({});
@@ -182,13 +182,13 @@ describe("getConnectionIds", () => {
     vi.unstubAllEnvs(); 
   });
 
-  it("queries CONN_TABLE_NAME with WS_CONN#{userId} pk", async () => {
+  it("queries TABLE_NAME_CONNECTIONS with WS_CONN#{userId} pk", async () => {
     wireConnections([]);
 
     await handler(makeEbEvent());
 
     const [queryArg] = vi.mocked(QueryCommand).mock.calls[0] as any[];
-    expect(queryArg.TableName).toBe(CONN_TABLE);
+    expect(queryArg.TableName).toBe(TABLE_NAME_CONNECTIONS);
     expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`WS_CONN#${TEST_USER_ID}`);
     expect(queryArg.KeyConditionExpression).toMatch(/pk\s*=\s*:pk/);
   });

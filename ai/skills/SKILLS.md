@@ -25,8 +25,10 @@ costscrunch/
 │   │   │   └── localstack-client.ts                  ← Setup mock cloud environment
 │   │   ├── integration/                              ← Integration tests
 │   │   │   └── expenses.integration.test.ts
-│   │   ├── vitest.setup.integration.ts
-│   │   ├── vitest.setup.unit.ts
+│   │   └── setup/                                    ← Setup tests
+│   │       ├── setupEnv.ts
+│   │       ├── vitest.setup.integration.ts
+│   │       └── vitest.setup.unit.ts
 │   │   └── unit/                                     ← Unit tests
 │   │       ├── analytics.unit.test.ts
 │   │       ├── expenses.unit.test.ts

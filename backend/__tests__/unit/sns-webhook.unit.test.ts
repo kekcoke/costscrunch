@@ -127,19 +127,18 @@ vi.mock("@aws-sdk/client-eventbridge", () => ({
 import { UpdateCommand }   from "@aws-sdk/lib-dynamodb";
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import { handler } from "../../src/lambdas/sns-webhook/index.js";
-import { TABLE_NAME, EVENT_BUS, TEST_USER_ID } from "../__helpers__/localstack-client.js"
+import { TEST_USER_ID } from "../__helpers__/localstack-client.js"
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EXPENSE_ID   = "exp-unit-001";
-const SCAN_ID      = "scan-unit-001";
-const TEXTRACT_JOB = "textract-job-unit-001";
+const TABLE_NAME_MAIN = process.env.TABLE_NAME_MAIN;
+const EVENT_BUS_NAME  = process.env.EVENT_BUS_NAME;
+const EXPENSE_ID      = "exp-unit-001";
+const SCAN_ID         = "scan-unit-001";
+const TEXTRACT_JOB    = "textract-job-unit-001";
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 beforeEach(() => {
-  process.env.TABLE_NAME     = TABLE_NAME;
-  process.env.EVENT_BUS_NAME = EVENT_BUS;
-
   // mockReset() clears call history + removes any mock implementation, then we
   // set safe defaults so tests that don't call a specific wire helper don't get
   // unhandled rejections from unrelated spies.
@@ -544,7 +543,7 @@ describe("emitScanCompleted — EventBridge event", () => {
     await handler(makeSnsEvent());
 
     const [cmd] = vi.mocked(PutEventsCommand).mock.calls[0] as any[];
-    expect(cmd.Entries[0].EventBusName).toBe(EVENT_BUS);
+    expect(cmd.Entries[0].EventBusName).toBe(EVENT_BUS_NAME);
   });
 
   it("does not call ebSend when Textract status is FAILED", async () => {

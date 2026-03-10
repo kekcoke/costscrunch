@@ -13,7 +13,7 @@ import type { EventBridgeEvent } from "aws-lambda";
 const ses = new SESClient({});
 const sns = new SNSClient({});
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const TABLE = process.env.TABLE_NAME!;
+const TABLE = process.env.TABLE_NAME_MAIN!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;
 
 const logger = new Logger({ serviceName: "notifications" });

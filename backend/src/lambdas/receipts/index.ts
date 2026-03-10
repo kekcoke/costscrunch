@@ -27,7 +27,7 @@ const s3 = new S3Client({});
 const textract = new TextractClient({});
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-const TABLE         = process.env.TABLE_NAME!;
+const TABLE         = process.env.TABLE_NAME_MAIN!;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // SNS topic + IAM role Textract will publish to on job completion
@@ -68,7 +68,7 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
   const key = `receipts/${userId}/${expenseId}/${scanId}/${body.filename}`;
 
   const { url, fields } = await createPresignedPost(s3, {
-    Bucket: process.env.RECEIPTS_BUCKET!,
+    Bucket: process.env.BUCKET_RECEIPTS_NAME!,
     Key: key,
     Conditions: [
       ["content-length-range", 1, MAX_FILE_SIZE],

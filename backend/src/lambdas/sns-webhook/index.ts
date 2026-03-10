@@ -41,7 +41,7 @@ const bedrock  = new BedrockRuntimeClient({ region: "us-east-1" });
 const ddb      = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const eb       = new EventBridgeClient({});
 
-const TABLE         = process.env.TABLE_NAME!;
+const TABLE         = process.env.TABLE_NAME_MAIN!;
 const EVENT_BUS     = process.env.EVENT_BUS_NAME!;
 const BEDROCK_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0";
 

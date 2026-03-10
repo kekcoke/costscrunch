@@ -25,8 +25,11 @@
     "src/**/*.ts", 
     "__tests__/**/*.ts", 
     "vitest.config.ts", 
+     "__tests__/__config__/**/*.ts",
     "__tests__/__helpers__/**/*.ts",
-    "__tests__/__mocks__/**/*.ts"
+    "__tests__/__mocks__/**/*.ts",
+    "__tests__/setup/**/*.ts"
+
 
   ],
   "exclude": ["node_modules", "dist", "dist-test"]

@@ -109,20 +109,17 @@ import { handler } from "../../src/lambdas/receipts/index.js";
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 import {
   makeApiEvent,
-  TEST_USER_ID,
-  BUCKET_NAME,
-  TABLE_NAME,
-  EVENT_BUS,
+  TEST_USER_ID
 } from "../__helpers__/localstack-client.js";
 
 // ─── Env setup ────────────────────────────────────────────────────────────────
 // Re-assert on every test so the suite is runnable in isolation
 // (vitest.setup.unit.ts may already set these globally).
-beforeEach(() => {
-  process.env.RECEIPTS_BUCKET        = BUCKET_NAME;
-  process.env.TABLE_NAME             = TABLE_NAME;
-  process.env.EVENT_BUS_NAME         = EVENT_BUS;
-});
+const TABLE_NAME_MAIN         = process.env.TABLE_NAME_MAIN;
+const EVENT_BUS_NAME          = process.env.EVENT_BUS_NAME;
+const SNS_TEXTRACT_TOPIC_ARN  = process.env.SNS_TEXTRACT_TOPIC_ARN;
+const SNS_TEXTRACT_ROLE_ARN   = process.env.SNS_TEXTRACT_ROLE_ARN; 
+const BUCKET_RECEIPTS_NAME    = process.env.BUCKET_RECEIPTS_NAME;
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -169,9 +166,9 @@ function makeS3Event(keyOverride?: string): S3Event {
           s3SchemaVersion: "1.0",
           configurationId: "test",
           bucket: {
-            name:          BUCKET_NAME,
+            name:          BUCKET_RECEIPTS_NAME,
             ownerIdentity: { principalId: "owner" },
-            arn:           `arn:aws:s3:::${BUCKET_NAME}`,
+            arn:           `arn:aws:s3:::${BUCKET_RECEIPTS_NAME}`,
           },
           object: {
             key,
@@ -241,7 +238,7 @@ describe("handleUploadUrl", () => {
     expect(createPresignedPost).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        Bucket:     BUCKET_NAME,
+        Bucket:     BUCKET_RECEIPTS_NAME,
         Conditions: expect.arrayContaining([
           ["content-length-range", 1, 10 * 1024 * 1024],
           ["eq", "$Content-Type", "image/jpeg"],
@@ -329,7 +326,7 @@ describe("S3 handler — key validation", () => {
     const putArg = vi.mocked(PutCommand).mock.calls[0]?.[0] as any;
     expect(putArg?.Item?.status).toBe("processing");
     expect(putArg?.Item?.userId).toBe(TEST_USER_ID);
-    expect(putArg?.TableName).toBe(TABLE_NAME);
+    expect(putArg?.TableName).toBe(TABLE_NAME_MAIN);
   });
 
   it("resolves MIME type to application/pdf for .pdf keys", async () => {
@@ -356,7 +353,7 @@ describe("S3 handler — key validation", () => {
 
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.DocumentLocation?.S3Object).toMatchObject({
-      Bucket: BUCKET_NAME,
+      Bucket: BUCKET_RECEIPTS_NAME,
       Name:   key, 
     });
   });
@@ -366,8 +363,8 @@ describe("S3 handler — key validation", () => {
 
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.NotificationChannel).toMatchObject({
-      SNSTopicArn: "arn:aws:sns:us-east-1:123:test-topic",
-      RoleArn:     "arn:aws:iam::123:role/test-role",
+      SNSTopicArn: SNS_TEXTRACT_TOPIC_ARN,
+      RoleArn:     SNS_TEXTRACT_ROLE_ARN,
     });
   });
 

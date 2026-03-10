@@ -34,7 +34,7 @@ const wsClient = new ApiGatewayManagementApiClient({
   endpoint: process.env.WEBSOCKET_ENDPOINT!,
 });
 
-const CONN_TABLE = process.env.CONN_TABLE_NAME!; // separate from the main table
+const CONN_TABLE = process.env.TABLE_NAME_CONNECTIONS!; // separate from the main table
 
 const logger  = new Logger({ serviceName: "receipts-ws-notifier" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "receipts-ws-notifier" });

@@ -51,10 +51,16 @@ export const eb  = new EventBridgeClient(BASE_CONFIG);
 export const ssm = new SSMClient(BASE_CONFIG);
 
 // ─── Constants matching the seed script ───────────────────────────────────────
-export const TABLE_NAME  = process.env.TABLE_NAME  ?? "costscrunch-dev-main";
-export const BUCKET_NAME = process.env.BUCKET_NAME ?? "costscrunch-dev-receipts-000000000000";
-export const EVENT_BUS   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev";
+export const TABLE_NAME_MAIN  = process.env.TABLE_NAME_MAIN  ?? "costscrunch-dev-main";
+export const TABLE_NAME_CONNECTIONS  = "costscrunch-dev-connections"
+export const BUCKET_RECEIPTS_NAME = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
+export const EVENT_BUS_NAME   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev-events";
+export const REDIS_HOST  = ""
+export const REDIS_PORT  = "6379"
 export const FROM_EMAIL  = "noreply@costscrunch.dev";
+export const PREFIX      = "costscrunch-dev";
+export const ENVIRONMENT = "dev"
+export const LOG_LEVEL   = "INFO"
 
 // ─── Test data helpers ────────────────────────────────────────────────────────
 export const TEST_USER_ID  = "test-user-001";
@@ -141,7 +147,7 @@ export async function cleanTable(pkPrefix: string): Promise<void> {
   const { ScanCommand, BatchWriteCommand } = await import("@aws-sdk/lib-dynamodb");
   const result = await ddbDoc.send(
     new ScanCommand({
-      TableName:        TABLE_NAME,
+      TableName:        TABLE_NAME_MAIN,
       FilterExpression: "begins_with(pk, :p)",
       ExpressionAttributeValues: { ":p": pkPrefix },
       ProjectionExpression: "pk, sk",
@@ -156,7 +162,7 @@ export async function cleanTable(pkPrefix: string): Promise<void> {
     await ddbDoc.send(
       new BatchWriteCommand({
         RequestItems: {
-          [TABLE_NAME]: chunk.map((item) => ({
+          [TABLE_NAME_MAIN]: chunk.map((item) => ({
             DeleteRequest: { Key: { pk: item.pk, sk: item.sk } },
           })),
         },
