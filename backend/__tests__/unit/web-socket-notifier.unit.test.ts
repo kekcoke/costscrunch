@@ -238,7 +238,10 @@ describe("pushToConnection", () => {
 
   it("deletes stale connection from DDB when GoneException is thrown", async () => {
     wireConnections(["gone-conn-001"]);
-    apiGwSend.mockRejectedValue(new GoneException("Connection stale"));
+    apiGwSend.mockRejectedValue(new GoneException({
+      message: "Connection stale",
+      $metadata: {}
+    }));
 
     await handler(makeEbEvent()); // must not throw
 
@@ -277,7 +280,10 @@ describe("handler — multi-tab fan-out", () => {
     wireConnections(["good-conn", "gone-conn"]);
     apiGwSend
       .mockResolvedValueOnce({})                              // good-conn succeeds
-      .mockRejectedValueOnce(new GoneException("stale"));     // gone-conn stale
+      .mockRejectedValueOnce(new GoneException({
+        message: "Stale",
+        $metadata: {}
+      }));     // gone-conn stale
 
     await expect(handler(makeEbEvent())).resolves.toBeUndefined();
 
@@ -289,7 +295,10 @@ describe("handler — multi-tab fan-out", () => {
 
   it("resolves without error when every connection is stale", async () => {
     wireConnections(["gone-1", "gone-2"]);
-    apiGwSend.mockRejectedValue(new GoneException("stale"));
+    apiGwSend.mockRejectedValue(new GoneException({
+        message: "Stale",
+        $metadata: {}
+    }));
 
     await expect(handler(makeEbEvent())).resolves.toBeUndefined();
 
