@@ -19,22 +19,21 @@ import { SSMClient } from "@aws-sdk/client-ssm";
 import { APIGatewayProxyEventV2 } from "aws-lambda/trigger/api-gateway-proxy.js";
 
 // ─── LocalStack connection config ─────────────────────────────────────────────
-const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
-const REGION              = process.env.AWS_REGION ?? "us-east-1";
-
-const BASE_CONFIG = {
-  endpoint:    LOCALSTACK_ENDPOINT,
-  region:      REGION,
-  credentials: {
-    accessKeyId:     "test",
-    secretAccessKey: "test",
-  },
-  forcePathStyle: true,   // Required for S3 LocalStack
+function getBaseConfig() {
+  return {
+    endpoint:    "http://localhost:4566",
+    region:      "us-east-1",
+    credentials: {
+      accessKeyId:     "test",
+      secretAccessKey: "test",
+    },
+    forcePathStyle: true,   // Required for S3 LocalStack
 } as const;
+}
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
-export const dynamodb = new DynamoDBClient(BASE_CONFIG);
+export const dynamodb = new DynamoDBClient(getBaseConfig());
 
 export const ddbDoc = DynamoDBDocumentClient.from(dynamodb, {
   marshallOptions: {
@@ -43,16 +42,17 @@ export const ddbDoc = DynamoDBDocumentClient.from(dynamodb, {
   },
 });
 
-export const s3  = new S3Client(BASE_CONFIG);
-export const ses = new SESClient(BASE_CONFIG);
-export const sqs = new SQSClient(BASE_CONFIG);
-export const sns = new SNSClient(BASE_CONFIG);
-export const eb  = new EventBridgeClient(BASE_CONFIG);
-export const ssm = new SSMClient(BASE_CONFIG);
+export const s3  = new S3Client(getBaseConfig());
+export const ses = new SESClient(getBaseConfig());
+export const sqs = new SQSClient(getBaseConfig());
+export const sns = new SNSClient(getBaseConfig());
+export const eb  = new EventBridgeClient(getBaseConfig());
+export const ssm = new SSMClient(getBaseConfig());
 
 // ─── Constants matching the seed script ───────────────────────────────────────
 export const TABLE_NAME_MAIN  = process.env.TABLE_NAME_MAIN  ?? "costscrunch-dev-main";
-export const TABLE_NAME_CONNECTIONS  = "costscrunch-dev-connections"
+export const TABLE_NAME_CONNECTIONS = process.env.TABLE_NAME_CONNECTIONS 
+  ?? "costscrunch-dev-connections";
 export const BUCKET_RECEIPTS_NAME = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
 export const EVENT_BUS_NAME   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev-events";
 export const REDIS_HOST  = ""
@@ -123,23 +123,19 @@ export function makeApiEvent(
   } as unknown as APIGatewayProxyEventV2;
 }
 
-/** Wait for LocalStack to be fully ready */
 export async function waitForLocalStack(maxWaitMs = 30_000): Promise<void> {
+  const endpoint = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
+  const healthUrl = `${endpoint.replace(/\/$/, "")}/_localstack/health`;
   const start = Date.now();
+
   while (Date.now() - start < maxWaitMs) {
     try {
-      const res = await fetch(`${LOCALSTACK_ENDPOINT}/_localstack/health`);
-      const json = (await res.json()) as { services: Record<string, string> };
-      const allRunning = Object.values(json.services).every(
-        (s) => s === "running" || s === "available"
-      );
-      if (allRunning) return;
-    } catch {
-      // not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 500));
+      const res = await fetch(healthUrl);
+      if (res.ok) return; // 200 = LocalStack is up and accepting requests
+    } catch { /* not up yet */ }
+    await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error(`LocalStack not ready after ${maxWaitMs}ms`);
+  throw new Error(`LocalStack not ready after ${maxWaitMs}ms at ${healthUrl}`);
 }
 
 /** Clean up all items from the test table matching a pk prefix */
