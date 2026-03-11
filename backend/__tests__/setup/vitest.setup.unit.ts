@@ -4,3 +4,5 @@
  */
 import "aws-sdk-client-mock-vitest/extend";
 import { vi } from "vitest";
+
+process.env.TABLE_NAME_MAIN           = "costscrunch-dev-main";

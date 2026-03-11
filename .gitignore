@@ -56,6 +56,7 @@ backend/tsconfig.test.tsbuildinfo
 .env.staging.local
 .env.production
 .env.production.local
+.env.*
 
 # AWS credential files (should never be in a project directory, but just in case)
 .aws/credentials

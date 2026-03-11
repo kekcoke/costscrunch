@@ -86,7 +86,7 @@ describe("GET /expenses (list)", () => {
     expect(body.items[0].merchant).toBe("Starbucks");
     expect(body.nextToken).toBeNull();
     expect(ddbMock).toHaveReceivedCommandWith(QueryCommand, {
-      TableName: "test-table",
+      TableName: "costscrunch-dev-main",
       KeyConditionExpression: expect.stringContaining("pk"),
     });
   });
@@ -211,7 +211,7 @@ describe("POST /expenses", () => {
     expect(body.status).toBe("submitted");
     expect(body.expenseId).toBeDefined();
     expect(ddbMock).toHaveReceivedCommandWith(PutCommand, {
-      TableName: "test-table",
+      TableName: "costscrunch-dev-main",
       ConditionExpression: "attribute_not_exists(pk)",
     });
   });

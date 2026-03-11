@@ -29,8 +29,6 @@
     "__tests__/__helpers__/**/*.ts",
     "__tests__/__mocks__/**/*.ts",
     "__tests__/setup/**/*.ts"
-
-
   ],
   "exclude": ["node_modules", "dist", "dist-test"]
 }
