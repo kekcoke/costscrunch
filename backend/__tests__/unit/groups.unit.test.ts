@@ -7,7 +7,6 @@
  */
 
 import { mockClient } from "aws-sdk-client-mock";
-import "aws-sdk-client-mock-jest";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -20,7 +19,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sesMock = mockClient(SESClient);
 
-import { handler } from "../../src/lambdas/groups/index";
+import { handler } from "../../src/lambdas/groups/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function makeEvent(overrides: Record<string, unknown> = {}) {

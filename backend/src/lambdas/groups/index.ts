@@ -13,7 +13,7 @@ import type { ApiEvent, Group, GroupMember } from "../../shared/models/types";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
-const TABLE = process.env.TABLE_NAME!;
+const TABLE = process.env.TABLE_NAME_MAIN!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;
 
 const logger = new Logger({ serviceName: "groups" });

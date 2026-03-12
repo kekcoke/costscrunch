@@ -20,12 +20,14 @@
         ↓
 ⚡ ElastiCache Redis (response cache + sessions)
         ↓
-⚙️ AWS Lambda (Node.js 20 + Powertools)
-     ├── expenses/     CRUD + approval workflows
-     ├── groups/       splits + balances + settlements
-     ├── receipts/     S3 → Textract → Claude AI
-     ├── analytics/    aggregations + trends
-     └── notifications/ SES + Pinpoint push/SMS
+⚙️ AWS Lambda (Node.js 20 + Powertools + Vitest)
+     ├── expenses/       CRUD + approval workflows
+     ├── groups/         splits + balances + settlements
+     ├── receipts/       S3 → Textract async triggering
+     ├── sns-webhook/    Textract completion → Claude AI → DB
+     ├── ws-notifier/    Real-time WebSocket updates
+     ├── analytics/      aggregations + trends
+     └── notifications/  SES + Pinpoint push/SMS
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
 📦 S3 (receipts + assets, KMS encrypted)
@@ -37,7 +39,7 @@
 
 ## Repository Structure
 ```
-./
+costscrunch
 ├── ai/
 │   ├── adapters/
 │   ├── references/
@@ -49,22 +51,40 @@
 │   ├── .DS_Store
 │   ├── __tests__/
 │   │   ├── .DS_Store
+│   │   ├── __config__/
+│   │   │   └── testConfig.ts
 │   │   ├── __helpers__/
 │   │   │   └── localstack-client.ts                  # localstack mock environment
 │   │   ├── integration/
-│   │   │   └── expenses.integration.test.ts
-│   │   ├── jest.setup.integration.ts
-│   │   ├── jest.setup.unit.ts
+│   │   ├── __mocks__/
+│   │   │   ├── .DS_Store
+│   │   │   ├── @aws-lambda-powertools/
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── logger.ts
+│   │   │   │   ├── metrics.ts
+│   │   │   │   └── tracer.ts
+│   │   │   └── eventBridge.ts
+│   │   ├── integration/
+│   │   │   ├── expenses.integration.test.ts
+│   │   │   └── receipts.integration.test.ts
+│   │   ├── setup/
+│   │   │   ├── setupTestEnv.ts
+│   │   │   ├── vitest.setup.integration.ts
+│   │   │   └── vitest.setup.unit.ts
 │   │   └── unit/
 │   │       ├── analytics.unit.test.ts
 │   │       ├── expenses.unit.test.ts
-│   │       └── groups.unit.test.ts
-│   ├── jest.config.ts
+│   │       ├── groups.unit.test.ts
+│   │       ├── receipts.unit.test.ts
+│   │       ├── sns-webhook.unit.test.ts
+│   │       └── web-socket-notifier.unit.test.ts
 │   ├── package.json
 │   ├── src/
+│   │   ├── .DS_Store
 │   │   ├── lambdas/                                  # lambda handlers
 │   │   │   ├── .DS_Store
 │   │   │   ├── analytics/
+│   │   │   │   ├── .DS_Store
 │   │   │   │   └── index.ts
 │   │   │   ├── expenses/
 │   │   │   │   └── index.ts
@@ -72,14 +92,19 @@
 │   │   │   │   └── index.ts
 │   │   │   ├── notifications/
 │   │   │   │   └── index.ts
-│   │   │   └── receipts/
+│   │   │   ├── receipts/
+│   │   │   │   └── index.ts
+│   │   │   ├── sns-webhook/
+│   │   │   │   └── index.ts
+│   │   │   └── web-socket-notifier/
 │   │   │       └── index.ts
-│   │   ├── server.ts        
+│   │   ├── server.ts
 │   │   └── shared/
 │   │       └── models/
 │   │           └── types.ts
 │   ├── tsconfig.json
-│   └── tsconfig.test.json
+│   ├── tsconfig.test.json
+│   └── vite.config.ts
 ├── frontend/
 │   ├── .DS_Store
 │   ├── .gitignore
@@ -122,7 +147,6 @@
 │   │   │   └── results.ts
 │   │   ├── models/                                   # Type, schema, constant definitions
 │   │   │   ├── constants.ts
-│   │   │   ├── expense.ts
 │   │   │   ├── interfaceProps.ts
 │   │   │   ├── scanForm.ts
 │   │   │   └── types.ts
@@ -142,14 +166,27 @@
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
 └── infrastructure/
+    ├── .DS_Store
     ├── .dockerignore
+    ├── __tests__/
+    │   └── localstack/
+    │       ├── dynamodb.test.ts
+    │       ├── eventbridge.test.ts
+    │       ├── health.test.ts
+    │       ├── kms.test.ts
+    │       ├── s3.test.ts
+    │       ├── ses.test.ts
+    │       ├── sns.test.ts
+    │       ├── sqs.test.ts
+    │       └── ssm.test.ts
     ├── docker-compose.localstack.yml                  # compose file localstack and seeding
     ├── localstack/
     │   └── dev/
-    │       └── seed-setup.sh                          # seeds localstack according CostsCruncStack specs
+    │       └── setup.sh                               # seeds localstack according CostsCruncStack specs
     ├── package.json
-    └── stacks/
-        └── CostsCrunchStack.ts                        # cloud infra blueprint
+    ├── stacks/
+    │   └── CostsCrunchStack.ts                         # cloud infra blueprint
+    └── tsconfig.json
 ```
 
 ---
@@ -180,30 +217,66 @@
 ```
 User uploads file
       ↓
-[Frontend] GET /receipts/upload-url
+[Frontend] POST /receipts/upload-url
       ↓
-[API] Lambda generates S3 pre-signed PUT URL (15 min TTL)
+[API] receipts Lambda (index.ts) generates S3 presigned POST URL
       ↓
-[Frontend] PUT directly to S3 (no Lambda in the path = cheap + fast)
+[Frontend] POST directly to S3 (no Lambda in path = cheap + fast)
       ↓
-[S3 Event] Triggers receipts Lambda
+[S3 Event] Triggers receipts Lambda (index.ts)
       ↓
-[Lambda] AWS Textract StartExpenseAnalysis → polls for completion
+[Lambda] Writes scan record to DynamoDB  →  status: "processing"
       ↓
-[Lambda] Parses: merchant, amount, date, tax, line items
+[Lambda] StartExpenseAnalysis (async) with SNS NotificationChannel + JobTag
+      ↓
+    Lambda returns immediately — no polling, no timeout risk
+      ↓
+         ╔══════════════════════════════════╗
+         ║ Textract processes file(10–90s)  ║
+         ╚══════════════════════════════════╝
+      ↓
+[SNS] textract-completion topic receives job completion notification
+      ↓
+[sns-webhook Lambda] Triggered by SNS
+      ↓
+[Lambda] GetExpenseAnalysis (instant — job already done)
+      ↓
+[Lambda] Parses: merchant, amount, date, tax, tip, line items
       ↓
 [Lambda] Claude 3 Haiku (Bedrock) → category + confidence + policy flags
+             ↓ (on Bedrock failure)
+         [Fallback] guessCategory() keyword matching → confidence: 85
       ↓
-[DynamoDB] Updates expense record + scan result
+[DynamoDB] Updates scan record  →  status: "completed"
+[DynamoDB] Back-fills expense record  →  merchant, amount, category (if_not_exists)
       ↓
-[EventBridge] Emits ReceiptScanCompleted event
+[EventBridge] Emits ReceiptScanCompleted
       ↓
-[Notifications Lambda] Sends email/push to user
+      ├──────────────────────────────────────────────┐
+      ↓                                              ↓
+[Notifications Lambda]                    [ws-notifier Lambda]
+Sends email / push / Pinpoint             Looks up connectionId(s) in
+to user                                   DynamoDB connections table
+                                                     ↓
+                                          [API Gateway WebSocket]
+                                          POST @connections → browser
+                                                     ↓
+                                    ┌────────────────┴────────────────┐
+                                    ↓                                 ↓
+                             [WebSocket message]               [Timeout / error]
+                             RECEIPT_SCAN_COMPLETED            fallbackHttpGet()
+                             resolves watchScanResult()        GET /receipts/{id}/scan
+                                    ↓                                 ↓
+                                    └─────────────┬───────────────────┘
+                                                  ↓
+                                    [Frontend] UI updated with
+                                    merchant, amount, category,
+                                    confidence, policy flags
 ```
 
-**Supported inputs:** JPG, PNG, HEIC, PDF  
-**Average processing time:** 3–8 seconds  
-**AI confidence:** typically 88–98%  
+**Supported inputs:** JPG, PNG, HEIC, PDF
+**Processing time:** 10–90 seconds (Textract async job)
+**AI confidence:** typically 88–98%
 **Fallback:** keyword-based categorization if Bedrock unavailable
 
 ---
@@ -274,49 +347,64 @@ Analytics
 ## Environment Variables
 
 ```bash
-# Backend (set via CDK / SSM)
-TABLE_NAME=costscrunch-prod-main
-EVENT_BUS_NAME=costscrunch-prod-events
-RECEIPTS_BUCKET=costscrunch-prod-receipts-{account}
-REDIS_HOST=...elasticache.amazonaws.com
-REDIS_PORT=6379
-USER_POOL_ID=us-east-1_xxxxxxxx
-FROM_EMAIL=noreply@costscrunch.com
-ENVIRONMENT=prod
-LOG_LEVEL=INFO
+# Environment & Global Settings
+ENVIRONMENT=
+PREFIX=
+AWS_REGION=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_ENDPOINT_URL=
 
-# Frontend (Vite env)
-VITE_API_URL=https://api.costscrunch.com
-VITE_USER_POOL_ID=us-east-1_xxxxxxxx
-VITE_USER_POOL_CLIENT_ID=xxxxxxxxxx
-VITE_REGION=us-east-1
-```
+# Logging & Observability (Powertools)
+LOG_LEVEL=
+DEBUG_EVENT=
+POWERTOOLS_SERVICE_NAME=
+POWERTOOLS_METRICS_NAMESPACE=
+POWERTOOLS_LOGGER_LOG_EVENT=
+
+# Data & Storage (DynamoDB & S3)
+TABLE_NAME_MAIN=
+TABLE_NAME_CONNECTIONS=
+BUCKET_RECEIPTS_NAME=
+BUCKET_ASSETS_NAME=
+
+# Events & Messaging (EventBridge, SNS, SQS)
+EVENT_BUS_NAME=
+TEXTRACT_SNS_TOPIC_ARN=
+TEXTRACT_ROLE_ARN=
+FROM_EMAIL=
+
+# Auth, Cache & APIs (Cognito, Redis, WebSocket)
+USER_POOL_ID=
+REDIS_HOST=
+REDIS_PORT=
+WEBSOCKET_ENDPOINT=
+
+# IAM & Third-Party Services (Bedrock, Textract)
+BEDROCK_MODEL_ID=```
 
 ---
 
 ## Local Development
 
 ```bash
-# Prerequisites: Node 20+, AWS CLI, CDK CLI
+# Prerequisites: Node 20+, AWS CLI, CDK CLI, Docker (for LocalStack)
 npm install -g aws-cdk
 
 # Install all dependencies
 npm install
 
+# Start LocalStack (Infra testing)
+cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+
+# Run Tests (Vitest)
+npm run test        # Runs all unit/integration tests
+
 # Start frontend
 npm run dev:frontend      # http://localhost:3000
 
-# Run CDK diff (no deploy)
-npm run diff
-
 # Deploy to dev
 npm run deploy:dev
-
-# Seed dev database
-npm run db:seed
-
-# Run load test (requires k6)
-npm run load-test
 ```
 
 ---
@@ -334,6 +422,135 @@ npm run load-test
 
 **Cost estimate at 100K MAU:** ~$450/month  
 **Cost estimate at 1M MAU:** ~$4,355/month ($0.004/user/month)
+
+---
+
+## CI/CD Deployment
+
+### Pipeline Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CI Workflow                                    │
+│  Trigger: push/PR to main, staging                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐             │
+│  │   Quality    │   │   Security   │   │        Build         │             │
+│  │    Gate      │   │    Scan      │   │                      │             │
+│  ├──────────────┤   ├──────────────┤   ├──────────────────────┤             │
+│  │ • Frontend   │   │ • Semgrep    │   │ • Backend bundle     │             │
+│  │ • Backend    │   │ • npm audit  │   │ • Frontend build     │             │
+│  │ • Infra      │   │ • Gitleaks   │   │ • CDK synth          │             │
+│  └──────────────┘   └──────────────┘   └──────────────────────┘             │
+│                              │                                              │
+│                              ▼                                              │
+│                    ┌──────────────────┐                                     │
+│                    │    Artifacts     │                                     │
+│                    │  (7-day retain)  │                                     │
+│                    └──────────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CD Workflow                                    │
+│  Trigger: CI success (workflow_run) or manual dispatch                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐             │
+│  │    Staging     │───▶│    E2E Tests   │───▶│   Production   │             │
+│  │                │    │   (Playwright) │    │   (protected)  │             │
+│  ├────────────────┤    └────────────────┘    ├────────────────┤             │
+│  │ • CDK deploy   │           │              │ • CDK deploy   │             │
+│  │ • S3 sync      │           │              │ • S3 sync      │             │
+│  │ • Smoke test   │           │              │ • CF invalidate│             │
+│  └────────────────┘           │              │ • Smoke test   │             │
+│                               │              │ • Slack notify │             │
+│                               ▼              └────────────────┘             │
+│                      ┌────────────────┐                                     │
+│                      │   Rollback     │  (manual trigger only)              │
+│                      │  (on failure)  │                                     │
+│                      └────────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Required GitHub Secrets
+
+| Secret | Description | Environment |
+|--------|-------------|-------------|
+| `AWS_ACCESS_KEY_ID_DEV` | AWS access key for CDK synth | CI |
+| `AWS_SECRET_ACCESS_KEY_DEV` | AWS secret key for CDK synth | CI |
+| `AWS_ACCESS_KEY_ID_STAGING` | AWS access key for staging deploy | CD |
+| `AWS_SECRET_ACCESS_KEY_STAGING` | AWS secret key for staging deploy | CD |
+| `AWS_ACCOUNT_ID_STAGING` | AWS account ID for staging | CD |
+| `AWS_ACCESS_KEY_ID_PROD` | AWS access key for production | CD |
+| `AWS_SECRET_ACCESS_KEY_PROD` | AWS secret key for production | CD |
+| `AWS_ACCOUNT_ID_PROD` | AWS account ID for production | CD |
+| `CODECOV_TOKEN` | Codecov coverage upload token | CI |
+| `SEMGREP_APP_TOKEN` | Semgrep SAST token | CI |
+| `VITE_API_URL` | Frontend API URL | CI |
+| `VITE_USER_POOL_ID` | Cognito User Pool ID | CI |
+| `VITE_USER_POOL_CLIENT_ID` | Cognito Client ID | CI |
+| `STAGING_URL` | Staging base URL for E2E | CD |
+| `STAGING_ASSETS_BUCKET` | S3 bucket for staging frontend | CD |
+| `STAGING_CF_DISTRIBUTION_ID` | CloudFront distribution ID | CD |
+| `PROD_ASSETS_BUCKET` | S3 bucket for production frontend | CD |
+| `CF_DISTRIBUTION_ID` | Production CloudFront ID | CD |
+| `TEST_USER_EMAIL` | Test user for E2E tests | CD |
+| `TEST_USER_PASSWORD` | Test user password | CD |
+| `SLACK_WEBHOOK_URL` | Slack notifications (optional) | CD |
+
+### One-Time Setup
+
+```bash
+# 1. Bootstrap CDK in each environment (run once per account/region)
+npx cdk bootstrap aws://ACCOUNT_ID/us-east-1
+
+# 2. Create IAM user for CI/CD with minimal permissions
+# Recommended: Use OIDC federation instead of access keys
+# See: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments
+
+# 3. Configure GitHub repository secrets
+# Go to: Settings → Secrets and variables → Actions → New repository secret
+
+# 4. Enable GitHub Environments
+# Go to: Settings → Environments → New environment
+#   - staging: No approval required
+#   - production: Add required reviewers
+```
+
+### Manual Deploy
+
+```bash
+# Via GitHub Actions UI
+# Navigate to Actions → CD → Run workflow
+# Select environment: staging | production
+
+# Via CLI (for development)
+npm run deploy:dev      # Deploy to dev environment
+npm run deploy:staging  # Deploy to staging
+npm run deploy:prod     # Deploy to production (requires approval)
+```
+
+### Rollback Procedure
+
+```bash
+# Automatic rollback via CloudFormation
+aws cloudformation rollback-stack --stack-name costscrunch-prod-CostsCrunchStack
+
+# Manual redeploy previous commit
+git checkout HEAD~1
+npm run deploy:prod
+
+# Via GitHub Actions
+# Actions → CD → Run workflow → Select "Rollback" option
+```
+
+### Environment Protection Rules
+
+| Environment | Approval | Deployment Branch | Auto-Deploy |
+|-------------|----------|-------------------|-------------|
+| staging | None | main, staging | Yes (on CI success) |
+| production | 1+ reviewers | main only | Yes (after staging) |
 
 ---
 

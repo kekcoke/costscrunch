@@ -121,3 +121,14 @@ export interface InitiateUploadResponse {
   expenseId: string;
   scanId: string;
 }
+
+export interface WsScanCompletedMessage {
+  type:         "RECEIPT_SCAN_COMPLETED";
+  expenseId:    string;
+  scanId:       string;
+  merchant?:    string;
+  amount?:      number;
+  category:     string;
+  confidence:   number;
+  processingMs: number;
+}

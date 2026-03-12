@@ -16,24 +16,28 @@ import { SQSClient } from "@aws-sdk/client-sqs";
 import { SNSClient } from "@aws-sdk/client-sns";
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { SSMClient } from "@aws-sdk/client-ssm";
+import { KMSClient } from "@aws-sdk/client-kms";
+import { IAMClient } from "@aws-sdk/client-iam";
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { APIGatewayProxyEventV2 } from "aws-lambda/trigger/api-gateway-proxy.js";
 
 // ─── LocalStack connection config ─────────────────────────────────────────────
-const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
-const REGION              = process.env.AWS_REGION ?? "us-east-1";
-
-const BASE_CONFIG = {
-  endpoint:    LOCALSTACK_ENDPOINT,
-  region:      REGION,
-  credentials: {
-    accessKeyId:     "test",
-    secretAccessKey: "test",
-  },
-  forcePathStyle: true,   // Required for S3 LocalStack
+function getBaseConfig() {
+  return {
+    endpoint:    "http://localhost:4566",
+    region:      "us-east-1",
+    credentials: {
+      accessKeyId:     "test",
+      secretAccessKey: "test",
+    },
+    forcePathStyle: true,   // Required for S3 LocalStack
 } as const;
+}
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
-export const dynamodb = new DynamoDBClient(BASE_CONFIG);
+export const dynamodb = new DynamoDBClient(getBaseConfig());
 
 export const ddbDoc = DynamoDBDocumentClient.from(dynamodb, {
   marshallOptions: {
@@ -42,18 +46,35 @@ export const ddbDoc = DynamoDBDocumentClient.from(dynamodb, {
   },
 });
 
-export const s3  = new S3Client(BASE_CONFIG);
-export const ses = new SESClient(BASE_CONFIG);
-export const sqs = new SQSClient(BASE_CONFIG);
-export const sns = new SNSClient(BASE_CONFIG);
-export const eb  = new EventBridgeClient(BASE_CONFIG);
-export const ssm = new SSMClient(BASE_CONFIG);
+export const s3  = new S3Client(getBaseConfig());
+export const ses = new SESClient(getBaseConfig());
+export const sqs = new SQSClient(getBaseConfig());
+export const sns = new SNSClient(getBaseConfig());
+export const eb  = new EventBridgeClient(getBaseConfig());
+export const ssm = new SSMClient(getBaseConfig());
+export const kms = new KMSClient(getBaseConfig());
+export const iam = new IAMClient(getBaseConfig());
+export const lambda = new LambdaClient(getBaseConfig());
+export const logs = new CloudWatchLogsClient(getBaseConfig());
 
 // ─── Constants matching the seed script ───────────────────────────────────────
-export const TABLE_NAME  = process.env.TABLE_NAME  ?? "costscrunch-dev-main";
-export const BUCKET_NAME = process.env.BUCKET_NAME ?? "costscrunch-dev-receipts-000000000000";
-export const EVENT_BUS   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev";
+export const TABLE_NAME_MAIN  = process.env.TABLE_NAME_MAIN  ?? "costscrunch-dev-main";
+export const TABLE_NAME_CONNECTIONS = process.env.TABLE_NAME_CONNECTIONS 
+  ?? "costscrunch-dev-connections";
+export const BUCKET_RECEIPTS_NAME = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
+export const BUCKET_ASSETS_NAME = process.env.BUCKET_ASSETS_NAME ?? "costscrunch-dev-assets-000000000000";
+export const EVENT_BUS_NAME   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev-events";
+export const REDIS_HOST  = process.env.REDIS_HOST ?? "localhost";
+export const REDIS_PORT  = process.env.REDIS_PORT ?? "6379";
 export const FROM_EMAIL  = "noreply@costscrunch.dev";
+export const PREFIX      = "costscrunch-dev";
+export const ENVIRONMENT = "dev";
+export const LOG_LEVEL   = process.env.LOG_LEVEL ?? "SILENT";
+export const USER_POOL_ID = process.env.USER_POOL_ID ?? "local-pool-costscrunch-dev";
+export const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID ?? "local-client-costscrunch-dev-web";
+export const WEBSOCKET_ENDPOINT = process.env.WEBSOCKET_ENDPOINT ?? "http://localhost:4566/_aws/apigatewayv2/ws";
+export const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
+export const TEXTRACT_TOPIC_ARN = process.env.TEXTRACT_SNS_TOPIC_ARN ?? "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion";
 
 // ─── Test data helpers ────────────────────────────────────────────────────────
 export const TEST_USER_ID  = "test-user-001";
@@ -66,60 +87,69 @@ export function makeApiEvent(
     routeKey: string;
     method: string;
     path: string;
+    headers: Record<string, string>;
     body: object | null;
     pathParameters: Record<string, string>;
     queryStringParameters: Record<string, string>;
     userId: string;
   }> = {}
-) {
+): APIGatewayProxyEventV2 {
   const userId = overrides.userId ?? TEST_USER_ID;
+  
+  // Return a type-cast object that satisfies the interface
   return {
-    version:        "2.0",
-    routeKey:       overrides.routeKey ?? "GET /expenses",
-    rawPath:        overrides.path ?? "/expenses",
+    version: "2.0",
+    routeKey: overrides.routeKey ?? "GET /expenses",
+    rawPath: overrides.path ?? "/expenses",
     rawQueryString: "",
-    body:           overrides.body ? JSON.stringify(overrides.body) : null,
-    pathParameters: overrides.pathParameters ?? {},
-    queryStringParameters: overrides.queryStringParameters ?? {},
+    headers: overrides.headers ?? {},
+    body: overrides.body ? JSON.stringify(overrides.body) : null,
+    pathParameters: overrides.pathParameters,
+    queryStringParameters: overrides.queryStringParameters,
     requestContext: {
-      accountId:  "000000000000",
-      apiId:      "test-api",
+      http: {
+        method: overrides.method ?? "GET",
+        path: overrides.path ?? "/",
+        protocol: "HTTP/1.1",
+        sourceIp: "0.0.0.0",
+        userAgent: "vitest",
+      },
+      accountId: "000000000000",
+      apiId: "test-api",
       domainName: "test.execute-api.us-east-1.amazonaws.com",
-      http:       { method: overrides.method ?? "GET", path: overrides.path ?? "/expenses" },
-      requestId:  "test-request-id",
-      stage:      "$default",
-      time:       new Date().toISOString(),
+      domainPrefix: "test.execute-api",
+      requestId: "test-request-id",
+      routeKey: overrides.routeKey ?? "ANY /",
+      stage: "test",
+      time: "01/Jan/2021:00:00:00 +0000",
+      timeEpoch: 1609459200000,
       authorizer: {
         jwt: {
           claims: {
-            sub:              userId,
-            email:            `${userId}@costscrunch.dev`,
-            "cognito:groups": "",
+            sub: userId,
+            email: `${userId}@costscrunch.dev`,
           },
+          scopes: [],
         },
       },
-    },
+    } as any, // Cast specific nested parts to avoid deep interface mismatches
     isBase64Encoded: false,
-  };
+  } as unknown as APIGatewayProxyEventV2;
 }
 
-/** Wait for LocalStack to be fully ready */
 export async function waitForLocalStack(maxWaitMs = 30_000): Promise<void> {
+  const endpoint = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
+  const healthUrl = `${endpoint.replace(/\/$/, "")}/_localstack/health`;
   const start = Date.now();
+
   while (Date.now() - start < maxWaitMs) {
     try {
-      const res = await fetch(`${LOCALSTACK_ENDPOINT}/_localstack/health`);
-      const json = (await res.json()) as { services: Record<string, string> };
-      const allRunning = Object.values(json.services).every(
-        (s) => s === "running" || s === "available"
-      );
-      if (allRunning) return;
-    } catch {
-      // not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 500));
+      const res = await fetch(healthUrl);
+      if (res.ok) return; // 200 = LocalStack is up and accepting requests
+    } catch { /* not up yet */ }
+    await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error(`LocalStack not ready after ${maxWaitMs}ms`);
+  throw new Error(`LocalStack not ready after ${maxWaitMs}ms at ${healthUrl}`);
 }
 
 /** Clean up all items from the test table matching a pk prefix */
@@ -127,7 +157,7 @@ export async function cleanTable(pkPrefix: string): Promise<void> {
   const { ScanCommand, BatchWriteCommand } = await import("@aws-sdk/lib-dynamodb");
   const result = await ddbDoc.send(
     new ScanCommand({
-      TableName:        TABLE_NAME,
+      TableName:        TABLE_NAME_MAIN,
       FilterExpression: "begins_with(pk, :p)",
       ExpressionAttributeValues: { ":p": pkPrefix },
       ProjectionExpression: "pk, sk",
@@ -142,7 +172,7 @@ export async function cleanTable(pkPrefix: string): Promise<void> {
     await ddbDoc.send(
       new BatchWriteCommand({
         RequestItems: {
-          [TABLE_NAME]: chunk.map((item) => ({
+          [TABLE_NAME_MAIN]: chunk.map((item) => ({
             DeleteRequest: { Key: { pk: item.pk, sk: item.sk } },
           })),
         },

@@ -44,12 +44,15 @@ export default defineConfig(() => ({
 
   // Vitest config (co-located so `vite` and `vitest` share the same config)
   test: {
-    globals:      true,
+    globals: true,
     environment: "jsdom",
-    setupFiles:  "__tests__/setup.ts", // ensure this file exists or change to .js
+    setupFiles: ["./__tests__/setup.ts"],
+    include: ["__tests__/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.d.ts", "src/mocks/**"],
     },
   },
 }));

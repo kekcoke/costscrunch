@@ -4,13 +4,13 @@
  * Unit tests for backend/src/lambdas/analytics/index.ts
  */
 
+
 import { mockClient } from "aws-sdk-client-mock";
-import "aws-sdk-client-mock-jest";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
-import { handler } from "../../src/lambdas/analytics/index";
+import { handler } from "../../src/lambdas/analytics/index.js";
 
 function makeEvent(overrides: Record<string, unknown> = {}) {
   return {

@@ -6,7 +6,6 @@
  */
 
 import { mockClient } from "aws-sdk-client-mock";
-import "aws-sdk-client-mock-jest";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -20,7 +19,7 @@ import {
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
 // Import AFTER mocking so the module-level client is intercepted
-import { rawHandler as handler } from "../../src/lambdas/expenses/index";
+import { rawHandler as handler } from "../../src/lambdas/expenses/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function makeEvent(overrides: Record<string, unknown> = {}) {
@@ -87,7 +86,7 @@ describe("GET /expenses (list)", () => {
     expect(body.items[0].merchant).toBe("Starbucks");
     expect(body.nextToken).toBeNull();
     expect(ddbMock).toHaveReceivedCommandWith(QueryCommand, {
-      TableName: "test-table",
+      TableName: "costscrunch-dev-main",
       KeyConditionExpression: expect.stringContaining("pk"),
     });
   });
@@ -212,7 +211,7 @@ describe("POST /expenses", () => {
     expect(body.status).toBe("submitted");
     expect(body.expenseId).toBeDefined();
     expect(ddbMock).toHaveReceivedCommandWith(PutCommand, {
-      TableName: "test-table",
+      TableName: "costscrunch-dev-main",
       ConditionExpression: "attribute_not_exists(pk)",
     });
   });

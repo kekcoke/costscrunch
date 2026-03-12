@@ -1,16 +1,65 @@
 {
-  "jest.configs": [
-    {
-      "name": "CostscrunchBackend",
-      "label": "Backend",
-      "rootDir": "costscrunch/backend",
-      "config": "costscrunch/backend/jest.config.ts"
-    }
+  // ─── Vitest Extension Configuration ─────────────────────────────────────────
+  "vitest.enable": true,
+  "vitest.commandLine": "npx vitest",
+  "vitest.workspaceConfig": "${workspaceFolder}/.vscode/vitest.workspace.ts",
+
+  // Auto-detect test files
+  "vitest.include": [
+    "**/__tests__/**/*.test.ts",
+    "**/__tests__/**/*.test.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ],
-  "jest.runMode": "watch",
-  "jest.debugMode": true,
-  "jest.jestCommandLine": "npx jest --config backend/jest.config.ts",
-  "jest.nodeEnv": {
-    "NODE_PATH": "backend/node_modules"
+
+  // Environment variables for all test projects
+  "vitest.nodeEnv": {
+    "NODE_ENV": "test"
+  },
+
+  // ─── Test Explorer Configuration ─────────────────────────────────────────────
+  "testExplorer.useNativeTesting": false,
+
+  // ─── File Associations ───────────────────────────────────────────────────────
+  "files.associations": {
+    "*.test.ts": "typescript",
+    "*.test.tsx": "typescriptreact",
+    "*.spec.ts": "typescript",
+    "*.spec.tsx": "typescriptreact",
+    "vitest.workspace.ts": "typescript",
+    "vite.config.ts": "typescript"
+  },
+
+  // ─── TypeScript Configuration ────────────────────────────────────────────────
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // ─── Monorepo Settings ───────────────────────────────────────────────────────
+  // Search exclude patterns for monorepo
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.esbuild": true,
+    "**/coverage": true
+  },
+
+  // File watcher excludes for performance
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.esbuild/**": true,
+    "**/coverage/**": true
+  },
+
+  // ─── Editor Settings ─────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // ─── Workbench Settings ──────────────────────────────────────────────────────
+  "workbench.editorAssociations": {
+    "*.test.ts": "default",
+    "*.test.tsx": "default"
   }
 }

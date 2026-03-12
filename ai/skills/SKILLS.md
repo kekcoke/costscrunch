@@ -9,7 +9,8 @@
 **CostsCrunch** is a serverless expense-tracking platform targeting individuals, teams, and enterprises. The entire backend runs on AWS Lambda + DynamoDB (single-table design); the frontend is a Vite/React 18 SPA. All infrastructure is defined as CDK v2 TypeScript.
 
 **Repo layout:**
-costscrunch/
+```
+costscrunch
 ├── ai/
 │   ├── adapters/
 │   ├── references/
@@ -21,42 +22,65 @@ costscrunch/
 │   ├── .DS_Store
 │   ├── __tests__/
 │   │   ├── .DS_Store
+│   │   ├── __config__/
+│   │   │   └── testConfig.ts
 │   │   ├── __helpers__/
-│   │   │   └── localstack-client.ts                  ← Setup mock cloud environment
-│   │   ├── integration/                              ← Integration tests
-│   │   │   └── expenses.integration.test.ts
-│   │   ├── jest.setup.integration.ts
-│   │   ├── jest.setup.unit.ts
-│   │   └── unit/                                     ← Unit tests
+│   │   │   └── localstack-client.ts                  # localstack mock environment
+│   │   ├── integration/
+│   │   ├── __mocks__/
+│   │   │   ├── .DS_Store
+│   │   │   ├── @aws-lambda-powertools/
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── logger.ts
+│   │   │   │   ├── metrics.ts
+│   │   │   │   └── tracer.ts
+│   │   │   └── eventBridge.ts
+│   │   ├── integration/
+│   │   │   ├── expenses.integration.test.ts
+│   │   │   └── receipts.integration.test.ts
+│   │   ├── setup/
+│   │   │   ├── setupTestEnv.ts
+│   │   │   ├── vitest.setup.integration.ts
+│   │   │   └── vitest.setup.unit.ts
+│   │   └── unit/
 │   │       ├── analytics.unit.test.ts
 │   │       ├── expenses.unit.test.ts
-│   │       └── groups.unit.test.ts
-│   ├── jest.config.ts
+│   │       ├── groups.unit.test.ts
+│   │       ├── receipts.unit.test.ts
+│   │       ├── sns-webhook.unit.test.ts
+│   │       └── web-socket-notifier.unit.test.ts
 │   ├── package.json
 │   ├── src/
-│   │   ├── lambdas/                                  ← lambda handlers
+│   │   ├── .DS_Store
+│   │   ├── lambdas/                                  # lambda handlers
 │   │   │   ├── .DS_Store
-│   │   │   ├── analytics/                            ← Period aggregations + category trends
+│   │   │   ├── analytics/
+│   │   │   │   ├── .DS_Store
 │   │   │   │   └── index.ts
-│   │   │   ├── expenses/                             ← CRUD + approval workflow
+│   │   │   ├── expenses/
 │   │   │   │   └── index.ts
-│   │   │   ├── groups/                               ← Group management + debt minimization
+│   │   │   ├── groups/
 │   │   │   │   └── index.ts
-│   │   │   ├── notifications/                        ← EventBridge-driven SES emails
+│   │   │   ├── notifications/
 │   │   │   │   └── index.ts
-│   │   │   └── receipts/                             ← S3 → Textract → Claude → DynamoDB
+│   │   │   ├── receipts/
+│   │   │   │   └── index.ts
+│   │   │   ├── sns-webhook/
+│   │   │   │   └── index.ts
+│   │   │   └── web-socket-notifier/
 │   │   │       └── index.ts
-│   │   ├── server.ts                                 ← Backend entrypoint, setup
-│   │   └── shared/                                   ← Types
+│   │   ├── server.ts
+│   │   └── shared/
 │   │       └── models/
 │   │           └── types.ts
 │   ├── tsconfig.json
-│   └── tsconfig.test.json
+│   ├── tsconfig.test.json
+│   └── vite.config.ts
 ├── frontend/
 │   ├── .DS_Store
 │   ├── .gitignore
 │   ├── README.md
-│   ├── __tests__/                                   ← Frontend tests
+│   ├── __tests__/
 │   │   ├── .DS_Store
 │   │   ├── components.test.tsx
 │   │   └── setup.ts
@@ -71,7 +95,7 @@ costscrunch/
 │   │   ├── App.tsx
 │   │   ├── assets/
 │   │   │   └── react.svg
-│   │   ├── components/                              ← Frontend components
+│   │   ├── components/
 │   │   │   ├── donutChart.tsx
 │   │   │   ├── expenseRow.tsx
 │   │   │   ├── index.ts
@@ -87,18 +111,17 @@ costscrunch/
 │   │   │   └── utils.ts
 │   │   ├── index.css
 │   │   ├── index.html
-│   │   ├── main.tsx                                  ← Frontend entrypoint
-│   │   ├── mocks/                                    ← Mock data
+│   │   ├── main.tsx                                  # Entrypoint
+│   │   ├── mocks/                                    # Mock data
 │   │   │   ├── expenses.ts
 │   │   │   ├── groups.ts
 │   │   │   └── results.ts
-│   │   ├── models/                                   ← Type, schema, constant definitions
+│   │   ├── models/                                   # Type, schema, constant definitions
 │   │   │   ├── constants.ts
-│   │   │   ├── expense.ts
 │   │   │   ├── interfaceProps.ts
 │   │   │   ├── scanForm.ts
 │   │   │   └── types.ts
-│   │   ├── pages/                                    ← Route-level pages
+│   │   ├── pages/                                    # Route-level pages
 │   │   │   ├── analytics.tsx
 │   │   │   ├── dashboard.tsx
 │   │   │   ├── expenses.tsx
@@ -114,14 +137,27 @@ costscrunch/
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
 └── infrastructure/
+    ├── .DS_Store
     ├── .dockerignore
-    ├── docker-compose.localstack.yml                  ← compose file localstack and seeding
+    ├── __tests__/
+    │   └── localstack/
+    │       ├── dynamodb.test.ts
+    │       ├── eventbridge.test.ts
+    │       ├── health.test.ts
+    │       ├── kms.test.ts
+    │       ├── s3.test.ts
+    │       ├── ses.test.ts
+    │       ├── sns.test.ts
+    │       ├── sqs.test.ts
+    │       └── ssm.test.ts
+    ├── docker-compose.localstack.yml                  # compose file localstack and seeding
     ├── localstack/
     │   └── dev/
-    │       └── seed-setup.sh                          ← seeds localstack according CostsCruncStack specs
+    │       └── setup.sh                               # seeds localstack according CostsCruncStack specs
     ├── package.json
-    └── stacks/
-        └── CostsCrunchStack.ts                        ← cloud infra blueprint
+    ├── stacks/
+    │   └── CostsCrunchStack.ts                         # cloud infra blueprint
+    └── tsconfig.json
 ```
 ---
 
@@ -133,7 +169,7 @@ costscrunch/
 | **Single-table DynamoDB** | PK / SK plus GSI1 (status+date) and GSI2 (category+date). |
 | **Cognito for identity** | All auth delegates to Cognito; the auth lambda is a thin orchestrator. |
 | **CDK v2** | All infrastructure is code — no ClickOps. |
-| **Vite + Vitest** | Frontend build tooling; tests mirror Jest API (vi.*). |
+| **Full Vitest Stack** | Both frontend AND backend use Vitest for unified testing (vi.*). |
 | **P99 < 80 ms** | Lambda provisioned concurrency on hot paths. DynamoDB on-demand. |
 
 ---
@@ -251,12 +287,15 @@ Prompt:
 ## 5. Testing Cheatsheet
 
 ```bash
-# Unit tests (fast, no Docker)
-cd backend && npx jest --selectProjects unit
+# Backend Unit tests
+cd backend && npm run test:ut
 
-# Integration tests (requires LocalStack)
+# Backend Integration tests (requires LocalStack)
 cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
-cd ../backend && npx jest --selectProjects integration
+cd ../backend && npm run test:ig
+
+# Infrastructure LocalStack tests
+cd infrastructure && npm test
 
 # Frontend Vitest
 cd frontend && npx vitest
