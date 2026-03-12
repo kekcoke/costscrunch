@@ -17,40 +17,90 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import type { S3Event, SNSEvent } from "aws-lambda";
-import { GetCommand, PutCommand, QueryCommand as DdbQueryCommand } from "@aws-sdk/lib-dynamodb";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+
+const {
+  mockTextractSend,
+  mockBedRockSend,
+  mockApiGwSend
+} = vi.hoisted(() => ({
+  mockTextractSend:       vi.fn().mockResolvedValue({ JobId: "textract-job-123" }),
+  mockBedRockSend:       vi.fn(),
+  mockApiGwSend:         vi.fn()
+}));
 
 // ─── Mocked services (not available in LocalStack free tier) ──────────────────
 vi.mock("@aws-sdk/client-textract", () => ({
-  TextractClient:            vi.fn(() => ({ send: vi.fn() })),
-  GetExpenseAnalysisCommand: vi.fn(),
+  // Regular function required for `new TextractClient()`.
+  TextractClient: vi.fn().mockImplementation(function () {
+    return { send: mockTextractSend };
+  }),
+  GetExpenseAnalysisCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
+  StartExpenseAnalysisCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
 }));
+
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
   BedrockRuntimeClient: vi.fn(() => ({ send: vi.fn() })),
   InvokeModelCommand:   vi.fn(),
 }));
 
-vi.mock("@aws-sdk/client-apigatewaymanagementapi", () => ({
-  ApiGatewayManagementApiClient: vi.fn(() => ({ send: vi.fn() })),
-  PostToConnectionCommand:       vi.fn(),
-  GoneException: class GoneException extends Error {
-    constructor() { super("GoneException"); this.name = "GoneException"; }
-  },
-}));
+vi.mock("@aws-sdk/client-apigatewaymanagementapi", () => {
+  // GoneException must be declared INSIDE the factory so the same class
+  // reference is used both when the handler does `instanceof GoneException`
+  // and when tests do `new GoneException()` after importing from this mock.
+  class GoneException extends Error {
+    readonly $fault = "client" as const;
+    readonly $metadata: object;
+    constructor(opts: { message: string; $metadata: object }) {
+      super(opts.message);
+      this.name = "GoneException";
+      this.$metadata = opts.$metadata;
+      Object.setPrototypeOf(this, GoneException.prototype);
+    }
+  }
+
+  return {
+    ApiGatewayManagementApiClient: vi.fn().mockImplementation(function () {
+      // Returns an object whose send is the CURRENT mockApiGwSend reference
+      return { send: (...args: any[]) => mockApiGwSend(...args) };    }),
+    PostToConnectionCommand: vi.fn(function (args) { 
+      return { _tag: "PostToConnection", input: args }; 
+    }),
+    GoneException,
+  };
+});
+
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
-  Logger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), appendKeys: vi.fn() })),
+  Logger: vi.fn(function () {
+    return {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      appendKeys: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/tracer", () => ({
-  Tracer: vi.fn(() => ({
-    getSegment: vi.fn(() => ({ addNewSubsegment: vi.fn(() => ({ close: vi.fn() })) })),
-  })),
+  Tracer: vi.fn(function () {
+    return {
+      getSegment: vi.fn(() => ({
+        addNewSubsegment: vi.fn(() => ({ close: vi.fn() })),
+      })),
+    };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/metrics", () => ({
-  Metrics:    vi.fn(() => ({ addMetric: vi.fn() })),
+  Metrics: vi.fn(function () {
+    return { addMetric: vi.fn() };
+  }),
   MetricUnit: { Count: "Count", Milliseconds: "Milliseconds", NoUnit: "NoUnit" },
 }));
 
@@ -61,10 +111,16 @@ vi.mock("ulid", () => ({
     .mockImplementation(() => "INTEG-ULID-FALLBACK"),
 }));
 
-import { TextractClient } from "@aws-sdk/client-textract";
-import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
+vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
+  BedrockRuntimeClient: vi.fn().mockImplementation(function () {
+    return { send: mockBedRockSend };
+  }),
+  InvokeModelCommand: vi.fn(function (args) {
+    return { _tag: "InvokeModel", input: args };
+  }),
+}));
+
 import {
-  ApiGatewayManagementApiClient,
   PostToConnectionCommand,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 
@@ -78,12 +134,14 @@ import {
   ddbDoc,
   s3,
   eb,
+  dynamodb,
   TABLE_NAME_MAIN,
   BUCKET_RECEIPTS_NAME,
   EVENT_BUS_NAME,
   TEST_USER_ID,
   waitForLocalStack,
   cleanTable,
+  TABLE_NAME_CONNECTIONS,
 } from "../__helpers__/localstack-client.js";
 import {
   CreateBucketCommand,
@@ -91,17 +149,36 @@ import {
 import {
   CreateEventBusCommand,
 } from "@aws-sdk/client-eventbridge";
+import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
 // ─── Suite-level constants ────────────────────────────────────────────────────
 const EXPENSE_ID   = "integ-pipe-expense-001";
 const SCAN_ID      = "integ-pipe-scan-001";
-const CONN_TABLE   = `${TABLE_NAME_MAIN}-connections`;
 const S3_KEY       = `receipts/${TEST_USER_ID}/${EXPENSE_ID}/${SCAN_ID}/receipt.jpg`;
 const TEXTRACT_JOB = "textract-integ-job-001";
 
 // ─── Suite setup ─────────────────────────────────────────────────────────────
 beforeAll(async () => {
   await waitForLocalStack();
+
+  for (const TableName of [TABLE_NAME_MAIN, TABLE_NAME_CONNECTIONS]) {
+    try {
+      await dynamodb.send(new CreateTableCommand({
+        TableName,
+        KeySchema: [
+          { AttributeName: "pk", KeyType: "HASH" },
+          { AttributeName: "sk", KeyType: "RANGE" },
+        ],
+        AttributeDefinitions: [
+          { AttributeName: "pk", AttributeType: "S" },
+          { AttributeName: "sk", AttributeType: "S" },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
+      }));
+    } catch (e: any) {
+      if (e.name !== "ResourceInUseException") throw e;
+    }
+  }
 
   // Bootstrap LocalStack resources
   try { await s3.send(new CreateBucketCommand({ Bucket: BUCKET_RECEIPTS_NAME })); }
@@ -111,10 +188,10 @@ beforeAll(async () => {
   catch (e: any) { if (e.name !== "ResourceAlreadyExistsException") throw e; }
 
   // Set all env vars the handlers need
-  process.env.TABLE_NAME_MAIN             = TABLE_NAME_MAIN;
-  process.env.TABLE_NAME_CONNECTIONS        = CONN_TABLE;
+  process.env.TABLE_NAME_MAIN        = TABLE_NAME_MAIN;
+  process.env.TABLE_NAME_CONNECTIONS = TABLE_NAME_CONNECTIONS;
   process.env.EVENT_BUS_NAME         = EVENT_BUS_NAME;
-  process.env.BUCKET_RECEIPTS_NAME        = BUCKET_RECEIPTS_NAME;
+  process.env.BUCKET_RECEIPTS_NAME   = BUCKET_RECEIPTS_NAME;
   process.env.TEXTRACT_SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract";
   process.env.TEXTRACT_ROLE_ARN      = "arn:aws:iam::000000000000:role/costscrunch-dev-textract";
   process.env.WEBSOCKET_ENDPOINT     = "https://stub.execute-api.us-east-1.amazonaws.com/prod";
@@ -122,7 +199,7 @@ beforeAll(async () => {
   process.env.AWS_REGION             = "us-east-1";
   process.env.AWS_ACCESS_KEY_ID      = "test";
   process.env.AWS_SECRET_ACCESS_KEY  = "test";
-}, 60_000);
+}, 60000);
 
 afterAll(async () => {
   await cleanTable("RECEIPT#");
@@ -147,8 +224,7 @@ function wireTextractInteg() {
     }],
   }];
 
-  vi.mocked(TextractClient).mock.results[0]!.value.send = vi.fn()
-    .mockResolvedValue({ ExpenseDocuments: docs });
+  mockTextractSend.mockResolvedValue({ ExpenseDocuments: docs });
 }
 
 function wireBedrockInteg() {
@@ -156,8 +232,7 @@ function wireBedrockInteg() {
   const encoded = new TextEncoder().encode(
     JSON.stringify({ content: [{ text: JSON.stringify(payload) }] })
   );
-  vi.mocked(BedrockRuntimeClient).mock.results[0]!.value.send = vi.fn()
-    .mockResolvedValue({ body: encoded });
+  mockBedRockSend.mockResolvedValue({ body: encoded });  // ← correct spy
 }
 
 // ─── S3 event factory ─────────────────────────────────────────────────────────
@@ -260,8 +335,7 @@ function makeEbEvent(overrides: Partial<{
 describe("S3 Initiator (index.ts) — integration", () => {
   it("writes a processing scan record to real DynamoDB", async () => {
     // Textract StartExpenseAnalysis is mocked to avoid calling AWS
-    vi.mocked(TextractClient).mock.results[0]!.value.send = vi.fn()
-      .mockResolvedValue({ JobId: TEXTRACT_JOB });
+    mockTextractSend.mockResolvedValue({ JobId: TEXTRACT_JOB });
 
     await s3Handler(makeS3Event());
 
@@ -281,8 +355,7 @@ describe("S3 Initiator (index.ts) — integration", () => {
   });
 
   it("sets a 30-day TTL on the processing scan record", async () => {
-    vi.mocked(TextractClient).mock.results[0]!.value.send = vi.fn()
-      .mockResolvedValue({ JobId: TEXTRACT_JOB });
+    mockTextractSend.mockResolvedValue({ JobId: TEXTRACT_JOB });
 
     await s3Handler(makeS3Event());
 
@@ -410,7 +483,7 @@ describe("SNS Webhook (sns-webhook.ts) — integration", () => {
     }));
 
     wireTextractInteg();
-    vi.mocked(BedrockRuntimeClient).mock.results[0]!.value.send = vi.fn()
+    mockBedRockSend
       .mockRejectedValue(new Error("Bedrock throttled"));
 
     await snsWebhookHandler(makeSnsEvent({ expenseId: fbExpenseId, scanId: fbScanId }));
@@ -437,7 +510,7 @@ describe("WebSocket Notifier (ws-notifier.ts) — integration", () => {
     // Seed a connection record in the connections table (LocalStack DDB)
     // In production this is written by the $connect Lambda.
     await ddbDoc.send(new PutCommand({
-      TableName: CONN_TABLE,
+      TableName: TABLE_NAME_CONNECTIONS,
       Item: {
         pk:           `WS_CONN#${TEST_USER_ID}`,
         sk:           `CONN#${CONN_ID}`,
@@ -452,8 +525,7 @@ describe("WebSocket Notifier (ws-notifier.ts) — integration", () => {
   afterAll(async () => { await cleanTable("WS_CONN#"); });
 
   it("queries the connection table and calls PostToConnectionCommand", async () => {
-    vi.mocked(ApiGatewayManagementApiClient).mock.results[0]!.value.send = vi.fn()
-      .mockResolvedValue({});
+    mockApiGwSend.mockResolvedValue({});
 
     await wsNotifierHandler(makeEbEvent());
 
@@ -463,8 +535,7 @@ describe("WebSocket Notifier (ws-notifier.ts) — integration", () => {
   });
 
   it("pushed payload is valid JSON with RECEIPT_SCAN_COMPLETED type", async () => {
-    vi.mocked(ApiGatewayManagementApiClient).mock.results[0]!.value.send = vi.fn()
-      .mockResolvedValue({});
+    mockApiGwSend.mockResolvedValue({});  // simple success — no GoneException here
 
     await wsNotifierHandler(makeEbEvent());
 
@@ -479,7 +550,7 @@ describe("WebSocket Notifier (ws-notifier.ts) — integration", () => {
     // Seed a stale connection
     const staleConnId = "integ-stale-conn-001";
     await ddbDoc.send(new PutCommand({
-      TableName: CONN_TABLE,
+      TableName: TABLE_NAME_CONNECTIONS,
       Item: {
         pk: `WS_CONN#${TEST_USER_ID}`, sk: `CONN#${staleConnId}`,
         connectionId: staleConnId, userId: TEST_USER_ID,
@@ -488,18 +559,18 @@ describe("WebSocket Notifier (ws-notifier.ts) — integration", () => {
 
     // ApiGW throws GoneException for the stale connection, succeeds for the good one
     const { GoneException } = await import("@aws-sdk/client-apigatewaymanagementapi");
-    vi.mocked(ApiGatewayManagementApiClient).mock.results[0]!.value.send = vi.fn()
-      .mockRejectedValueOnce(new GoneException({
-        message: "",
-        $metadata: {}
-      }))
-      .mockResolvedValue({});
+    mockApiGwSend.mockImplementation(async (cmd: any) => {
+      if (cmd.input?.ConnectionId === staleConnId) {
+        throw new GoneException({ message: "Gone", $metadata: {} });
+      }
+      return {};
+    });
 
     await wsNotifierHandler(makeEbEvent());
 
     // The stale connection row should be gone from DDB
     const { Item } = await ddbDoc.send(new GetCommand({
-      TableName: CONN_TABLE,
+      TableName: TABLE_NAME_CONNECTIONS,
       Key: { pk: `WS_CONN#${TEST_USER_ID}`, sk: `CONN#${staleConnId}` },
     }));
     expect(Item).toBeUndefined();

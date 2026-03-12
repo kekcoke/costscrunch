@@ -22,10 +22,6 @@ export default defineConfig({
 
     globals: true,
 
-    // Global setup for all tests (loads .env.test)
-    // runs ONCE before workers, always honoured by projects
-    globalSetup: [resolve(__dirname, "__tests__/setup/setupTestEnv.ts")],
-
     // --- Test projects ---
     projects: [
       {
@@ -34,6 +30,7 @@ export default defineConfig({
           include: ["**/__tests__/unit/**/*.test.ts"],
           globals: true,
           setupFiles: [
+            resolve(__dirname, "__tests__/setup/setupTestEnv.ts"),
             resolve(__dirname, "__tests__/setup/vitest.setup.unit.ts"),
           ],
         },
@@ -44,6 +41,7 @@ export default defineConfig({
           include: ["**/__tests__/integration/**/*.test.ts"],
           globals: true,
           setupFiles: [
+            resolve(__dirname, "__tests__/setup/setupTestEnv.ts"),
             resolve(__dirname, "__tests__/setup/vitest.setup.integration.ts"),
           ],
         },

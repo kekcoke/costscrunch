@@ -117,9 +117,16 @@ import {
 // (vitest.setup.unit.ts may already set these globally).
 const TABLE_NAME_MAIN         = process.env.TABLE_NAME_MAIN;
 const EVENT_BUS_NAME          = process.env.EVENT_BUS_NAME;
-const SNS_TEXTRACT_TOPIC_ARN  = process.env.SNS_TEXTRACT_TOPIC_ARN;
-const SNS_TEXTRACT_ROLE_ARN   = process.env.SNS_TEXTRACT_ROLE_ARN; 
-const BUCKET_RECEIPTS_NAME    = process.env.BUCKET_RECEIPTS_NAME;
+const BUCKET_RECEIPTS_NAME    = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
+
+let snsTopic: string;
+let snsRole: string;
+
+beforeAll(() => {
+  // Safe to read process.env here — setupFiles have already run
+  snsTopic = process.env.TEXTRACT_SNS_TOPIC_ARN!;
+  snsRole  = process.env.TEXTRACT_ROLE_ARN!;
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -361,10 +368,11 @@ describe("S3 handler — key validation", () => {
   it("passes SNS topic ARN and role ARN to Textract notification channel", async () => {
     await handler(makeS3Event());
 
-    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
-    expect(startArg?.NotificationChannel).toMatchObject({
-      SNSTopicArn: SNS_TEXTRACT_TOPIC_ARN,
-      RoleArn:     SNS_TEXTRACT_ROLE_ARN,
+    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0];
+    expect(startArg).toBeDefined();
+    expect(startArg?.NotificationChannel).toEqual({
+      SNSTopicArn: snsTopic,
+      RoleArn:     snsRole
     });
   });
 
