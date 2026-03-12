@@ -6,11 +6,11 @@
 # Requires: aws-cli, python3  (provided by Dockerfile.seed)
 #
 # Resources created:
-#   KMS key + alias, DynamoDB tables (main + connections) + GSIs + TTL + PITR,
-#   S3 buckets (receipts + assets),
+#   KMS key + alias, DynamoDB tables (main + connections) + GSIs + TTL + PITR + encryption,
+#   S3 buckets (receipts + assets) + encryption + CORS + lifecycle,
 #   Cognito MOCK — DynamoDB-backed substitute (Cognito is paid-tier only),
 #   SQS queues (scan-dlq, notif-dlq, notifications.fifo, ws-notifier-dlq),
-#   SNS topics (textract-completion + notifications), EventBridge bus + rules,
+#   SNS topics (textract-completion), EventBridge bus + rules + archive,
 #   SSM parameters (including WS endpoint + Textract topic ARN), seed test data
 #
 # ── LocalStack free tier limitations relevant to this stack ──────────────────
@@ -98,6 +98,12 @@ $AWS dynamodb update-continuous-backups \
   --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
   --no-cli-pager 2>/dev/null || true
 
+# Enable SSE encryption with KMS (matches CDK TableEncryptionV2.customerManagedKey)
+$AWS dynamodb update-table \
+  --table-name "$TABLE_NAME_MAIN" \
+  --sse-specification "Enabled=true,SSEType=KMS,KMSMasterKeyId=$KMS_KEY_ID" \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ DynamoDB main table ready"
 
 # ── DynamoDB — WebSocket Connection Table ────────────────────────────────────
@@ -118,6 +124,12 @@ $AWS dynamodb update-time-to-live \
   --time-to-live-specification "Enabled=true,AttributeName=ttl" \
   --no-cli-pager 2>/dev/null || true
 
+# Enable SSE encryption with KMS (matches CDK TableEncryptionV2.customerManagedKey)
+$AWS dynamodb update-table \
+  --table-name "$TABLE_NAME_DYNAMO_CONNECTIONS" \
+  --sse-specification "Enabled=true,SSEType=KMS,KMSMasterKeyId=$KMS_KEY_ID" \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ DynamoDB connections table ready"
 
 # ── S3 — Receipts Bucket ──────────────────────────────────────────────────────
@@ -132,14 +144,26 @@ $AWS s3api put-bucket-versioning \
   --versioning-configuration Status=Enabled \
   --no-cli-pager 2>/dev/null || true
 
-# CORS: PUT + GET only, localhost:3000 only (matches CDK — no HEAD, no :5173)
+# Enable bucket encryption with KMS (matches CDK BucketEncryption.KMS_MANAGED)
+$AWS s3api put-bucket-encryption \
+  --bucket "$BUCKET_RECEIPTS_NAME" \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms"
+      }
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# CORS: PUT + GET only, localhost:3000 + localhost:5173 for Vite dev server (matches CDK dev mode "*")
 $AWS s3api put-bucket-cors \
   --bucket "$BUCKET_RECEIPTS_NAME" \
   --cors-configuration '{
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["http://localhost:3000"],
+      "AllowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
@@ -180,6 +204,18 @@ $AWS s3api put-public-access-block \
   --bucket "$BUCKET_ASSETS" \
   --public-access-block-configuration \
     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+  --no-cli-pager 2>/dev/null || true
+
+# Enable bucket encryption (matches CDK defaults for assets bucket)
+$AWS s3api put-bucket-encryption \
+  --bucket "$BUCKET_ASSETS" \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms"
+      }
+    }]
+  }' \
   --no-cli-pager 2>/dev/null || true
 
 echo "✅ Assets bucket ready"
@@ -315,7 +351,14 @@ $AWS events put-rule \
   --state ENABLED \
   --no-cli-pager 2>/dev/null || true
 
-echo "✅ EventBridge ready"
+# EventBridge Archive (matches CDK events.Archive with 30-day retention)
+$AWS events create-archive \
+  --archive-name "${PREFIX}-archive" \
+  --event-source-arn "arn:aws:events:us-east-1:000000000000:event-bus/${EVENT_BUS_NAME}" \
+  --retention-days 30 \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ EventBridge ready (bus + rules + archive)"
 
 # ── SQS Queues ────────────────────────────────────────────────────────────────
 echo "📦 Creating SQS queues"
@@ -352,7 +395,7 @@ $AWS sqs create-queue \
 
 echo "✅ SQS ready"
 
-# ── SNS ───────────────────────────────────────────────────────────────────────
+# ── SNS ───────────────────────────────────────────────────────────────
 echo "📦 Creating SNS topics"
 
 # Textract async completion topic — sns-webhook Lambda subscribes here
@@ -361,11 +404,6 @@ TEXTRACT_TOPIC_ARN=$($AWS sns create-topic \
   --no-cli-pager \
   --query "TopicArn" \
   --output text 2>/dev/null || echo "arn:aws:sns:us-east-1:000000000000:${PREFIX}-textract-completion")
-
-# App notifications topic (Pinpoint/SES fan-out) — unchanged
-$AWS sns create-topic \
-  --name "${PREFIX}-notifications" \
-  --no-cli-pager 2>/dev/null || true
 
 echo "  ↳ Textract topic ARN: $TEXTRACT_TOPIC_ARN"
 echo "✅ SNS ready"
@@ -387,6 +425,8 @@ $AWS ssm put-parameter --name "/costscrunch/dev/textract-topic-arn"   --value "$
 $AWS ssm put-parameter --name "/costscrunch/dev/conn-table-name"      --value "$TABLE_NAME_DYNAMO_CONNECTIONS"                --type String --overwrite --no-cli-pager 2>/dev/null || true
 # WebSocket endpoint is a LocalStack stub — real URL comes from CDK output in real envs
 $AWS ssm put-parameter --name "/costscrunch/dev/ws-endpoint"          --value "http://localhost:4566/_aws/apigatewayv2/ws" --type String --overwrite --no-cli-pager 2>/dev/null || true
+# Bedrock model ID (matches CDK BEDROCK_MODEL_ID)
+$AWS ssm put-parameter --name "/costscrunch/dev/bedrock-model-id"     --value "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0" --type String --overwrite --no-cli-pager 2>/dev/null || true
 
 echo "✅ SSM ready"
 

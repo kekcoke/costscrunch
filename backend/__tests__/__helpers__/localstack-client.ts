@@ -16,6 +16,10 @@ import { SQSClient } from "@aws-sdk/client-sqs";
 import { SNSClient } from "@aws-sdk/client-sns";
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { SSMClient } from "@aws-sdk/client-ssm";
+import { KMSClient } from "@aws-sdk/client-kms";
+import { IAMClient } from "@aws-sdk/client-iam";
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { APIGatewayProxyEventV2 } from "aws-lambda/trigger/api-gateway-proxy.js";
 
 // ─── LocalStack connection config ─────────────────────────────────────────────
@@ -48,19 +52,29 @@ export const sqs = new SQSClient(getBaseConfig());
 export const sns = new SNSClient(getBaseConfig());
 export const eb  = new EventBridgeClient(getBaseConfig());
 export const ssm = new SSMClient(getBaseConfig());
+export const kms = new KMSClient(getBaseConfig());
+export const iam = new IAMClient(getBaseConfig());
+export const lambda = new LambdaClient(getBaseConfig());
+export const logs = new CloudWatchLogsClient(getBaseConfig());
 
 // ─── Constants matching the seed script ───────────────────────────────────────
 export const TABLE_NAME_MAIN  = process.env.TABLE_NAME_MAIN  ?? "costscrunch-dev-main";
 export const TABLE_NAME_CONNECTIONS = process.env.TABLE_NAME_CONNECTIONS 
   ?? "costscrunch-dev-connections";
 export const BUCKET_RECEIPTS_NAME = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
+export const BUCKET_ASSETS_NAME = process.env.BUCKET_ASSETS_NAME ?? "costscrunch-dev-assets-000000000000";
 export const EVENT_BUS_NAME   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev-events";
-export const REDIS_HOST  = ""
-export const REDIS_PORT  = "6379"
+export const REDIS_HOST  = process.env.REDIS_HOST ?? "localhost";
+export const REDIS_PORT  = process.env.REDIS_PORT ?? "6379";
 export const FROM_EMAIL  = "noreply@costscrunch.dev";
 export const PREFIX      = "costscrunch-dev";
-export const ENVIRONMENT = "dev"
-export const LOG_LEVEL   = "INFO"
+export const ENVIRONMENT = "dev";
+export const LOG_LEVEL   = process.env.LOG_LEVEL ?? "SILENT";
+export const USER_POOL_ID = process.env.USER_POOL_ID ?? "local-pool-costscrunch-dev";
+export const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID ?? "local-client-costscrunch-dev-web";
+export const WEBSOCKET_ENDPOINT = process.env.WEBSOCKET_ENDPOINT ?? "http://localhost:4566/_aws/apigatewayv2/ws";
+export const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
+export const TEXTRACT_TOPIC_ARN = process.env.TEXTRACT_SNS_TOPIC_ARN ?? "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion";
 
 // ─── Test data helpers ────────────────────────────────────────────────────────
 export const TEST_USER_ID  = "test-user-001";
