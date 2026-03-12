@@ -37,7 +37,7 @@
 
 ## Repository Structure
 ```
-./
+costscrunch
 ├── ai/
 │   ├── adapters/
 │   ├── references/
@@ -49,22 +49,40 @@
 │   ├── .DS_Store
 │   ├── __tests__/
 │   │   ├── .DS_Store
+│   │   ├── __config__/
+│   │   │   └── testConfig.ts
 │   │   ├── __helpers__/
 │   │   │   └── localstack-client.ts                  # localstack mock environment
 │   │   ├── integration/
-│   │   │   └── expenses.integration.test.ts
-│   │   ├── jest.setup.integration.ts
-│   │   ├── jest.setup.unit.ts
+│   │   ├── __mocks__/
+│   │   │   ├── .DS_Store
+│   │   │   ├── @aws-lambda-powertools/
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── logger.ts
+│   │   │   │   ├── metrics.ts
+│   │   │   │   └── tracer.ts
+│   │   │   └── eventBridge.ts
+│   │   ├── integration/
+│   │   │   ├── expenses.integration.test.ts
+│   │   │   └── receipts.integration.test.ts
+│   │   ├── setup/
+│   │   │   ├── setupTestEnv.ts
+│   │   │   ├── vitest.setup.integration.ts
+│   │   │   └── vitest.setup.unit.ts
 │   │   └── unit/
 │   │       ├── analytics.unit.test.ts
 │   │       ├── expenses.unit.test.ts
-│   │       └── groups.unit.test.ts
-│   ├── jest.config.ts
+│   │       ├── groups.unit.test.ts
+│   │       ├── receipts.unit.test.ts
+│   │       ├── sns-webhook.unit.test.ts
+│   │       └── web-socket-notifier.unit.test.ts
 │   ├── package.json
 │   ├── src/
+│   │   ├── .DS_Store
 │   │   ├── lambdas/                                  # lambda handlers
 │   │   │   ├── .DS_Store
 │   │   │   ├── analytics/
+│   │   │   │   ├── .DS_Store
 │   │   │   │   └── index.ts
 │   │   │   ├── expenses/
 │   │   │   │   └── index.ts
@@ -72,14 +90,19 @@
 │   │   │   │   └── index.ts
 │   │   │   ├── notifications/
 │   │   │   │   └── index.ts
-│   │   │   └── receipts/
+│   │   │   ├── receipts/
+│   │   │   │   └── index.ts
+│   │   │   ├── sns-webhook/
+│   │   │   │   └── index.ts
+│   │   │   └── web-socket-notifier/
 │   │   │       └── index.ts
-│   │   ├── server.ts        
+│   │   ├── server.ts
 │   │   └── shared/
 │   │       └── models/
 │   │           └── types.ts
 │   ├── tsconfig.json
-│   └── tsconfig.test.json
+│   ├── tsconfig.test.json
+│   └── vite.config.ts
 ├── frontend/
 │   ├── .DS_Store
 │   ├── .gitignore
@@ -122,7 +145,6 @@
 │   │   │   └── results.ts
 │   │   ├── models/                                   # Type, schema, constant definitions
 │   │   │   ├── constants.ts
-│   │   │   ├── expense.ts
 │   │   │   ├── interfaceProps.ts
 │   │   │   ├── scanForm.ts
 │   │   │   └── types.ts
@@ -142,14 +164,27 @@
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
 └── infrastructure/
+    ├── .DS_Store
     ├── .dockerignore
+    ├── __tests__/
+    │   └── localstack/
+    │       ├── dynamodb.test.ts
+    │       ├── eventbridge.test.ts
+    │       ├── health.test.ts
+    │       ├── kms.test.ts
+    │       ├── s3.test.ts
+    │       ├── ses.test.ts
+    │       ├── sns.test.ts
+    │       ├── sqs.test.ts
+    │       └── ssm.test.ts
     ├── docker-compose.localstack.yml                  # compose file localstack and seeding
     ├── localstack/
     │   └── dev/
-    │       └── seed-setup.sh                          # seeds localstack according CostsCruncStack specs
+    │       └── setup.sh                               # seeds localstack according CostsCruncStack specs
     ├── package.json
-    └── stacks/
-        └── CostsCrunchStack.ts                        # cloud infra blueprint
+    ├── stacks/
+    │   └── CostsCrunchStack.ts                         # cloud infra blueprint
+    └── tsconfig.json
 ```
 
 ---
@@ -418,10 +453,10 @@ npm run load-test
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CD Workflow                                     │
+│                              CD Workflow                                    │
 │  Trigger: CI success (workflow_run) or manual dispatch                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
+│                                                                             │
 │  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐             │
 │  │    Staging     │───▶│    E2E Tests   │───▶│   Production   │             │
 │  │                │    │   (Playwright) │    │   (protected)  │             │
