@@ -391,6 +391,135 @@ npm run load-test
 
 ---
 
+## CI/CD Deployment
+
+### Pipeline Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CI Workflow                                    │
+│  Trigger: push/PR to main, staging                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐             │
+│  │   Quality    │   │   Security   │   │        Build         │             │
+│  │    Gate      │   │    Scan      │   │                      │             │
+│  ├──────────────┤   ├──────────────┤   ├──────────────────────┤             │
+│  │ • Frontend   │   │ • Semgrep    │   │ • Backend bundle     │             │
+│  │ • Backend    │   │ • npm audit  │   │ • Frontend build     │             │
+│  │ • Infra      │   │ • Gitleaks   │   │ • CDK synth          │             │
+│  └──────────────┘   └──────────────┘   └──────────────────────┘             │
+│                              │                                              │
+│                              ▼                                              │
+│                    ┌──────────────────┐                                     │
+│                    │    Artifacts     │                                     │
+│                    │  (7-day retain)  │                                     │
+│                    └──────────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CD Workflow                                     │
+│  Trigger: CI success (workflow_run) or manual dispatch                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐             │
+│  │    Staging     │───▶│    E2E Tests   │───▶│   Production   │             │
+│  │                │    │   (Playwright) │    │   (protected)  │             │
+│  ├────────────────┤    └────────────────┘    ├────────────────┤             │
+│  │ • CDK deploy   │           │              │ • CDK deploy   │             │
+│  │ • S3 sync      │           │              │ • S3 sync      │             │
+│  │ • Smoke test   │           │              │ • CF invalidate│             │
+│  └────────────────┘           │              │ • Smoke test   │             │
+│                               │              │ • Slack notify │             │
+│                               ▼              └────────────────┘             │
+│                      ┌────────────────┐                                     │
+│                      │   Rollback     │  (manual trigger only)              │
+│                      │  (on failure)  │                                     │
+│                      └────────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Required GitHub Secrets
+
+| Secret | Description | Environment |
+|--------|-------------|-------------|
+| `AWS_ACCESS_KEY_ID_DEV` | AWS access key for CDK synth | CI |
+| `AWS_SECRET_ACCESS_KEY_DEV` | AWS secret key for CDK synth | CI |
+| `AWS_ACCESS_KEY_ID_STAGING` | AWS access key for staging deploy | CD |
+| `AWS_SECRET_ACCESS_KEY_STAGING` | AWS secret key for staging deploy | CD |
+| `AWS_ACCOUNT_ID_STAGING` | AWS account ID for staging | CD |
+| `AWS_ACCESS_KEY_ID_PROD` | AWS access key for production | CD |
+| `AWS_SECRET_ACCESS_KEY_PROD` | AWS secret key for production | CD |
+| `AWS_ACCOUNT_ID_PROD` | AWS account ID for production | CD |
+| `CODECOV_TOKEN` | Codecov coverage upload token | CI |
+| `SEMGREP_APP_TOKEN` | Semgrep SAST token | CI |
+| `VITE_API_URL` | Frontend API URL | CI |
+| `VITE_USER_POOL_ID` | Cognito User Pool ID | CI |
+| `VITE_USER_POOL_CLIENT_ID` | Cognito Client ID | CI |
+| `STAGING_URL` | Staging base URL for E2E | CD |
+| `STAGING_ASSETS_BUCKET` | S3 bucket for staging frontend | CD |
+| `STAGING_CF_DISTRIBUTION_ID` | CloudFront distribution ID | CD |
+| `PROD_ASSETS_BUCKET` | S3 bucket for production frontend | CD |
+| `CF_DISTRIBUTION_ID` | Production CloudFront ID | CD |
+| `TEST_USER_EMAIL` | Test user for E2E tests | CD |
+| `TEST_USER_PASSWORD` | Test user password | CD |
+| `SLACK_WEBHOOK_URL` | Slack notifications (optional) | CD |
+
+### One-Time Setup
+
+```bash
+# 1. Bootstrap CDK in each environment (run once per account/region)
+npx cdk bootstrap aws://ACCOUNT_ID/us-east-1
+
+# 2. Create IAM user for CI/CD with minimal permissions
+# Recommended: Use OIDC federation instead of access keys
+# See: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments
+
+# 3. Configure GitHub repository secrets
+# Go to: Settings → Secrets and variables → Actions → New repository secret
+
+# 4. Enable GitHub Environments
+# Go to: Settings → Environments → New environment
+#   - staging: No approval required
+#   - production: Add required reviewers
+```
+
+### Manual Deploy
+
+```bash
+# Via GitHub Actions UI
+# Navigate to Actions → CD → Run workflow
+# Select environment: staging | production
+
+# Via CLI (for development)
+npm run deploy:dev      # Deploy to dev environment
+npm run deploy:staging  # Deploy to staging
+npm run deploy:prod     # Deploy to production (requires approval)
+```
+
+### Rollback Procedure
+
+```bash
+# Automatic rollback via CloudFormation
+aws cloudformation rollback-stack --stack-name costscrunch-prod-CostsCrunchStack
+
+# Manual redeploy previous commit
+git checkout HEAD~1
+npm run deploy:prod
+
+# Via GitHub Actions
+# Actions → CD → Run workflow → Select "Rollback" option
+```
+
+### Environment Protection Rules
+
+| Environment | Approval | Deployment Branch | Auto-Deploy |
+|-------------|----------|-------------------|-------------|
+| staging | None | main, staging | Yes (on CI success) |
+| production | 1+ reviewers | main only | Yes (after staging) |
+
+---
+
 ## Roadmap (Post-MVP)
 
 - [ ] Plaid integration (automatic bank transaction sync)
