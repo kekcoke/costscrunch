@@ -380,12 +380,13 @@ NOTIF_DLQ_ARN="arn:aws:sqs:us-east-1:000000000000:${PREFIX}-notif-dlq"
 
 $AWS sqs create-queue \
   --queue-name "${PREFIX}-notifications.fifo" \
-  --attributes \
-    FifoQueue=true \
-    ContentBasedDeduplication=true \
-    VisibilityTimeout=60 \
-    MessageRetentionPeriod=1209600 \
-    "RedrivePolicy={\"deadLetterTargetArn\":\"${NOTIF_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  --attributes '{
+    "FifoQueue": "true",
+    "ContentBasedDeduplication": "true",
+    "VisibilityTimeout": "60",
+    "MessageRetentionPeriod": "1209600",
+    "RedrivePolicy": "{\"deadLetterTargetArn\":\"'"${NOTIF_DLQ_ARN}"'\",\"maxReceiveCount\":\"3\"}"
+  }' \
   --no-cli-pager 2>/dev/null || true
 
 $AWS sqs create-queue \
@@ -480,6 +481,6 @@ echo "  List tables:  aws --endpoint-url=http://localhost:4566 dynamodb list-tab
 echo "  List buckets: aws --endpoint-url=http://localhost:4566 s3 ls"
 echo "  List queues:  aws --endpoint-url=http://localhost:4566 sqs list-queues"
 echo "  List buses:   aws --endpoint-url=http://localhost:4566 events list-event-buses"
-echo "  Scan table:       aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE"
+echo "  Scan table:       aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE_NAME_MAIN"
 echo "  Scan conn table:  aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE_NAME_DYNAMO_CONNECTIONS"
 echo "  List SNS topics:  aws --endpoint-url=http://localhost:4566 sns list-topics"
