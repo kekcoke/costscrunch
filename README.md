@@ -195,7 +195,7 @@ User uploads file
     Lambda returns immediately — no polling, no timeout risk
       ↓
          ╔══════════════════════════════════╗
-         ║  Textract processes file (10–90s) ║
+         ║ Textract processes file(10–90s)  ║
          ╚══════════════════════════════════╝
       ↓
 [SNS] textract-completion topic receives job completion notification
@@ -310,23 +310,41 @@ Analytics
 ## Environment Variables
 
 ```bash
-# Backend (set via CDK / SSM)
-TABLE_NAME=costscrunch-prod-main
-EVENT_BUS_NAME=costscrunch-prod-events
-RECEIPTS_BUCKET=costscrunch-prod-receipts-{account}
-REDIS_HOST=...elasticache.amazonaws.com
-REDIS_PORT=6379
-USER_POOL_ID=us-east-1_xxxxxxxx
-FROM_EMAIL=noreply@costscrunch.com
-ENVIRONMENT=prod
-LOG_LEVEL=INFO
+# Environment & Global Settings
+ENVIRONMENT=
+PREFIX=
+AWS_REGION=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_ENDPOINT_URL=
 
-# Frontend (Vite env)
-VITE_API_URL=https://api.costscrunch.com
-VITE_USER_POOL_ID=us-east-1_xxxxxxxx
-VITE_USER_POOL_CLIENT_ID=xxxxxxxxxx
-VITE_REGION=us-east-1
-```
+# Logging & Observability (Powertools)
+LOG_LEVEL=
+DEBUG_EVENT=
+POWERTOOLS_SERVICE_NAME=
+POWERTOOLS_METRICS_NAMESPACE=
+POWERTOOLS_LOGGER_LOG_EVENT=
+
+# Data & Storage (DynamoDB & S3)
+TABLE_NAME_MAIN=
+TABLE_NAME_CONNECTIONS=
+BUCKET_RECEIPTS_NAME=
+BUCKET_ASSETS_NAME=
+
+# Events & Messaging (EventBridge, SNS, SQS)
+EVENT_BUS_NAME=
+TEXTRACT_SNS_TOPIC_ARN=
+TEXTRACT_ROLE_ARN=
+FROM_EMAIL=
+
+# Auth, Cache & APIs (Cognito, Redis, WebSocket)
+USER_POOL_ID=
+REDIS_HOST=
+REDIS_PORT=
+WEBSOCKET_ENDPOINT=
+
+# IAM & Third-Party Services (Bedrock, Textract)
+BEDROCK_MODEL_ID=```
 
 ---
 
