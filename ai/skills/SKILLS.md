@@ -169,7 +169,7 @@ costscrunch
 | **Single-table DynamoDB** | PK / SK plus GSI1 (status+date) and GSI2 (category+date). |
 | **Cognito for identity** | All auth delegates to Cognito; the auth lambda is a thin orchestrator. |
 | **CDK v2** | All infrastructure is code — no ClickOps. |
-| **Vite + Vitest** | Frontend build tooling; tests mirror Jest API (vi.*). |
+| **Full Vitest Stack** | Both frontend AND backend use Vitest for unified testing (vi.*). |
 | **P99 < 80 ms** | Lambda provisioned concurrency on hot paths. DynamoDB on-demand. |
 
 ---
@@ -287,12 +287,15 @@ Prompt:
 ## 5. Testing Cheatsheet
 
 ```bash
-# Unit tests (fast, no Docker)
-cd backend && npx jest --selectProjects unit
+# Backend Unit tests
+cd backend && npm run test:ut
 
-# Integration tests (requires LocalStack)
+# Backend Integration tests (requires LocalStack)
 cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
-cd ../backend && npx jest --selectProjects integration
+cd ../backend && npm run test:ig
+
+# Infrastructure LocalStack tests
+cd infrastructure && npm test
 
 # Frontend Vitest
 cd frontend && npx vitest

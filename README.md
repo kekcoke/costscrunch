@@ -20,12 +20,14 @@
         ↓
 ⚡ ElastiCache Redis (response cache + sessions)
         ↓
-⚙️ AWS Lambda (Node.js 20 + Powertools)
-     ├── expenses/     CRUD + approval workflows
-     ├── groups/       splits + balances + settlements
-     ├── receipts/     S3 → Textract → Claude AI
-     ├── analytics/    aggregations + trends
-     └── notifications/ SES + Pinpoint push/SMS
+⚙️ AWS Lambda (Node.js 20 + Powertools + Vitest)
+     ├── expenses/       CRUD + approval workflows
+     ├── groups/         splits + balances + settlements
+     ├── receipts/       S3 → Textract async triggering
+     ├── sns-webhook/    Textract completion → Claude AI → DB
+     ├── ws-notifier/    Real-time WebSocket updates
+     ├── analytics/      aggregations + trends
+     └── notifications/  SES + Pinpoint push/SMS
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
 📦 S3 (receipts + assets, KMS encrypted)
@@ -386,26 +388,23 @@ BEDROCK_MODEL_ID=```
 ## Local Development
 
 ```bash
-# Prerequisites: Node 20+, AWS CLI, CDK CLI
+# Prerequisites: Node 20+, AWS CLI, CDK CLI, Docker (for LocalStack)
 npm install -g aws-cdk
 
 # Install all dependencies
 npm install
 
+# Start LocalStack (Infra testing)
+cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+
+# Run Tests (Vitest)
+npm run test        # Runs all unit/integration tests
+
 # Start frontend
 npm run dev:frontend      # http://localhost:3000
 
-# Run CDK diff (no deploy)
-npm run diff
-
 # Deploy to dev
 npm run deploy:dev
-
-# Seed dev database
-npm run db:seed
-
-# Run load test (requires k6)
-npm run load-test
 ```
 
 ---
