@@ -237,9 +237,9 @@ to user                                   DynamoDB connections table
                                     confidence, policy flags
 ```
 
-**Supported inputs:** JPG, PNG, HEIC, PDF  
-**Average processing time:** 3–8 seconds  
-**AI confidence:** typically 88–98%  
+**Supported inputs:** JPG, PNG, HEIC, PDF
+**Processing time:** 10–90 seconds (Textract async job)
+**AI confidence:** typically 88–98%
 **Fallback:** keyword-based categorization if Bedrock unavailable
 
 ---
