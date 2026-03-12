@@ -6,11 +6,12 @@
 # Requires: aws-cli, python3  (provided by Dockerfile.seed)
 #
 # Resources created:
-#   KMS key + alias, DynamoDB table + GSIs + TTL + PITR,
+#   KMS key + alias, DynamoDB tables (main + connections) + GSIs + TTL + PITR,
 #   S3 buckets (receipts + assets),
 #   Cognito MOCK — DynamoDB-backed substitute (Cognito is paid-tier only),
-#   SQS queues (scan-dlq, notif-dlq, notifications.fifo),
-#   EventBridge bus + rules, SNS topic, SSM parameters, seed test data
+#   SQS queues (scan-dlq, notif-dlq, notifications.fifo, ws-notifier-dlq),
+#   SNS topics (textract-completion + notifications), EventBridge bus + rules,
+#   SSM parameters (including WS endpoint + Textract topic ARN), seed test data
 #
 # ── LocalStack free tier limitations relevant to this stack ──────────────────
 # The following services used in CostsCrunchStack.ts are NOT available on the
@@ -23,17 +24,20 @@
 #   CloudFront       — basic distribution CRUD only; no real CDN behaviour
 #   Bedrock          — paid tier only; AI enrichment in receipts Lambda won't run
 #   Pinpoint         — paid tier only; push/SMS notifications won't fire
+#   API GW WebSocket — basic WS CRUD accepted; @connections push is a no-op locally
 #   IAM enforcement  — policies accepted but NOT enforced on free tier
 #   Persistence      — free tier has no durable state; seed must re-run on restart
 
 set -euo pipefail
 
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
-TABLE="costscrunch-dev-main"
-BUCKET_RECEIPTS="costscrunch-dev-receipts-000000000000"
+TABLE_NAME_MAIN="costscrunch-dev-main"
+TABLE_NAME_DYNAMO_CONNECTIONS="costscrunch-dev-connections"
+BUCKET_RECEIPTS_NAME="costscrunch-dev-receipts-000000000000"
 BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
-EVENT_BUS="costscrunch-dev-events"
+EVENT_BUS_NAME="costscrunch-dev-events"
 PREFIX="costscrunch-dev"
+FROM_EMAIL="noreply@costscrunch.dev"
 
 echo "🔧 costscrunch LocalStack seed starting..."
 
@@ -53,9 +57,9 @@ $AWS kms create-alias \
 echo "✅ KMS ready (key: $KMS_KEY_ID)"
 
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
-echo "📦 Creating DynamoDB table: $TABLE"
+echo "📦 Creating DynamoDB table: $TABLE_NAME_MAIN"
 $AWS dynamodb create-table \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --attribute-definitions \
     AttributeName=pk,AttributeType=S \
     AttributeName=sk,AttributeType=S \
@@ -84,33 +88,53 @@ $AWS dynamodb create-table \
 
 # Enable TTL (attribute name: ttl — matches CDK timeToLiveAttribute)
 $AWS dynamodb update-time-to-live \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --time-to-live-specification "Enabled=true,AttributeName=ttl" \
   --no-cli-pager 2>/dev/null || true
 
 # Enable point-in-time recovery (matches CDK pointInTimeRecovery: true)
 $AWS dynamodb update-continuous-backups \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
   --no-cli-pager 2>/dev/null || true
 
-echo "✅ DynamoDB ready"
+echo "✅ DynamoDB main table ready"
+
+# ── DynamoDB — WebSocket Connection Table ────────────────────────────────────
+echo "📦 Creating DynamoDB connections table: $TABLE_NAME_DYNAMO_CONNECTIONS"
+$AWS dynamodb create-table \
+  --table-name "$TABLE_NAME_DYNAMO_CONNECTIONS" \
+  --attribute-definitions \
+    AttributeName=pk,AttributeType=S \
+    AttributeName=sk,AttributeType=S \
+  --key-schema \
+    AttributeName=pk,KeyType=HASH \
+    AttributeName=sk,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Connections table already exists, skipping"
+
+$AWS dynamodb update-time-to-live \
+  --table-name "$TABLE_NAME_DYNAMO_CONNECTIONS" \
+  --time-to-live-specification "Enabled=true,AttributeName=ttl" \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ DynamoDB connections table ready"
 
 # ── S3 — Receipts Bucket ──────────────────────────────────────────────────────
-echo "📦 Creating S3 receipts bucket: $BUCKET_RECEIPTS"
+echo "📦 Creating S3 receipts bucket: $BUCKET_RECEIPTS_NAME"
 $AWS s3api create-bucket \
-  --bucket "$BUCKET_RECEIPTS" \
+  --bucket "$BUCKET_RECEIPTS_NAME" \
   --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
 
 # Enable versioning (matches CDK versioned: true)
 $AWS s3api put-bucket-versioning \
-  --bucket "$BUCKET_RECEIPTS" \
+  --bucket "$BUCKET_RECEIPTS_NAME" \
   --versioning-configuration Status=Enabled \
   --no-cli-pager 2>/dev/null || true
 
 # CORS: PUT + GET only, localhost:3000 only (matches CDK — no HEAD, no :5173)
 $AWS s3api put-bucket-cors \
-  --bucket "$BUCKET_RECEIPTS" \
+  --bucket "$BUCKET_RECEIPTS_NAME" \
   --cors-configuration '{
     "CORSRules": [{
       "AllowedHeaders": ["*"],
@@ -124,7 +148,7 @@ $AWS s3api put-bucket-cors \
 
 # Lifecycle: transition to INTELLIGENT_TIERING after 30d; expire after 365d (matches CDK)
 $AWS s3api put-bucket-lifecycle-configuration \
-  --bucket "$BUCKET_RECEIPTS" \
+  --bucket "$BUCKET_RECEIPTS_NAME" \
   --lifecycle-configuration '{
     "Rules": [
       {
@@ -186,7 +210,7 @@ echo "📦 Seeding Cognito mock (DynamoDB-backed)"
 
 # User pool record
 $AWS dynamodb put-item \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --item '{
     "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
     "sk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
@@ -199,7 +223,7 @@ $AWS dynamodb put-item \
 
 # Web client record
 $AWS dynamodb put-item \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --item '{
     "pk":           {"S": "POOL#'"$MOCK_POOL_ID"'"},
     "sk":           {"S": "CLIENT#'"$MOCK_CLIENT_ID"'"},
@@ -217,7 +241,7 @@ for GROUP_DEF in "admins:1" "support:2" "business:3" "pro:4" "free:5"; do
   GROUP_NAME="${GROUP_DEF%%:*}"
   PRECEDENCE="${GROUP_DEF##*:}"
   $AWS dynamodb put-item \
-    --table-name "$TABLE" \
+    --table-name "$TABLE_NAME_MAIN" \
     --item '{
       "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
       "sk":         {"S": "GROUP#'"$GROUP_NAME"'"},
@@ -231,7 +255,7 @@ done
 # Seed test user — sub is stable so dependent records stay consistent
 MOCK_USER_SUB="00000000-0000-0000-0000-test-user-001"
 $AWS dynamodb put-item \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --item '{
     "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
     "sk":         {"S": "USER#'"$MOCK_USER_SUB"'"},
@@ -256,14 +280,14 @@ echo "✅ Cognito mock ready"
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity: noreply@costscrunch.dev"
 $AWS ses verify-email-identity \
-  --email-address "noreply@costscrunch.dev" \
+  --email-address $FROM_EMAIL \
   --no-cli-pager 2>/dev/null || true
 echo "✅ SES ready"
 
 # ── EventBridge ───────────────────────────────────────────────────────────────
-echo "📦 Creating EventBridge bus: $EVENT_BUS"
+echo "📦 Creating EventBridge bus: $EVENT_BUS_NAME"
 $AWS events create-event-bus \
-  --name "$EVENT_BUS" \
+  --name "$EVENT_BUS_NAME" \
   --no-cli-pager 2>/dev/null || echo "  ↳ Bus already exists, skipping"
 
 # Match EventBridge rules in CDK
@@ -271,15 +295,22 @@ $AWS events create-event-bus \
 # LocalStack doesn't validate targets on rule creation, so we can create rules before lambdas.
 echo "  ↳ Creating EventBridge rules (stub targets)"
 $AWS events put-rule \
-  --name "${PREFIX}-scan-completed" \
-  --event-bus-name "$EVENT_BUS" \
+  --name "${PREFIX}-scan-completed-notif" \
+  --event-bus-name "$EVENT_BUS_NAME" \
+  --event-pattern '{"source":["costscrunch.receipts"],"detail-type":["ReceiptScanCompleted"]}' \
+  --state ENABLED \
+  --no-cli-pager 2>/dev/null || true
+
+$AWS events put-rule \
+  --name "${PREFIX}-scan-completed-ws" \
+  --event-bus-name "$EVENT_BUS_NAME" \
   --event-pattern '{"source":["costscrunch.receipts"],"detail-type":["ReceiptScanCompleted"]}' \
   --state ENABLED \
   --no-cli-pager 2>/dev/null || true
 
 $AWS events put-rule \
   --name "${PREFIX}-expense-approved" \
-  --event-bus-name "$EVENT_BUS" \
+  --event-bus-name "$EVENT_BUS_NAME" \
   --event-pattern '{"source":["costscrunch.expenses"],"detail-type":["ExpenseStatusChanged"],"detail":{"status":["approved","rejected"]}}' \
   --state ENABLED \
   --no-cli-pager 2>/dev/null || true
@@ -314,35 +345,55 @@ $AWS sqs create-queue \
     "RedrivePolicy={\"deadLetterTargetArn\":\"${NOTIF_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
   --no-cli-pager 2>/dev/null || true
 
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-ws-notifier-dlq" \
+  --attributes MessageRetentionPeriod=1209600 \
+  --no-cli-pager 2>/dev/null || true
+
 echo "✅ SQS ready"
 
 # ── SNS ───────────────────────────────────────────────────────────────────────
-echo "📦 Creating SNS topic"
+echo "📦 Creating SNS topics"
+
+# Textract async completion topic — sns-webhook Lambda subscribes here
+TEXTRACT_TOPIC_ARN=$($AWS sns create-topic \
+  --name "${PREFIX}-textract-completion" \
+  --no-cli-pager \
+  --query "TopicArn" \
+  --output text 2>/dev/null || echo "arn:aws:sns:us-east-1:000000000000:${PREFIX}-textract-completion")
+
+# App notifications topic (Pinpoint/SES fan-out) — unchanged
 $AWS sns create-topic \
   --name "${PREFIX}-notifications" \
   --no-cli-pager 2>/dev/null || true
+
+echo "  ↳ Textract topic ARN: $TEXTRACT_TOPIC_ARN"
 echo "✅ SNS ready"
 
 # ── SSM Parameters ────────────────────────────────────────────────────────────
 echo "📦 Writing SSM parameters"
 
-$AWS ssm put-parameter --name "/costscrunch/dev/table-name"      --value "$TABLE"            --type String --overwrite --no-cli-pager 2>/dev/null || true
-$AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS"  --type String --overwrite --no-cli-pager 2>/dev/null || true
-$AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS"        --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/table-name"      --value "$TABLE_NAME_MAIN"            --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS_NAME"  --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS_NAME"        --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Cognito mock IDs in place of real pool/client IDs
 $AWS ssm put-parameter --name "/costscrunch/dev/user-pool-id"    --value "$MOCK_POOL_ID"     --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/user-pool-client-id" --value "$MOCK_CLIENT_ID" --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Stubs for paid-tier services
 $AWS ssm put-parameter --name "/costscrunch/dev/pinpoint-app-id" --value "local-pinpoint-stub-000000" --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/redis-host"      --value "localhost"         --type String --overwrite --no-cli-pager 2>/dev/null || true
-$AWS ssm put-parameter --name "/costscrunch/dev/redis-port"      --value "6379"              --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/redis-port"           --value "6379"                       --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/textract-topic-arn"   --value "$TEXTRACT_TOPIC_ARN"        --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/conn-table-name"      --value "$TABLE_NAME_DYNAMO_CONNECTIONS"                --type String --overwrite --no-cli-pager 2>/dev/null || true
+# WebSocket endpoint is a LocalStack stub — real URL comes from CDK output in real envs
+$AWS ssm put-parameter --name "/costscrunch/dev/ws-endpoint"          --value "http://localhost:4566/_aws/apigatewayv2/ws" --type String --overwrite --no-cli-pager 2>/dev/null || true
 
 echo "✅ SSM ready"
 
 # ── Seed test data ────────────────────────────────────────────────────────────
 echo "📦 Seeding test user profile"
 $AWS dynamodb put-item \
-  --table-name "$TABLE" \
+  --table-name "$TABLE_NAME_MAIN" \
   --item '{
     "pk":        {"S": "USER#test-user-001"},
     "sk":        {"S": "PROFILE#test-user-001"},
@@ -373,18 +424,22 @@ echo ""
 echo "✅✅✅ LocalStack seed complete! Resources available at http://localhost:4566"
 echo ""
 echo "Resource summary:"
-echo "  DynamoDB table:    $TABLE"
-echo "  Receipts bucket:   $BUCKET_RECEIPTS"
-echo "  Assets bucket:     $BUCKET_ASSETS"
-echo "  EventBridge bus:   $EVENT_BUS"
+echo "  DynamoDB main table:  $TABLE_NAME_MAIN"
+echo "  DynamoDB conn table:  $TABLE_NAME_DYNAMO_CONNECTIONS"
+echo "  Receipts bucket:      $BUCKET_RECEIPTS_NAME"
+echo "  Assets bucket:        $BUCKET_ASSETS"
+echo "  EventBridge bus:      $EVENT_BUS_NAME"
+echo "  Textract SNS topic:   $TEXTRACT_TOPIC_ARN"
 echo "  Cognito mock:"
-echo "    pool ID:         $MOCK_POOL_ID"
-echo "    client ID:       $MOCK_CLIENT_ID"
-echo "    test user sub:   $MOCK_USER_SUB"
+echo "    pool ID:            $MOCK_POOL_ID"
+echo "    client ID:          $MOCK_CLIENT_ID"
+echo "    test user sub:      $MOCK_USER_SUB"
 echo ""
 echo "Useful commands:"
 echo "  List tables:  aws --endpoint-url=http://localhost:4566 dynamodb list-tables"
 echo "  List buckets: aws --endpoint-url=http://localhost:4566 s3 ls"
 echo "  List queues:  aws --endpoint-url=http://localhost:4566 sqs list-queues"
 echo "  List buses:   aws --endpoint-url=http://localhost:4566 events list-event-buses"
-echo "  Scan table:   aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE"
+echo "  Scan table:       aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE"
+echo "  Scan conn table:  aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name $TABLE_NAME_DYNAMO_CONNECTIONS"
+echo "  List SNS topics:  aws --endpoint-url=http://localhost:4566 sns list-topics"

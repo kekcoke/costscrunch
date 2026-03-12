@@ -18,7 +18,7 @@ services:
     environment:
       # Free tier services only — paid-tier services (cognito, elasticache,
       # textract, bedrock) are excluded; attempting to start them errors out.
-      - SERVICES=dynamodb,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,secretsmanager,ssm
+      - SERVICES=dynamodb,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,secretsmanager,ssm,events
       - DEBUG=0
       - PERSISTENCE=1
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}

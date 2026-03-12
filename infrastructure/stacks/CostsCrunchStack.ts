@@ -1,6 +1,7 @@
 // ─── Costscrunch — AWS CDK Infrastructure Stack ────────────────────────────────
-// Deploys: Cognito, DynamoDB, S3, API Gateway, Lambda Functions,
-//          ElastiCache, CloudFront, WAF, EventBridge, SNS/Pinpoint
+// Deploys: Cognito, DynamoDB, S3, HTTP API Gateway, WebSocket API Gateway,
+//          Lambda Functions, ElastiCache, CloudFront, WAF, EventBridge,
+//          SNS (Textract completion) + Pinpoint
 
 import { Stack, StackProps, Duration, RemovalPolicy, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
@@ -108,9 +109,22 @@ export class CostsCrunchStack extends Stack {
             ],
         });
 
+        // ── WebSocket Connection Table ────────────────────────────────────────────
+        // Stores active API Gateway WebSocket connectionIds keyed by userId.
+        // Written by $connect Lambda; read by ws-notifier.ts; pruned on GoneException.
+        const connTable = new dynamodb.TableV2(this, "ConnTable", {
+            tableName:     `${prefix}-connections`,
+            partitionKey:  { name: "pk", type: dynamodb.AttributeType.STRING },
+            sortKey:       { name: "sk", type: dynamodb.AttributeType.STRING },
+            billing:       dynamodb.Billing.onDemand(),
+            encryption:    dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
+            timeToLiveAttribute: "ttl",
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+        });
+
         // ── S3 Buckets ────────────────────────────────────────────────
         const receiptsBucket = new s3.Bucket(this, "ReceiptsBucket", {
-            bucketName: `${prefix}-receipts-${this.account} `,
+            bucketName: `${prefix}-receipts-${this.account}`,
             encryption: s3.BucketEncryption.KMS_MANAGED,
             encryptionKey: kmsKey,
             versioned: true,
@@ -241,6 +255,22 @@ export class CostsCrunchStack extends Stack {
             encryptionMasterKey: kmsKey,
         });
 
+        // ── Textract SNS Topic ────────────────────────────────────────────────────────
+        // Textract publishes a completion notification here when an async job finishes.
+        // sns-webhook.ts Lambda subscribes to this topic.
+        const textractTopic = new sns.Topic(this, "TextractTopic", {
+            topicName:   `${prefix}-textract-completion`,
+            masterKey:   kmsKey,
+            displayName: "Textract async job completion",
+        });
+
+        // IAM role Textract assumes to publish to the SNS topic
+        const textractSnsRole = new iam.Role(this, "TextractSnsRole", {
+            roleName:  `${prefix}-textract-sns`,
+            assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
+        });
+        textractTopic.grantPublish(textractSnsRole);
+
         // ── EventBridge ──────────────────────────────────────────────────────────
         const eventBus = new events.EventBus(this, "EventBus", {
             eventBusName: `${prefix}-events`,
@@ -251,7 +281,12 @@ export class CostsCrunchStack extends Stack {
             sourceEventBus: eventBus,
             retention: Duration.days(30),
             eventPattern: {
-                source: ["costscrunch.expenses", "costscrunch.users", "costscrunch.billing"],
+                source: [
+                    "costscrunch.expenses", 
+                    "costscrunch.users", 
+                    "costscrunch.billing", 
+                    "costscrunch.receipts"
+                ],
             }
         });
 
@@ -259,14 +294,15 @@ export class CostsCrunchStack extends Stack {
         // https://docs.aws.amazon.com/powertools/typescript/latest/getting-started/lambda-layers/#lookup-layer-arn-via-aws-ssm-parameter-store
         const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
             this, "PowertoolsLayer",
-            `arn:aws:lambda:${this.region}:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:latest`
+            `arn:aws:lambda:${this.region}:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22`  // pin version — :latest not valid in Lambda ARNs
         );
 
         // ── Lambda Shared Environment ────────────────────────────────────────────
         const sharedEnv = {
-            TABLE_NAME: table.tableName,
-            EVENT_BUS_NAME: eventBus.eventBusName,
-            RECEIPTS_BUCKET: receiptsBucket.bucketName,
+            TABLE_NAME_MAIN:      table.tableName,
+            TABLE_NAME_CONNECTIONS: connTable.tableName,   // ws-notifier reads connection records
+            EVENT_BUS_NAME:  eventBus.eventBusName,
+            BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
             USER_POOL_ID: userPool.userPoolId,
@@ -308,9 +344,13 @@ export class CostsCrunchStack extends Stack {
             ...sharedLambdaProps as any,
             entry: "backend/src/lambdas/receipts/index.ts",
             functionName: `${prefix}-receipts`,
-            timeout: Duration.seconds(300), // Textract can take time
-            memorySize: 1024,
-            environment: { ...sharedEnv },
+            // timeout removed: Lambda now returns immediately after StartExpenseAnalysis.
+            // Textract async completion flows through sns-webhook Lambda instead.
+            environment: {
+                ...sharedEnv,
+                TEXTRACT_SNS_TOPIC_ARN: textractTopic.topicArn,
+                TEXTRACT_ROLE_ARN:      textractSnsRole.roleArn,
+            },
         });
 
         const analyticsLambda = new NodejsFunction(this, "AnalyticsLambda", {
@@ -331,67 +371,172 @@ export class CostsCrunchStack extends Stack {
             },
         });
 
+        // ── SNS Webhook Lambda ────────────────────────────────────────────────────
+        // Receives Textract completion notifications from SNS.
+        // Replaces the polling loop that was in receiptsLambda.
+        const snsWebhookLambda = new NodejsFunction(this, "SnsWebhookLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/receipts/sns-webhook.ts",
+            functionName: `${prefix}-sns-webhook`,
+            environment: {
+                ...sharedEnv,
+                TEXTRACT_SNS_TOPIC_ARN: textractTopic.topicArn,
+                TEXTRACT_ROLE_ARN:      textractSnsRole.roleArn,
+            },
+        });
+
+        // ── WebSocket Notifier Lambda ──────────────────────────────────────────────
+        // Triggered by EventBridge ReceiptScanCompleted.
+        // Pushes results to the user's browser over the WebSocket API.
+        const wsNotifierLambda = new NodejsFunction(this, "WsNotifierLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/receipts/ws-notifier.ts",
+            functionName: `${prefix}-ws-notifier`,
+            environment: {
+                ...sharedEnv,
+                // WEBSOCKET_ENDPOINT injected after wsApi is created (below)
+            },
+        });
+
         // ── IAM Permissions ──────────────────────────────────────────────────────
+        // Main table
         table.grantReadWriteData(expensesLambda);
         table.grantReadWriteData(groupsLambda);
-        table.grantReadWriteData(receiptsLambda);
+        table.grantReadWriteData(receiptsLambda);      // writes initial scan record
+        table.grantReadWriteData(snsWebhookLambda);    // updates scan + expense records
         table.grantReadData(analyticsLambda);
         table.grantReadWriteData(notificationsLambda);
 
-        receiptsBucket.grantRead(receiptsLambda);
-        receiptsBucket.grantWrite(expensesLambda); // for pre-signed URL generation
-        eventBus.grantPutEventsTo(receiptsLambda);
+        // Connection table (ws-notifier reads; $connect Lambda writes)
+        connTable.grantReadWriteData(wsNotifierLambda);
+
+        // S3
+        receiptsBucket.grantPut(receiptsLambda);       // presigned POST generation
+        receiptsBucket.grantRead(snsWebhookLambda);    // Textract reads from here (via IAM role)
+
+        // EventBridge
+        eventBus.grantPutEventsTo(snsWebhookLambda);  // emits ReceiptScanCompleted
         eventBus.grantPutEventsTo(expensesLambda);
 
-        // Textract permissions for receipts Lambda
+        // Textract: only receiptsLambda starts jobs; only snsWebhookLambda fetches results
         receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
-            actions: ["textract:StartExpenseAnalysis", "textract:GetExpenseAnalysis"],
+            actions:   ["textract:StartExpenseAnalysis"],
+            resources: ["*"],
+        }));
+        receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions:   ["iam:PassRole"],
+            resources: [textractSnsRole.roleArn],
+        }));
+        snsWebhookLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions:   ["textract:GetExpenseAnalysis"],
             resources: ["*"],
         }));
 
-        // Bedrock permissions for AI enrichment
-        receiptsLambda.addToRolePolicy(new iam.PolicyStatement({
-            actions: ["bedrock:InvokeModel"],
+        // Bedrock: only snsWebhookLambda calls Claude (moved from receiptsLambda)
+        snsWebhookLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions:   ["bedrock:InvokeModel"],
             resources: [`arn:aws:bedrock:${this.region}::${BEDROCK_MODEL_ID}`],
         }));
 
-        // KMS permissions
+        // SNS: snsWebhookLambda must be able to subscribe to the Textract topic
+        textractTopic.grantSubscribe(snsWebhookLambda);
+        snsWebhookLambda.addEventSource(
+            new lambdaEventSources.SnsEventSource(textractTopic, {
+                deadLetterQueue: scanDlq,
+            })
+        );
+
+        // API Gateway Management: ws-notifier pushes messages to connections
+        wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions:   ["execute-api:ManageConnections"],
+            resources: [`arn:aws:execute-api:${this.region}:${this.account}:*/prod/POST/@connections/*`],
+        }));
+
+        // KMS
         kmsKey.grantEncryptDecrypt(expensesLambda);
         kmsKey.grantEncryptDecrypt(receiptsLambda);
+        kmsKey.grantEncryptDecrypt(snsWebhookLambda);
         kmsKey.grantEncryptDecrypt(groupsLambda);
+        kmsKey.grantEncryptDecrypt(wsNotifierLambda);
 
         // Notifications Lambda: SES + Pinpoint
         notificationsLambda.addToRolePolicy(new iam.PolicyStatement({
-            actions: ["ses:SendEmail", "ses:SendTemplatedEmail", "mobiletargeting:SendMessages"],
+            actions:   ["ses:SendEmail", "ses:SendTemplatedEmail", "mobiletargeting:SendMessages"],
             resources: ["*"],
         }));
 
-        // ── S3 → Lambda Event Source (receipt scanning) ──────────────────────────
+        // ── S3 → Lambda Event Source (receipt initiation) ────────────────────────
+        // receiptsLambda is triggered by S3; it starts the async Textract job.
+        // On completion Textract publishes to textractTopic → snsWebhookLambda.
         receiptsLambda.addEventSource(new lambdaEventSources.S3EventSource(receiptsBucket, {
             events: [s3.EventType.OBJECT_CREATED],
             filters: [{ prefix: "receipts/" }],
         }));
 
+        // ── WebSocket API (API Gateway v2) ────────────────────────────────────────
+        // Browsers connect to wss://ws.costscrunch.com; ws-notifier.ts pushes results.
+        const wsApi = new apigwv2.WebSocketApi(this, "WsApi", {
+            apiName: `${prefix}-ws`,
+            // $connect: write connectionId to connTable (requires a small connect Lambda)
+            // $disconnect: delete connectionId from connTable
+            // $default: no-op (all real messages are server-push only)
+        });
+
+        const wsStage = new apigwv2.WebSocketStage(this, "WsStage", {
+            webSocketApi:  wsApi,
+            stageName:     "prod",
+            autoDeploy:    true,
+        });
+
+        // Inject the WSS callback URL so ws-notifier can call @connections
+        wsNotifierLambda.addEnvironment(
+            "WEBSOCKET_ENDPOINT", wsStage.callbackUrl
+        );
+
         // ── EventBridge → Notifications Lambda ───────────────────────────────────
-        new events.Rule(this, "ScanCompletedRule", {
+        // ReceiptScanCompleted fires both the WebSocket notifier AND the
+        // existing notifications Lambda (email/push/Pinpoint).
+        const wsNotifierDlq = new sqs.Queue(this, "WsNotifierDlq", {
+            queueName:       `${prefix}-ws-notifier-dlq`,
+            retentionPeriod: Duration.days(14),
+            encryption:      sqs.QueueEncryption.KMS,
+            encryptionMasterKey: kmsKey,
+        });
+
+        new events.Rule(this, "ScanCompletedNotifRule", {
             eventBus,
+            ruleName: `${prefix}-scan-completed-notif`,
             eventPattern: {
-                source: ["costscrunch.receipts"],
+                source:     ["costscrunch.receipts"],
                 detailType: ["ReceiptScanCompleted"],
             },
             targets: [new targets.LambdaFunction(notificationsLambda, {
                 deadLetterQueue: notificationsDlq,
-                maxEventAge: Duration.hours(2),
-                retryAttempts: 3,
+                maxEventAge:     Duration.hours(2),
+                retryAttempts:   3,
+            })],
+        });
+
+        new events.Rule(this, "ScanCompletedWsRule", {
+            eventBus,
+            ruleName: `${prefix}-scan-completed-ws`,
+            eventPattern: {
+                source:     ["costscrunch.receipts"],
+                detailType: ["ReceiptScanCompleted"],
+            },
+            targets: [new targets.LambdaFunction(wsNotifierLambda, {
+                deadLetterQueue: wsNotifierDlq,
+                maxEventAge:     Duration.hours(1),
+                retryAttempts:   2,
             })],
         });
 
         new events.Rule(this, "ExpenseApprovedRule", {
             eventBus,
             eventPattern: {
-                source: ["costscrunch.expenses"],
+                source:     ["costscrunch.expenses"],
                 detailType: ["ExpenseStatusChanged"],
-                detail: { status: ["approved", "rejected"] },
+                detail:     { status: ["approved", "rejected"] },
             },
             targets: [new targets.LambdaFunction(notificationsLambda)],
         });
@@ -536,6 +681,9 @@ export class CostsCrunchStack extends Stack {
         new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId, exportName: `${prefix}-user-pool-id` });
         new CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId, exportName: `${prefix}-client-id` });
         new CfnOutput(this, "TableName", { value: table.tableName, exportName: `${prefix}-table` });
-        new CfnOutput(this, "ReceiptsBucket", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` })
+        new CfnOutput(this, "ReceiptsBucket", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` });
+        new CfnOutput(this, "WsApiUrl",       { value: wsStage.url,               exportName: `${prefix}-ws-url` });
+        new CfnOutput(this, "ConnTableName",  { value: connTable.tableName,        exportName: `${prefix}-conn-table` });
+        new CfnOutput(this, "TextractTopicArn", { value: textractTopic.topicArn,  exportName: `${prefix}-textract-topic` });
     }
 }
