@@ -99,7 +99,8 @@ describe("SQS Queues", () => {
         })
       );
       const policy = JSON.parse(response.Attributes?.RedrivePolicy ?? "{}");
-      expect(policy.maxReceiveCount).toBe(3);
+      // LocalStack returns maxReceiveCount as string
+      expect(Number(policy.maxReceiveCount)).toBe(3);
       expect(policy.deadLetterTargetArn).toContain(QUEUE_NOTIF_DLQ);
     });
   });
