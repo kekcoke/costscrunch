@@ -1,5 +1,6 @@
 // ─── CostsCrunch — TopBar Component ──────────────────────────────────────────
 import type { TopBarProps } from "../models/interfaceProps";
+import ThemeSlider from "./themeSlider";
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: "Overview",
@@ -36,7 +37,9 @@ export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "10px" }}>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <ThemeSlider />
+
         <button
           onClick={onScan}
           style={{
