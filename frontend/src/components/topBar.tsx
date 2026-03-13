@@ -1,5 +1,6 @@
 // ─── CostsCrunch — TopBar Component ──────────────────────────────────────────
 import type { TopBarProps } from "../models/interfaceProps";
+import ThemeSlider from "./themeSlider";
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: "Overview",
@@ -14,7 +15,7 @@ export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
     <header
       style={{
         position: "sticky", top: 0, zIndex: 9,
-        background: "rgba(6,14,26,0.9)",
+        background: "var(--color-surface-3)",
         backdropFilter: "blur(12px)",
         borderBottom: "1px solid var(--color-border-dim)",
         padding: "16px 32px",
@@ -36,7 +37,9 @@ export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "10px" }}>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <ThemeSlider />
+
         <button
           onClick={onScan}
           style={{

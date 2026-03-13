@@ -2,8 +2,9 @@
 // Thin orchestrator: layout, routing, global modal state.
 // All data lives in useExpenseStore. All UI lives in components/ and pages/.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
+import { useThemeStore, initSystemThemeListener, selectMode } from "./stores/useThemeStore";
 import { Sidebar, TopBar, ScanModal } from "./components";
 import {
   DashboardPage,
@@ -32,6 +33,16 @@ export default function App() {
   const addExpense = useExpenseStore((s) => s.addExpense);
   const pending    = useExpenseStore(selectPending);
 
+  // Theme integration - subscribe to mode directly for reactivity
+  const mode = useThemeStore(selectMode);
+  const resolvedTheme = mode === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : mode;
+
+  useEffect(() => {
+    initSystemThemeListener();
+  }, []);
+
   const PageComponent = PAGES[activeTab] ?? DashboardPage;
 
   const handleAddBlankExpense = () => {
@@ -55,7 +66,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div className={`theme-${resolvedTheme}`} style={{ minHeight: "100vh", background: "var(--color-bg)", color: "var(--color-text)" }}>
       {showScan && (
         <ScanModal
           onClose={() => setShowScan(false)}
