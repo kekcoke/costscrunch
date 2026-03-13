@@ -24,13 +24,14 @@
      ├── expenses/       CRUD + approval workflows
      ├── groups/         splits + balances + settlements
      ├── receipts/       S3 → Textract async triggering
+     ├── image-preprocess/ Lossless image compression (Sharp)
      ├── sns-webhook/    Textract completion → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends
      └── notifications/  SES + Pinpoint push/SMS
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
-📦 S3 (receipts + assets, KMS encrypted)
+📦 S3 (uploads + processed + receipts + assets, KMS encrypted)
 🔍 EventBridge (async event bus)
 📡 CloudWatch + X-Ray (observability)
 ```
@@ -216,18 +217,64 @@ costscrunch
 
 ## Receipt Scan Pipeline
 
+### Image Preprocessing Layer (NEW)
+
+All user uploads now pass through a lossless compression layer before Textract processing:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    IMAGE PREPROCESSING PIPELINE                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌───────────────────┐    ┌──────────────┐  │
+│  │ UploadsBucket│───▶│ image-preprocess  │───▶│ProcessBucket │  │
+│  │  (uploads/)  │    │     Lambda        │    │ (receipts/)  │  │
+│  └──────────────┘    └───────────────────┘    └──────────────┘  │
+│         │                     │                     │           │
+│         │              ┌──────┴──────┐              │           │
+│         │              │   SHARP     │              │           │
+│         │              │ compression │              │           │
+│         │              └──────┬──────┘              │           │
+│         │                     │                     │           │
+│    7-day TTL            JPEG: quality 100     30-day TTL        │
+│    (auto-cleanup)       PNG:  level 9         (long-term)       │
+│                         HEIC→JPEG convert                         │
+│                         PDF: pass-through                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- **Cost reduction:** Smaller files = lower Textract costs (charged per page)
+- **Faster processing:** Reduced S3 transfer time
+- **Storage optimization:** Compressed images stored long-term
+- **HEIC support:** iPhone photos auto-converted to JPEG
+
+**Compression settings:**
+| Format | Settings | Typical Reduction |
+|--------|----------|-------------------|
+| JPEG | quality: 100, mozjpeg: true | 10-30% |
+| PNG | compressionLevel: 9, adaptiveFiltering | 15-40% |
+| HEIC | → JPEG (quality: 100) | N/A (format change) |
+| PDF | Pass-through unchanged | 0% |
+
+### Full Pipeline Flow
+
 ```
 User uploads file
       ↓
 [Frontend] POST /receipts/upload-url
       ↓
-[API] receipts Lambda (index.ts) generates S3 presigned POST URL
+[API] receipts Lambda generates S3 presigned POST URL
+      │  → Bucket: UploadsBucket
+      │  → Key prefix: uploads/{userId}/{expenseId}/{scanId}/
       ↓
 [Frontend] POST directly to S3 (no Lambda in path = cheap + fast)
       ↓
-[S3 Event] Triggers receipts Lambda (index.ts) and saves to next bucket
+[S3 Event] Triggers image-preprocess Lambda
       ↓
-[Lambda] Compresses image and saves to S3
+[Lambda] Compresses image using Sharp (lossless)
+      ↓
+[Lambda] Uploads to ProcessedBucket with key: receipts/{userId}/{expenseId}/{scanId}/
       ↓
 [S3 Event] Triggers receipts Lambda (index.ts)
       ↓
@@ -280,10 +327,29 @@ to user                                   DynamoDB connections table
                                     confidence, policy flags
 ```
 
-**Supported inputs:** JPG, PNG, HEIC, PDF
-**Processing time:** 10–90 seconds (Textract async job)
-**AI confidence:** typically 88–98%
-**Fallback:** keyword-based categorization if Bedrock unavailable
+**Supported inputs:** JPG, PNG, HEIC, PDF  
+**Processing time:** 10–90 seconds (Textract async job)  
+**AI confidence:** typically 88–98%  
+**Fallback:** keyword-based categorization if Bedrock unavailable  
+
+### Backwards Compatibility
+
+The preprocessing layer is designed for seamless backwards compatibility:
+
+| Scenario | Behavior |
+|----------|----------|
+| **Existing frontend** | No changes required — upload URL endpoint returns new bucket/key transparently |
+| **Direct ProcessedBucket upload** | Still works — receipts Lambda triggers on `receipts/` prefix in ProcessedBucket |
+| **Missing BUCKET_UPLOADS_NAME** | Falls back to BUCKET_RECEIPTS_NAME for upload URLs |
+| **HEIC files** | Now supported — auto-converted to JPEG during preprocessing |
+| **API response shape** | Unchanged — still returns `{ url, fields, key, expenseId, scanId }` |
+
+**Migration path for existing deployments:**
+1. Deploy new UploadsBucket and ProcessedBucket (CDK handles creation)
+2. Deploy image-preprocess Lambda
+3. Update receipts Lambda env vars: add `BUCKET_UPLOADS_NAME`, `BUCKET_PROCESSED_NAME`
+4. Update S3 event sources via CDK (automatic on deploy)
+5. No frontend changes required
 
 ---
 
@@ -371,7 +437,9 @@ POWERTOOLS_LOGGER_LOG_EVENT=
 # Data & Storage (DynamoDB & S3)
 TABLE_NAME_MAIN=
 TABLE_NAME_CONNECTIONS=
-BUCKET_RECEIPTS_NAME=
+BUCKET_UPLOADS_NAME=        # NEW: User upload bucket (preprocessing input)
+BUCKET_PROCESSED_NAME=      # NEW: Compressed images (preprocessing output)
+BUCKET_RECEIPTS_NAME=       # DEPRECATED: Use UPLOADS/PROCESSED for new deployments
 BUCKET_ASSETS_NAME=
 
 # Events & Messaging (EventBridge, SNS, SQS)
