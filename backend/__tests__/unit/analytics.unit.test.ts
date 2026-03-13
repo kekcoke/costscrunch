@@ -185,7 +185,7 @@ describe("GET /analytics/trends", () => {
     const { trend } = JSON.parse(res.body);
 
     for (let i = 1; i < trend.length; i++) {
-      expect(trend[i].month >= trend[i - 1].month).toBe(true);
+      expect(trend[i].label >= trend[i - 1].label).toBe(true);
     }
   });
 
@@ -200,7 +200,7 @@ describe("GET /analytics/trends", () => {
       makeEvent({ routeKey: "GET /analytics/trends" }) as any
     );
     const { trend } = JSON.parse(res.body);
-    const thisBucket = trend.find((t: any) => t.month === thisMonth);
+    const thisBucket = trend.find((t: any) => t.label === thisMonth);
 
     expect(thisBucket?.total).toBeCloseTo(200);
     expect(thisBucket?.count).toBe(1);
@@ -221,9 +221,59 @@ describe("GET /analytics/trends", () => {
   });
 });
 
+// ── Chart Data ───────────────────────────────────────────────────────────────
+describe("GET /analytics/chartData", () => {
+  it("returns donut and bubble chart data", async () => {
+    const expenses = [
+      makeExpense({ amount: 100, category: "Food" }),
+      makeExpense({ amount: 50, category: "Travel" }),
+    ];
+    ddbMock.on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(
+      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.donut).toHaveLength(2);
+    expect(body.bubble).toHaveLength(2);
+  });
+
+  it("donut data contains label and value", async () => {
+    const expenses = [
+      makeExpense({ amount: 100, amountUSD: 100, category: "Food" }),
+      makeExpense({ amount: 50, amountUSD: 50, category: "Travel" }),
+    ];
+    ddbMock.on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(
+      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+    );
+    const { donut } = JSON.parse(res.body);
+
+    expect(donut).toContainEqual(expect.objectContaining({ label: "Food", value: 100 }));
+    expect(donut).toContainEqual(expect.objectContaining({ label: "Travel", value: 50 }));
+  });
+
+  it("returns empty arrays when no expenses", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+    const res = await handler(
+      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+    );
+    const body = JSON.parse(res.body);
+
+    expect(body.donut).toEqual([]);
+    expect(body.bubble).toEqual([]);
+  });
+});
+
 // ── 404 ────────────────────────────────────────────────────────────────────────
 describe("Unknown route", () => {
   it("returns 404", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+
     const res = await handler(
       makeEvent({ routeKey: "GET /analytics/unknown" }) as any
     );

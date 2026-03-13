@@ -65,6 +65,7 @@ costscrunch
 │   │   │   │   └── tracer.ts
 │   │   │   └── eventBridge.ts
 │   │   ├── integration/
+│   │   │   ├── analytics.integration.test.ts
 │   │   │   ├── expenses.integration.test.ts
 │   │   │   └── receipts.integration.test.ts
 │   │   ├── setup/
@@ -101,6 +102,7 @@ costscrunch
 │   │   ├── server.ts
 │   │   └── shared/
 │   │       └── models/
+│   │           ├── charts.ts
 │   │           └── types.ts
 │   ├── tsconfig.json
 │   ├── tsconfig.test.json
