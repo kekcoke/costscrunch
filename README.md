@@ -225,6 +225,10 @@ User uploads file
       ↓
 [Frontend] POST directly to S3 (no Lambda in path = cheap + fast)
       ↓
+[S3 Event] Triggers receipts Lambda (index.ts) and saves to next bucket
+      ↓
+[Lambda] Compresses image and saves to S3
+      ↓
 [S3 Event] Triggers receipts Lambda (index.ts)
       ↓
 [Lambda] Writes scan record to DynamoDB  →  status: "processing"
