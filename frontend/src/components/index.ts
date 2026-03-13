@@ -1,5 +1,5 @@
 // ─── CostsCrunch — Components Barrel Export ──────────────────────────────────
-export { default as DonutChart  } from "./donutChart"
+export { default as DonutChart  } from "./charts/donutChart"
 export { default as ExpenseRow  } from "./expenseRow";
 export { default as Sidebar     } from "./sideBar";
 export { default as ScanModal   } from "./scanModal";

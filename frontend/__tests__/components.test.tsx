@@ -13,10 +13,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { selectFiltered, useExpenseStore } from "./../src/stores/useExpenseStore";
-import StatCard   from "../src/components/StatCard";
-import ExpenseRow from "../src/components/ExpenseRow";
-import DonutChart from "../src/components/DonutChart";
-import ScanModal  from "../src/components/ScanModal";
+import StatCard   from "../src/components/statCard.js";
+import ExpenseRow from "../src/components/expenseRow.js";
+import DonutChart from "../src/components/charts/donutChart";
+import ScanModal  from "../src/components/scanModal.js";
 import { MOCK_EXPENSES } from "../src/mocks/expenses";
 
 // ─────────────────────────────────────────────────────────────────────────────

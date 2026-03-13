@@ -6,8 +6,9 @@ import { fetchAuthSession } from "@aws-amplify/auth";
 import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
-  GetExpensesQuery, ExpenseSummary, InitiateUploadResponse,
+  GetExpensesQuery, InitiateUploadResponse,
 } from "../../../backend/src/shared/models/types";
+import type { ExpenseSummaryStats } from "../models/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.costscrunch.io";
 
@@ -177,14 +178,19 @@ export const groupsApi = {
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export const analyticsApi = {
-  summary: (period?: "month" | "quarter" | "year") =>
-    apiFetch<ExpenseSummary & { byMonth: Record<string, number> }>(
-      `/analytics/summary${period ? `?period=${period}` : ""}`
+  summary: (query?: import("../models/types").AnalyticsQuery) =>
+    apiFetch<ExpenseSummaryStats & { byMonth: Record<string, number> }>(
+      `/analytics/summary${toQueryString(query)}`
     ),
 
-  trends: () =>
-    apiFetch<{ trend: Array<{ month: string; total: number; count: number }> }>(
-      "/analytics/trends"
+  trends: (query?: import("../models/types").AnalyticsQuery) =>
+    apiFetch<import("../models/types").AnalyticsTrends>(
+      `/analytics/trends${toQueryString(query)}`
+    ),
+
+  chartData: (query?: import("../models/types").AnalyticsQuery) =>
+    apiFetch<import("../models/types").AnalyticsChartData>(
+      `/analytics/chart-data${toQueryString(query)}`
     ),
 };
 
