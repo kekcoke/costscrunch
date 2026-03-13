@@ -282,15 +282,6 @@ export interface GetExpensesQuery {
   nextToken?: string;  // base64 DynamoDB LastEvaluatedKey
 }
 
-export interface ExpenseSummary {
-  totalAmount: number;
-  currency: string;
-  count: number;
-  byCategory: Record<string, number>;
-  byStatus: Record<ExpenseStatus, number>;
-  period: string;
-}
-
 export interface InitiateUploadRequest {
   filename: string;
   mimeType: string;
@@ -299,7 +290,7 @@ export interface InitiateUploadRequest {
 }
 
 export interface InitiateUploadResponse {
-  uploadUrl: string;          // S3 pre-signed PUT URL
+  uploadUrl: string;          // S3 post signed URL
   s3Key: string;
   expenseId: string;          // new or existing
   scanId: string;             // poll this for results

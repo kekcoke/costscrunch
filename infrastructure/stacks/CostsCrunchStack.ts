@@ -651,6 +651,7 @@ export class CostsCrunchStack extends Stack {
         // Analytics
         addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/analytics/chartData", analyticsLambda);
 
         // ── CloudFront Distribution ──────────────────────────────────────────────
         const distribution = new cloudfront.Distribution(this, "CfDistribution", {
