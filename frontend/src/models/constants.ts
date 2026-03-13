@@ -11,6 +11,7 @@ export const CATEGORIES = {
   Other:     { icon: "📁", color: "#64748b" },
 };
 
+export type Category = keyof typeof CATEGORIES;
 export const CATEGORY_NAMES = Object.keys(CATEGORIES);
 
 /** @type {Record<string, string>} */

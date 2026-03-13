@@ -1,12 +1,84 @@
 // ─── CostsCrunch — AnalyticsPage ─────────────────────────────────────────────
-import { useMemo } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, useMemo } from "react";
+import { analyticsApi } from "../services/api.js";
+
 import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
 import { CATEGORIES } from "../models/constants";
 import { fmt } from "../helpers/utils";
+import StatCard from "../components/StatCard.jsx";
 import { DonutChart } from "../components";
 
+// ── Lazy chart components (async rendering) ───────────────────────────────────
+const HorizontalBarChart = lazy(() => import("../components/charts/horizontalBarChart.js"));
+const BubbleChart        = lazy(() => import("../components/charts/bubbleChart.js"));
+const StackedBarChart    = lazy(() => import("../components/charts/stackedBarChart.js"));
+ 
 const TREND_MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb"] as const;
 const TREND_HISTORICAL = [2100, 3400, 4800, 2900]; // all except current month
+
+interface Filters {
+  period:     Period;
+  categories: string[];
+  from:       string;
+  to:         string;
+  currency:   "USD" | "EUR" | "GBP";
+  scope:      Scope;
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type ChartType = "donut" | "horizontalBar" | "bubble" | "stackedBar";
+type Period    = "month" | "quarter" | "year";
+type Scope     = "personal" | "group" | "all";
+
+const DEFAULT_FILTERS: Filters = {
+  period:     "month",
+  categories: [],
+  from:       "",
+  to:         "",
+  currency:   "USD",
+  scope:      "all",
+};
+ 
+const CHART_TYPES: Array<{ type: ChartType; label: string; icon: string }> = [
+  { type: "donut",         label: "Donut / Pie chart",        icon: "◔" },
+  { type: "horizontalBar", label: "Horizontal bar chart",     icon: "≡" },
+  { type: "bubble",        label: "Bubble chart",             icon: "⊙" },
+  { type: "stackedBar",    label: "Stacked bar chart",        icon: "▦" },
+];
+ 
+const ALL_CATEGORIES = Object.keys(CATEGORIES);
+
+// ── Chart loading spinner ─────────────────────────────────────────────────────
+function ChartLoader() {
+  return (
+    <div
+      role="progressbar"
+      aria-label="Loading chart"
+      data-testid="chart-loading"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "300px",
+        gap: "12px",
+        color: "var(--color-text-dim)",
+      }}
+    >
+      <span
+        style={{
+          width: "20px",
+          height: "20px",
+          border: "2px solid var(--color-border)",
+          borderTopColor: "#6366f1",
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+          flexShrink: 0,
+        }}
+      />
+      Rendering chart…
+    </div>
+  );
+}
 
 export function AnalyticsPage() {
   const expenses = useExpenseStore(selectExpenses);

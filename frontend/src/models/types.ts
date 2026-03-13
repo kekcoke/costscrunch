@@ -116,6 +116,66 @@ export interface ExpenseSummary {
   byMonth: Record<string, number>;
 }
 
+export interface ExpenseSummaryStats {
+  totalAmount: number;
+  expenseCount: number;
+  avgPerExpense: number;
+  topCategory: CategoryName;
+  period: "week" | "month" | "quarter" | "year";
+  currency: string;
+}
+
+export interface TrendBucket {
+  period: string;
+  total: number;
+  categories: Record<string, number>;
+}
+
+export interface AnalyticsTrends {
+  buckets: TrendBucket[];
+}
+
+export interface DonutChartDatum {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface HorizontalBarChartDatum {
+  category: string;
+  amount: number;
+}
+
+export interface BubbleChartDatum {
+  date: string;
+  amount: number;
+  frequency: number;
+  category: string;
+}
+
+export interface AnalyticsChartData {
+  donut: DonutChartDatum[];
+  horizontalBar: HorizontalBarChartDatum[];
+  bubble: BubbleChartDatum[];
+  stackedBar: TrendBucket[];
+}
+
+export interface AnalyticsQuery {
+  period?: "week" | "month" | "quarter" | "year";
+  categories?: string[];
+  from?: string;
+  to?: string;
+  currency?: string;
+  scope?: "personal" | "group" | "all";
+  chartType?: "donut" | "horizontalBar" | "bubble" | "stackedBar";
+}
+
+export interface AnalyticsApiLike {
+  summary: (query?: AnalyticsQuery) => Promise<ExpenseSummaryStats>;
+  trends: (query?: AnalyticsQuery) => Promise<AnalyticsTrends>;
+  chartData: (query?: AnalyticsQuery) => Promise<AnalyticsChartData>;
+}
+
 export interface InitiateUploadResponse {
   uploadUrl: string;
   expenseId: string;
