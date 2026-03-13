@@ -33,6 +33,8 @@ set -euo pipefail
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
 TABLE_NAME_MAIN="costscrunch-dev-main"
 TABLE_NAME_DYNAMO_CONNECTIONS="costscrunch-dev-connections"
+BUCKET_UPLOADS_NAME="costscrunch-dev-uploads-000000000000"
+BUCKET_PROCESSED_NAME="costscrunch-dev-processed-000000000000"
 BUCKET_RECEIPTS_NAME="costscrunch-dev-receipts-000000000000"
 BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
 EVENT_BUS_NAME="costscrunch-dev-events"
@@ -131,6 +133,105 @@ $AWS dynamodb update-table \
   --no-cli-pager 2>/dev/null || true
 
 echo "✅ DynamoDB connections table ready"
+
+# ── S3 — Uploads Bucket (initial user uploads) ──────────────────────────────────
+echo "📦 Creating S3 uploads bucket: $BUCKET_UPLOADS_NAME"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_UPLOADS_NAME" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
+
+# NO versioning (matches CDK versioned: false) - temporary uploads bucket
+
+# Enable bucket encryption with KMS (matches CDK BucketEncryption.KMS_MANAGED)
+$AWS s3api put-bucket-encryption \
+  --bucket "$BUCKET_UPLOADS_NAME" \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms"
+      }
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# CORS: PUT + GET only, localhost for dev (matches CDK dev mode "*")
+$AWS s3api put-bucket-cors \
+  --bucket "$BUCKET_UPLOADS_NAME" \
+  --cors-configuration '{
+    "CORSRules": [{
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["PUT","GET"],
+      "AllowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Lifecycle: expire after 7 days (matches CDK - auto-delete after processing)
+$AWS s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET_UPLOADS_NAME" \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "auto-expire",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Expiration": {"Days": 7}
+      }
+    ]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Uploads bucket ready"
+
+# ── S3 — Processed Bucket (compressed images) ────────────────────────────────────
+echo "📦 Creating S3 processed bucket: $BUCKET_PROCESSED_NAME"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_PROCESSED_NAME" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Bucket already exists, skipping"
+
+# Enable versioning (matches CDK versioned: true)
+$AWS s3api put-bucket-versioning \
+  --bucket "$BUCKET_PROCESSED_NAME" \
+  --versioning-configuration Status=Enabled \
+  --no-cli-pager 2>/dev/null || true
+
+# Enable bucket encryption with KMS (matches CDK BucketEncryption.KMS_MANAGED)
+$AWS s3api put-bucket-encryption \
+  --bucket "$BUCKET_PROCESSED_NAME" \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms"
+      }
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Lifecycle: transition to INTELLIGENT_TIERING after 30d; expire after 365d (matches CDK)
+$AWS s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET_PROCESSED_NAME" \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "intelligent-tiering",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Transitions": [{"Days": 30, "StorageClass": "INTELLIGENT_TIERING"}]
+      },
+      {
+        "ID": "expiration",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Expiration": {"Days": 365},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
+      }
+    ]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Processed bucket ready"
 
 # ── S3 — Receipts Bucket ──────────────────────────────────────────────────────
 echo "📦 Creating S3 receipts bucket: $BUCKET_RECEIPTS_NAME"
@@ -413,6 +514,8 @@ echo "✅ SNS ready"
 echo "📦 Writing SSM parameters"
 
 $AWS ssm put-parameter --name "/costscrunch/dev/table-name"      --value "$TABLE_NAME_MAIN"            --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/uploads-bucket"  --value "$BUCKET_UPLOADS_NAME"   --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/processed-bucket" --value "$BUCKET_PROCESSED_NAME" --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS_NAME"  --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS_NAME"        --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Cognito mock IDs in place of real pool/client IDs
@@ -467,6 +570,8 @@ echo ""
 echo "Resource summary:"
 echo "  DynamoDB main table:  $TABLE_NAME_MAIN"
 echo "  DynamoDB conn table:  $TABLE_NAME_DYNAMO_CONNECTIONS"
+echo "  Uploads bucket:       $BUCKET_UPLOADS_NAME"
+echo "  Processed bucket:     $BUCKET_PROCESSED_NAME"
 echo "  Receipts bucket:      $BUCKET_RECEIPTS_NAME"
 echo "  Assets bucket:        $BUCKET_ASSETS"
 echo "  EventBridge bus:      $EVENT_BUS_NAME"
