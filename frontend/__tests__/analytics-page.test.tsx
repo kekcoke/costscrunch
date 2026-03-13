@@ -42,9 +42,9 @@ import { MemoryRouter } from "react-router-dom";
 // ── Mock API ──────────────────────────────────────────────────────────────────
 vi.mock("../src/services/api", () => ({
   analyticsApi: {
-    getSummary: vi.fn(),
-    getTrends: vi.fn(),
-    getChartData: vi.fn(),
+    summary: vi.fn(),
+    trends: vi.fn(),
+    chartData: vi.fn(),
   },
 }));
 

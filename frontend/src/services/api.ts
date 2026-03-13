@@ -6,7 +6,7 @@ import { fetchAuthSession } from "@aws-amplify/auth";
 import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
-  GetExpensesQuery, ExpenseSummary, InitiateUploadResponse,
+  GetExpensesQuery, InitiateUploadResponse,
 } from "../../../backend/src/shared/models/types";
 import type { ExpenseSummaryStats } from "../models/types";
 

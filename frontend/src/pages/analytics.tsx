@@ -2,51 +2,80 @@
 import { useState, useEffect, useCallback, lazy, Suspense, useMemo } from "react";
 import { analyticsApi } from "../services/api.js";
 
-import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
 import { CATEGORIES } from "../models/constants";
 import { fmt } from "../helpers/utils";
-import StatCard from "../components/StatCard.jsx";
-import { DonutChart } from "../components";
+import DonutChart from "../components/charts/donutChart";
+import type { AnalyticsChartData, AnalyticsQuery, ExpenseSummaryStats } from "../models/types";
 
 // ── Lazy chart components (async rendering) ───────────────────────────────────
-const HorizontalBarChart = lazy(() => import("../components/charts/horizontalBarChart.js"));
-const BubbleChart        = lazy(() => import("../components/charts/bubbleChart.js"));
-const StackedBarChart    = lazy(() => import("../components/charts/stackedBarChart.js"));
- 
-const TREND_MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb"] as const;
-const TREND_HISTORICAL = [2100, 3400, 4800, 2900]; // all except current month
+const HorizontalBarChart = lazy(() => import("../components/charts/horizontalBarChart"));
+const BubbleChart = lazy(() => import("../components/charts/bubbleChart"));
+const StackedBarChart = lazy(() => import("../components/charts/stackedBarChart"));
 
 interface Filters {
-  period:     Period;
+  period: Period;
   categories: string[];
-  from:       string;
-  to:         string;
-  currency:   "USD" | "EUR" | "GBP";
-  scope:      Scope;
+  from: string;
+  to: string;
+  currency: "USD" | "EUR" | "GBP";
+  scope: Scope;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ChartType = "donut" | "horizontalBar" | "bubble" | "stackedBar";
-type Period    = "month" | "quarter" | "year";
-type Scope     = "personal" | "group" | "all";
+type Period = "month" | "quarter" | "year";
+type Scope = "personal" | "group" | "all";
 
 const DEFAULT_FILTERS: Filters = {
-  period:     "month",
+  period: "month",
   categories: [],
-  from:       "",
-  to:         "",
-  currency:   "USD",
-  scope:      "all",
+  from: "",
+  to: "",
+  currency: "USD",
+  scope: "all",
 };
- 
+
 const CHART_TYPES: Array<{ type: ChartType; label: string; icon: string }> = [
-  { type: "donut",         label: "Donut / Pie chart",        icon: "◔" },
-  { type: "horizontalBar", label: "Horizontal bar chart",     icon: "≡" },
-  { type: "bubble",        label: "Bubble chart",             icon: "⊙" },
-  { type: "stackedBar",    label: "Stacked bar chart",        icon: "▦" },
+  { type: "donut", label: "Donut / Pie chart", icon: "◔" },
+  { type: "horizontalBar", label: "Horizontal bar chart", icon: "≡" },
+  { type: "bubble", label: "Bubble chart", icon: "⊙" },
+  { type: "stackedBar", label: "Stacked bar chart", icon: "▦" },
 ];
- 
-const ALL_CATEGORIES = Object.keys(CATEGORIES);
+
+const CATEGORY_NAMES = Object.keys(CATEGORIES);
+
+// Fallback data ensures stable UI in offline/dev/error states.
+const MOCK_CHART_DATA: AnalyticsChartData = {
+  donut: [
+    { label: "Travel", value: 1600, color: "#6366f1" },
+    { label: "Meals", value: 900, color: "#f59e0b" },
+    { label: "Software", value: 1715, color: "#8b5cf6" },
+  ],
+  horizontalBar: [
+    { category: "Software", amount: 1715 },
+    { category: "Travel", amount: 1600 },
+    { category: "Meals", amount: 900 },
+  ],
+  bubble: [
+    { date: "2026-03-01", amount: 450, frequency: 3, category: "Travel" },
+    { date: "2026-03-08", amount: 120, frequency: 8, category: "Meals" },
+    { date: "2026-03-15", amount: 1200, frequency: 1, category: "Software" },
+  ],
+  stackedBar: [
+    { period: "2026-01", total: 3200, categories: { Travel: 1200, Meals: 800, Software: 1200 } },
+    { period: "2026-02", total: 4100, categories: { Travel: 1500, Meals: 1100, Software: 1500 } },
+    { period: "2026-03", total: 4215, categories: { Travel: 1600, Meals: 900, Software: 1715 } },
+  ],
+};
+
+const MOCK_SUMMARY: ExpenseSummaryStats = {
+  totalAmount: 4215.8,
+  expenseCount: 47,
+  avgPerExpense: 89.7,
+  topCategory: "Travel",
+  period: "month",
+  currency: "USD",
+};
 
 // ── Chart loading spinner ─────────────────────────────────────────────────────
 function ChartLoader() {
@@ -80,76 +109,294 @@ function ChartLoader() {
   );
 }
 
-export function AnalyticsPage() {
-  const expenses = useExpenseStore(selectExpenses);
+export default function AnalyticsPage() {
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [selectedChart, setSelectedChart] = useState<ChartType>("donut");
+  const [apiChartData, setApiChartData] = useState<AnalyticsChartData | null>(null);
+  const [summary, setSummary] = useState<ExpenseSummaryStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [chartError, setChartError] = useState<string | null>(null);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
 
-  const totalMonth = useMemo(
-    () => expenses.reduce((s, e) => s + e.amount, 0),
-    [expenses]
+  const chartQuery = useMemo<AnalyticsQuery>(
+    () => ({
+      period: filters.period,
+      categories: filters.categories,
+      from: filters.from || undefined,
+      to: filters.to || undefined,
+      currency: filters.currency,
+      scope: filters.scope,
+      chartType: selectedChart,
+    }),
+    [filters, selectedChart]
   );
 
-  const catData = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const e of expenses) map[e.category] = (map[e.category] ?? 0) + e.amount;
-    return Object.entries(map)
-      .map(([label, value]) => ({
-        label,
-        value,
-        color: CATEGORIES[label as keyof typeof CATEGORIES]?.color ?? "#64748b",
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [expenses]);
+  const handleChartTypeSelect = useCallback((type: ChartType) => {
+    setSelectedChart((prev) => (prev === type ? prev : type));
+  }, []);
 
-  const trendVals = [...TREND_HISTORICAL, totalMonth];
-  const trendMax  = Math.max(...trendVals);
+  const handlePeriodChange = useCallback((value: Period) => {
+    setFilters((prev) => (prev.period === value ? prev : { ...prev, period: value }));
+  }, []);
+
+  const handleCurrencyChange = useCallback((value: Filters["currency"]) => {
+    setFilters((prev) => (prev.currency === value ? prev : { ...prev, currency: value }));
+  }, []);
+
+  const handleScopeChange = useCallback((value: Scope) => {
+    setFilters((prev) => (prev.scope === value ? prev : { ...prev, scope: value }));
+  }, []);
+
+  const handleDateChange = useCallback((key: "from" | "to", value: string) => {
+    setFilters((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
+  }, []);
+
+  const toggleCategory = useCallback((category: string) => {
+    setFilters((prev) => {
+      const exists = prev.categories.includes(category);
+      const nextCategories = exists
+        ? prev.categories.filter((c) => c !== category)
+        : [...prev.categories, category];
+      return { ...prev, categories: nextCategories };
+    });
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      setLoading(true);
+      setChartError(null);
+
+      try {
+        const [summaryRes, chartRes] = await Promise.all([
+          analyticsApi.summary(chartQuery),
+          analyticsApi.chartData(chartQuery),
+        ]);
+
+        if (!cancelled) {
+          setSummary(summaryRes);
+          setApiChartData(chartRes);
+        }
+      } catch {
+        if (!cancelled) {
+          setSummary(MOCK_SUMMARY);
+          setApiChartData(MOCK_CHART_DATA);
+          setChartError("Using fallback chart data.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void fetchAll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chartQuery]);
+
+  const effectiveChartData = useMemo(() => apiChartData ?? MOCK_CHART_DATA, [apiChartData]);
+  const effectiveSummary = useMemo(() => summary ?? MOCK_SUMMARY, [summary]);
+
+  const chartTitle = useMemo(
+    () => CHART_TYPES.find((c) => c.type === selectedChart)?.label ?? "Chart",
+    [selectedChart]
+  );
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-        <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "28px" }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "16px", marginBottom: "24px" }}>Spending by Category</div>
-          <DonutChart data={catData} />
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "20px" }}>
+        <section
+          role="region"
+          aria-label="Filters"
+          style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "18px" }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "10px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              Period
+              <select
+                aria-label="Period"
+                value={filters.period}
+                onChange={(e) => handlePeriodChange(e.target.value as Period)}
+                style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
+              >
+                <option value="month">month</option>
+                <option value="quarter">quarter</option>
+                <option value="year">year</option>
+              </select>
+            </label>
 
-        <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "28px" }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "16px", marginBottom: "24px" }}>Monthly Trend</div>
-          {TREND_MONTHS.map((m, i) => {
-            const pct = (trendVals[i] / trendMax) * 100;
-            const isCurrent = i === TREND_MONTHS.length - 1;
-            return (
-              <div key={m} style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
-                <span style={{ fontSize: "12px", color: "var(--color-text-dim)", width: "28px" }}>{m}</span>
-                <div style={{ flex: 1, height: "10px", background: "var(--color-surface-2)", borderRadius: "5px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: isCurrent ? "linear-gradient(90deg,#0ea5e9,#6366f1)" : "#1e3048", borderRadius: "5px", transition: "width 1s ease" }} />
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              Categories
+              <button
+                type="button"
+                onClick={() => setShowCategoryMenu((v) => !v)}
+                aria-label="Categories filter"
+                style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px", textAlign: "left" }}
+              >
+                {filters.categories.length ? `${filters.categories.length} selected` : "Select categories"}
+              </button>
+              {showCategoryMenu && (
+                <div style={{ position: "absolute", top: "56px", left: 0, zIndex: 20, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "10px", minWidth: "180px" }}>
+                  {CATEGORY_NAMES.map((name) => (
+                    <label key={name} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--color-text)", marginBottom: "6px" }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.categories.includes(name)}
+                        onChange={() => toggleCategory(name)}
+                      />
+                      {name}
+                    </label>
+                  ))}
                 </div>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: isCurrent ? "#0ea5e9" : "#64748b", width: "70px", textAlign: "right" }}>
-                  {fmt(trendVals[i])}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              )}
+            </div>
 
-        <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "28px", gridColumn: "1 / -1" }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "16px", marginBottom: "20px" }}>Receipt Scan Stats</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px" }}>
-            {(
-              [
-                { label: "Scanned this month", value: "47",  icon: "📷", color: "#0ea5e9" },
-                { label: "Avg confidence",     value: "94%", icon: "🎯", color: "#10b981" },
-                { label: "Auto-categorized",   value: "91%", icon: "🤖", color: "#8b5cf6" },
-                { label: "Manual corrections", value: "4",   icon: "✏️", color: "#f59e0b" },
-              ] as const
-            ).map((s) => (
-              <div key={s.label} style={{ background: "var(--color-surface-2)", borderRadius: "12px", padding: "20px", textAlign: "center" }}>
-                <div style={{ fontSize: "28px", marginBottom: "8px" }}>{s.icon}</div>
-                <div style={{ fontSize: "24px", fontWeight: 800, color: s.color, fontFamily: "var(--font-display)" }}>{s.value}</div>
-                <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "4px" }}>{s.label}</div>
-              </div>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              From
+              <input
+                aria-label="From"
+                type="date"
+                value={filters.from}
+                onChange={(e) => handleDateChange("from", e.target.value)}
+                style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              To
+              <input
+                aria-label="To"
+                type="date"
+                value={filters.to}
+                onChange={(e) => handleDateChange("to", e.target.value)}
+                style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              Currency
+              <select
+                aria-label="Currency"
+                value={filters.currency}
+                onChange={(e) => handleCurrencyChange(e.target.value as Filters["currency"])}
+                style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+              </select>
+            </label>
+
+            <fieldset
+              role="group"
+              aria-label="Expense scope"
+              style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px", display: "flex", gap: "10px" }}
+            >
+              <label style={{ fontSize: "12px" }}>
+                <input type="radio" name="scope" checked={filters.scope === "personal"} onChange={() => handleScopeChange("personal")} /> personal
+              </label>
+              <label style={{ fontSize: "12px" }}>
+                <input type="radio" name="scope" checked={filters.scope === "group"} onChange={() => handleScopeChange("group")} /> group
+              </label>
+              <label style={{ fontSize: "12px" }}>
+                <input type="radio" name="scope" checked={filters.scope === "all"} onChange={() => handleScopeChange("all")} /> all
+              </label>
+            </fieldset>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              aria-label="Reset Filters"
+              style={{ marginLeft: "auto", border: "1px solid var(--color-border)", background: "var(--color-surface-2)", color: "var(--color-text)", borderRadius: "8px", padding: "6px 10px" }}
+            >
+              Reset Filters
+            </button>
+          </div>
+        </section>
+
+        <section style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "16px" }}>Analytics Charts</div>
+            <div style={{ fontSize: "13px", color: "var(--color-text-dim)" }}>
+              Showing: <strong style={{ color: "var(--color-text)" }}>{chartTitle}</strong>
+            </div>
+          </div>
+
+          <div
+            role="toolbar"
+            aria-label="Chart type"
+            style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "18px" }}
+          >
+            {CHART_TYPES.map((chart) => (
+              <button
+                key={chart.type}
+                type="button"
+                aria-label={chart.label}
+                aria-pressed={selectedChart === chart.type}
+                onClick={() => handleChartTypeSelect(chart.type)}
+                style={{
+                  border: selectedChart === chart.type ? "1px solid #6366f1" : "1px solid var(--color-border)",
+                  background: selectedChart === chart.type ? "rgba(99,102,241,0.14)" : "var(--color-surface-2)",
+                  color: "var(--color-text)",
+                  borderRadius: "10px",
+                  padding: "8px 10px",
+                  fontSize: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                <span aria-hidden="true">{chart.icon}</span>
+                {chart.label}
+              </button>
             ))}
           </div>
-        </div>
+
+          {chartError && (
+            <div style={{ marginBottom: "10px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+              {chartError}
+            </div>
+          )}
+
+          {loading ? (
+            <ChartLoader />
+          ) : (
+            <Suspense fallback={<ChartLoader />}>
+              {selectedChart === "donut" && <DonutChart data={effectiveChartData.donut} />}
+              {selectedChart === "horizontalBar" && (
+                <HorizontalBarChart data={effectiveChartData.horizontalBar} currency={filters.currency} />
+              )}
+              {selectedChart === "bubble" && (
+                <BubbleChart data={effectiveChartData.bubble} currency={filters.currency} period={filters.period} />
+              )}
+              {selectedChart === "stackedBar" && (
+                <StackedBarChart data={effectiveChartData.stackedBar} currency={filters.currency} />
+              )}
+            </Suspense>
+          )}
+        </section>
+
+        <section style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "20px" }}>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "14px", marginBottom: "10px" }}>Summary</div>
+          <div style={{ fontSize: "22px", fontWeight: 800, color: "#0ea5e9", fontFamily: "var(--font-display)" }}>
+            {fmt(effectiveSummary.totalAmount)}
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+            {effectiveSummary.expenseCount} expenses
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "2px" }}>
+            Avg {fmt(effectiveSummary.avgPerExpense)} per expense
+          </div>
+        </section>
       </div>
     </div>
   );
