@@ -46,7 +46,7 @@
   --color-surface-3:    #e2e8f0;
   --color-border:       #cbd5e1;
   --color-border-dim:   #e2e8f0;
-  --color-text:         #0f172a;
+  --color-text:         #89a9f5;
   --color-text-muted:   #475569;
   --color-text-dim:     #64748b;
   --color-text-dimmer:  #94a3b8;
@@ -69,14 +69,6 @@
 }
 
 html {
-  color-scheme: dark;
-}
-
-.theme-light {
-  color-scheme: light;
-}
-
-.theme-dark {
   color-scheme: dark;
 }
 
