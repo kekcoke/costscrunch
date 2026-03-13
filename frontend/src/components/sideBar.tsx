@@ -58,8 +58,8 @@ export default function Sidebar({
                 width: "100%",
                 display: "flex", alignItems: "center", gap: "10px",
                 padding: "10px 12px", borderRadius: "9px", border: "none",
-                background: isActive ? "rgba(99,102,241,0.15)" : "transparent",
-                color: isActive ? "#818cf8" : "var(--color-text-dim)",
+                background: isActive ? "var(--color-surface-2)" : "transparent",
+                color: isActive ? "var(--color-indigo)" : "var(--color-text-dim)",
                 cursor: "pointer", fontSize: "14px",
                 fontWeight: isActive ? 600 : 400,
                 marginBottom: "2px", transition: "all 0.15s",
@@ -75,7 +75,7 @@ export default function Sidebar({
                   aria-label={`${pendingCount} pending`}
                   style={{
                     marginLeft: "auto",
-                    background: "#f59e0b", color: "#000",
+                    background: "var(--color-amber)", color: "var(--color-bg)",
                     fontSize: "10px", fontWeight: 700,
                     padding: "2px 6px", borderRadius: "4px",
                   }}
@@ -106,7 +106,7 @@ export default function Sidebar({
             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-muted)" }}>
               Alex Johnson
             </div>
-            <div style={{ fontSize: "11px", color: "#334155" }}>Pro Plan</div>
+            <div style={{ fontSize: "11px", color: "var(--color-text-dimmer)" }}>Pro Plan</div>
           </div>
         </div>
       </div>

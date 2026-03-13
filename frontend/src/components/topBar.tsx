@@ -15,7 +15,7 @@ export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
     <header
       style={{
         position: "sticky", top: 0, zIndex: 9,
-        background: "rgba(6,14,26,0.9)",
+        background: "var(--color-surface-3)",
         backdropFilter: "blur(12px)",
         borderBottom: "1px solid var(--color-border-dim)",
         padding: "16px 32px",

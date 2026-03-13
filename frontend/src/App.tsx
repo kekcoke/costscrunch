@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
-import { useThemeStore, initSystemThemeListener } from "./stores/useThemeStore";
+import { useThemeStore, initSystemThemeListener, selectMode } from "./stores/useThemeStore";
 import { Sidebar, TopBar, ScanModal } from "./components";
 import {
   DashboardPage,
@@ -33,9 +33,11 @@ export default function App() {
   const addExpense = useExpenseStore((s) => s.addExpense);
   const pending    = useExpenseStore(selectPending);
 
-  // Theme integration
-  const getResolvedTheme = useThemeStore((s) => s.getResolvedTheme);
-  const resolvedTheme = getResolvedTheme();
+  // Theme integration - subscribe to mode directly for reactivity
+  const mode = useThemeStore(selectMode);
+  const resolvedTheme = mode === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : mode;
 
   useEffect(() => {
     initSystemThemeListener();
