@@ -4,6 +4,16 @@ import { SETTINGS_SECTIONS } from "../models/constants";
 export function SettingsPage() {
   return (
     <div style={{ animation: "fadeUp 0.4s both", maxWidth: "640px" }}>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Settings
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          Account and preferences
+        </div>
+      </header>
+
       {SETTINGS_SECTIONS.map((section) => (
         <div
           key={section.title}

@@ -210,13 +210,23 @@ export default function AnalyticsPage() {
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Analytics
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          Insights and spending analysis
+        </div>
+      </header>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "20px" }}>
         <section
           role="region"
           aria-label="Filters"
           style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "18px" }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-4, repeat(4, minmax(0,1fr)))", gap: "10px" }}>
             <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
               Period
               <select

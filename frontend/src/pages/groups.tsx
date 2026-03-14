@@ -21,6 +21,16 @@ export function GroupsPage() {
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Groups & Splits
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          Shared budgets and expense splitting
+        </div>
+      </header>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: "20px" }}>
         {MOCK_GROUPS.map((g) => (
           <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "18px", overflow: "hidden" }}>

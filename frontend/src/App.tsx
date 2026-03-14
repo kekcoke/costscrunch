@@ -2,7 +2,7 @@
 // Thin orchestrator: layout, routing, global modal state.
 // All data lives in useExpenseStore. All UI lives in components/ and pages/.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
 import { useThemeStore, initSystemThemeListener, selectMode } from "./stores/useThemeStore";
 import { Sidebar, TopBar, ScanModal } from "./components";
@@ -15,6 +15,7 @@ import {
 } from "./pages";
 import type { FC } from "react";
 import { type ExpenseStatus, type ExpenseSource } from "./models/types";
+import { useIsMobile, useSwipeGesture } from "./helpers/mobile-utils";
 
 type PageId = "dashboard" | "expenses" | "groups" | "analytics" | "settings";
 
@@ -26,9 +27,14 @@ const PAGES: Record<PageId, FC> = {
   settings:  SettingsPage,
 };
 
+
+
+
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<PageId>("dashboard");
-  const [showScan,  setShowScan]  = useState(false);
+  const [showScan, setShowScan] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const addExpense = useExpenseStore((s) => s.addExpense);
   const pending    = useExpenseStore(selectPending);
@@ -39,9 +45,20 @@ export default function App() {
     ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
     : mode;
 
+  const isMobile = useIsMobile();
+
   useEffect(() => {
     initSystemThemeListener();
   }, []);
+
+  // Swipe to open sidebar (mobile only)
+  useSwipeGesture(
+    useCallback(() => {
+      if (isMobile && !sidebarOpen) {
+        setSidebarOpen(true);
+      }
+    }, [isMobile, sidebarOpen])
+  );
 
   const PageComponent = PAGES[activeTab] ?? DashboardPage;
 
@@ -77,19 +94,35 @@ export default function App() {
         />
       )}
 
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={(id) => setActiveTab(id as PageId)}
-        pendingCount={pending.length}
-      />
+      {/* Mobile Sidebar */}
+      {isMobile && (
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={(id) => setActiveTab(id as PageId)}
+          pendingCount={pending.length}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isMobile={true}
+        />
+      )}
 
-      <div style={{ marginLeft: "var(--sidebar-width)", minHeight: "100vh" }}>
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={(id) => setActiveTab(id as PageId)}
+          pendingCount={pending.length}
+        />
+      )}
+
+      <div className="main-content" style={{ marginLeft: isMobile ? 0 : "var(--sidebar-width)", minHeight: "100vh" }}>
         <TopBar
           activeTab={activeTab}
           onScan={() => setShowScan(true)}
           onAdd={handleAddBlankExpense}
+          onMenuClick={() => setSidebarOpen(true)}
         />
-        <main style={{ padding: "32px" }}>
+        <main style={{ padding: isMobile ? "16px" : "32px" }}>
           <PageComponent />
         </main>
       </div>

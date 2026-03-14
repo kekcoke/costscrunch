@@ -31,14 +31,24 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "28px" }}>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Overview
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          February 2026
+        </div>
+      </header>
+
+      <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-4, repeat(4, 1fr))", gap: "16px", marginBottom: "28px" }}>
         <StatCard label="Month Total"    value={fmt(totalMonth)}          sub="↑ 12% vs last month"                  delay={0} />
         <StatCard label="My Expenses"    value={fmt(myTotal)}             sub={`${myExpenses.length} transactions`}  accent="#0ea5e9" delay={0.05} />
         <StatCard label="Pending Review" value={String(pending.length)}   sub={`${fmt(pendingAmt)} to approve`}      accent="#f59e0b" delay={0.1} />
         <StatCard label="Active Groups"  value={String(MOCK_GROUPS.length)} sub="3 shared budgets"                   accent="#10b981" delay={0.15} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "20px", marginBottom: "28px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-dashboard, 1fr 360px)", gap: "20px", marginBottom: "28px" }}>
         <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", overflow: "hidden", animation: "fadeUp 0.5s 0.2s both" }}>
           <div style={{ padding: "20px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "15px" }}>Recent Expenses</div>
@@ -56,7 +66,7 @@ export function DashboardPage() {
 
       <div style={{ animation: "fadeUp 0.5s 0.3s both" }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "15px", marginBottom: "16px" }}>Group Budgets</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-3, repeat(3, 1fr))", gap: "16px" }}>
           {MOCK_GROUPS.map((g) => (
             <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}22`, borderRadius: "14px", padding: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
