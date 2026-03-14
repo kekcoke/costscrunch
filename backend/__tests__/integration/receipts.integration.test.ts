@@ -136,6 +136,8 @@ import {
   eb,
   dynamodb,
   TABLE_NAME_MAIN,
+  BUCKET_UPLOADS_NAME,
+  BUCKET_PROCESSED_NAME,
   BUCKET_RECEIPTS_NAME,
   EVENT_BUS_NAME,
   TEST_USER_ID,
@@ -154,6 +156,7 @@ import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 // ─── Suite-level constants ────────────────────────────────────────────────────
 const EXPENSE_ID   = "integ-pipe-expense-001";
 const SCAN_ID      = "integ-pipe-scan-001";
+// Key now reflects processed bucket output: receipts/{userId}/{expenseId}/{scanId}/{filename}
 const S3_KEY       = `receipts/${TEST_USER_ID}/${EXPENSE_ID}/${SCAN_ID}/receipt.jpg`;
 const TEXTRACT_JOB = "textract-integ-job-001";
 
@@ -181,6 +184,12 @@ beforeAll(async () => {
   }
 
   // Bootstrap LocalStack resources
+  try { await s3.send(new CreateBucketCommand({ Bucket: BUCKET_UPLOADS_NAME })); }
+  catch (e: any) { if (!["BucketAlreadyOwnedByYou","BucketAlreadyExists"].includes(e.name)) throw e; }
+
+  try { await s3.send(new CreateBucketCommand({ Bucket: BUCKET_PROCESSED_NAME })); }
+  catch (e: any) { if (!["BucketAlreadyOwnedByYou","BucketAlreadyExists"].includes(e.name)) throw e; }
+
   try { await s3.send(new CreateBucketCommand({ Bucket: BUCKET_RECEIPTS_NAME })); }
   catch (e: any) { if (!["BucketAlreadyOwnedByYou","BucketAlreadyExists"].includes(e.name)) throw e; }
 
@@ -191,6 +200,8 @@ beforeAll(async () => {
   process.env.TABLE_NAME_MAIN        = TABLE_NAME_MAIN;
   process.env.TABLE_NAME_CONNECTIONS = TABLE_NAME_CONNECTIONS;
   process.env.EVENT_BUS_NAME         = EVENT_BUS_NAME;
+  process.env.BUCKET_UPLOADS_NAME    = BUCKET_UPLOADS_NAME;
+  process.env.BUCKET_PROCESSED_NAME  = BUCKET_PROCESSED_NAME;
   process.env.BUCKET_RECEIPTS_NAME   = BUCKET_RECEIPTS_NAME;
   process.env.TEXTRACT_SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract";
   process.env.TEXTRACT_ROLE_ARN      = "arn:aws:iam::000000000000:role/costscrunch-dev-textract";
@@ -251,9 +262,9 @@ function makeS3Event(keyOverride = S3_KEY): S3Event {
         s3SchemaVersion: "1.0",
         configurationId: "test",
         bucket: {
-          name:          BUCKET_RECEIPTS_NAME,
+          name:          BUCKET_PROCESSED_NAME,
           ownerIdentity: { principalId: "owner" },
-          arn:           `arn:aws:s3:::${BUCKET_RECEIPTS_NAME}`,
+          arn:           `arn:aws:s3:::${BUCKET_PROCESSED_NAME}`,
         },
         object: { key: keyOverride, size: 150_000, eTag: "abc", sequencer: "001" },
       },
@@ -348,7 +359,7 @@ describe("S3 Initiator (index.ts) — integration", () => {
       status:     "processing",
       entityType: "SCAN",
       userId:     TEST_USER_ID,
-      s3Bucket:   BUCKET_RECEIPTS_NAME,
+      s3Bucket:   BUCKET_PROCESSED_NAME,
       s3Key:      S3_KEY,
       mimeType:   "image/jpeg",
     });
@@ -400,7 +411,7 @@ describe("SNS Webhook (sns-webhook.ts) — integration", () => {
         userId:     TEST_USER_ID,
         status:     "processing",
         s3Key:      S3_KEY,
-        s3Bucket:   BUCKET_RECEIPTS_NAME,
+        s3Bucket:   BUCKET_PROCESSED_NAME,
         mimeType:   "image/jpeg",
         createdAt:  new Date().toISOString(),
       },
@@ -608,12 +619,13 @@ describe("receiptApi — upload-url + pipeline DDB state (integration)", () => {
     expect(result).toMatchObject({ statusCode: 200 });
 
     const body = JSON.parse((result as any).body);
-    expect(body.url).toContain(BUCKET_RECEIPTS_NAME);
+    // Upload URL should point to uploads bucket (preprocessing will move to processed bucket)
+    expect(body.url).toContain(BUCKET_UPLOADS_NAME);
     expect(body.fields["Content-Type"]).toBe("image/jpeg");
     expect(body.fields["x-amz-meta-userid"]).toBe(TEST_USER_ID);
-    // Key must follow receipts/{userId}/{expenseId}/{scanId}/{filename}
+    // Key must follow uploads/{userId}/{expenseId}/{scanId}/{filename}
     expect(body.key).toMatch(
-      new RegExp(`^receipts/${TEST_USER_ID}/[A-Z0-9-]+/[A-Z0-9-]+/receipt\\.jpg$`)
+      new RegExp(`^uploads/${TEST_USER_ID}/[A-Z0-9-]+/[A-Z0-9-]+/receipt\\.jpg$`)
     );
   });
 
