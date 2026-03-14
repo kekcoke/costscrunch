@@ -1,5 +1,6 @@
 // ─── CostsCrunch — GroupsPage ─────────────────────────────────────────────────
 import { useMemo } from "react";
+import "./groups.css";
 import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
 import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
@@ -20,7 +21,7 @@ export function GroupsPage() {
   }, [expenses]);
 
   return (
-    <div style={{ animation: "fadeUp 0.4s both" }}>
+    <div className="groups-container">
       {/* Page Header */}
       <header className="page-header" style={{ marginBottom: "20px" }}>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
@@ -31,44 +32,43 @@ export function GroupsPage() {
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: "20px" }}>
+      <div className="group-grid">
         {MOCK_GROUPS.map((g) => (
-          <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "18px", overflow: "hidden" }}>
-            <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "24px", borderBottom: "1px solid var(--color-border-dim)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "16px", borderBottom: "1px solid var(--color-border-dim)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "20px" }}>{g.name}</div>
-                  <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>{g.members} members · active</div>
+                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "18px" }}>{g.name}</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>{g.members} members · active</div>
                 </div>
-                <div style={{ background: g.color + "22", border: `1px solid ${g.color}44`, borderRadius: "8px", padding: "6px 12px", fontSize: "13px", fontWeight: 700, color: g.color }}>
+                <div style={{ background: g.color + "18", border: `1px solid ${g.color}33`, borderRadius: "6px", padding: "4px 8px", fontSize: "12px", fontWeight: 700, color: g.color }}>
                   {fmt(g.total)}
                 </div>
               </div>
             </div>
-            <div style={{ padding: "20px" }}>
-              <div style={{ marginBottom: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>
-                  <span>Your share</span>
-                  <span style={{ color: "var(--color-text)", fontWeight: 700 }}>{fmt(g.myShare)}</span>
+            <div style={{ padding: "16px", flex: 1 }}>
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--color-text-dim)", marginBottom: "6px" }}>
+                  <span>Your share: <b style={{ color: "var(--color-text)" }}>{fmt(g.myShare)}</b></span>
+                  <span>{((g.myShare / g.total) * 100).toFixed(0)}%</span>
                 </div>
-                <div style={{ height: "6px", background: "var(--color-surface-2)", borderRadius: "3px" }}>
-                  <div style={{ height: "100%", width: `${((g.myShare / g.total) * 100).toFixed(0)}%`, background: `linear-gradient(90deg,${g.color},${g.color}88)`, borderRadius: "3px" }} />
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--color-text-dimmer)", marginTop: "5px" }}>
-                  {((g.myShare / g.total) * 100).toFixed(0)}% of group total
+                <div style={{ height: "4px", background: "var(--color-surface-2)", borderRadius: "2px" }}>
+                  <div style={{ height: "100%", width: `${((g.myShare / g.total) * 100).toFixed(0)}%`, background: `linear-gradient(90deg,${g.color},${g.color}88)`, borderRadius: "2px" }} />
                 </div>
               </div>
-              {(expensesByGroup[g.id] ?? []).slice(0, 3).map((e) => (
-                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--color-surface-2)" }}>
-                  <div>
-                    <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{e.merchant}</div>
-                    <div style={{ fontSize: "11px", color: "var(--color-text-dimmer)" }}>{e.addedBy} · {fmtDate(e.date)}</div>
+              <div className="recent-expenses-desktop">
+                {(expensesByGroup[g.id] ?? []).slice(0, 2).map((e) => (
+                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--color-surface-2)" }}>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{e.merchant}</div>
+                      <div style={{ fontSize: "10px", color: "var(--color-text-dimmer)" }}>{fmtDate(e.date)}</div>
+                    </div>
+                    <div style={{ fontSize: "12px", fontWeight: 700 }}>{fmt(e.amount)}</div>
                   </div>
-                  <div style={{ fontSize: "13px", fontWeight: 700 }}>{fmt(e.amount)}</div>
-                </div>
-              ))}
-              <button style={{ width: "100%", marginTop: "14px", background: g.color + "18", border: `1px solid ${g.color}33`, borderRadius: "9px", padding: "10px", color: g.color, fontWeight: 600, fontSize: "13px", cursor: "pointer" }}>
-                View All Group Expenses →
+                ))}
+              </div>
+              <button style={{ width: "100%", marginTop: "12px", background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
+                View Group →
               </button>
             </div>
           </div>
