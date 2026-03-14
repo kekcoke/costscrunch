@@ -2,23 +2,30 @@
 import { NAV_ITEMS } from "../models/constants";
 import type { SideBarProps } from "../models/interfaceProps";
 
+interface SidebarProps extends SideBarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  isMobile?: boolean;
+}
+
 export default function Sidebar({
   activeTab,
   onTabChange,
   pendingCount,
-}: SideBarProps) {
-  return (
-    <aside
-      style={{
-        position: "fixed", left: 0, top: 0, bottom: 0,
-        width: "var(--sidebar-width)",
-        background: "var(--color-surface-3)",
-        borderRight: "1px solid var(--color-border-dim)",
-        display: "flex", flexDirection: "column",
-        padding: "28px 0",
-        zIndex: 10,
-      }}
-    >
+  isOpen = true,
+  onClose,
+  isMobile = false,
+}: SidebarProps) {
+
+  const handleNavClick = (id: string) => {
+    onTabChange(id);
+    if (isMobile && onClose) {
+      onClose();
+    }
+  };
+
+  const sidebarContent = (
+    <>
       {/* Logo */}
       <div style={{ padding: "0 20px 28px", borderBottom: "1px solid var(--color-border-dim)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -52,7 +59,7 @@ export default function Sidebar({
           return (
             <button
               key={item.id}
-              onClick={() => onTabChange(item.id)}
+              onClick={() => handleNavClick(item.id)}
               aria-current={isActive ? "page" : undefined}
               style={{
                 width: "100%",
@@ -110,6 +117,63 @@ export default function Sidebar({
           </div>
         </div>
       </div>
+    </>
+  );
+
+  // Mobile sidebar with overlay
+  if (isMobile) {
+    return (
+      <>
+        {/* Overlay */}
+        {isOpen && (
+          <div
+            className="mobile-sidebar-overlay"
+            onClick={onClose}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.5)",
+              zIndex: 99,
+              animation: "fadeIn 0.2s ease-out",
+            }}
+          />
+        )}
+        
+        {/* Sidebar */}
+        <aside
+          style={{
+            position: "fixed", left: 0, top: 0, bottom: 0,
+            width: "260px",
+            background: "var(--color-surface-3)",
+            borderRight: "1px solid var(--color-border-dim)",
+            display: "flex", flexDirection: "column",
+            padding: "28px 0",
+            zIndex: 100,
+            transform: isOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.25s ease-out",
+          }}
+        >
+          {sidebarContent}
+        </aside>
+      </>
+    );
+  }
+
+  // Desktop sidebar (always visible)
+  return (
+    <aside
+      className="desktop-sidebar"
+      style={{
+        position: "fixed", left: 0, top: 0, bottom: 0,
+        width: "var(--sidebar-width)",
+        background: "var(--color-surface-3)",
+        borderRight: "1px solid var(--color-border-dim)",
+        display: "flex", flexDirection: "column",
+        padding: "28px 0",
+        zIndex: 10,
+      }}
+    >
+      {sidebarContent}
     </aside>
   );
 }

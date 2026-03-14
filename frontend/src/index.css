@@ -14,6 +14,7 @@
   --radius-xl:  18px;
 
   --sidebar-width: 220px;
+  --mobile-breakpoint: 768px;
 }
 
 /* ── Theme: Dark (default) ───────────────────────────────────────────────────── */
@@ -129,6 +130,24 @@ select {
   }
 }
 
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ── Utility Classes ────────────────────────────────────────────────────────── */
 .animate-fade-up {
   animation: fadeUp 0.4s both;
@@ -141,4 +160,55 @@ select {
 /* ── Vite root mount ─────────────────────────────────────────────────────────── */
 #root {
   min-height: 100vh;
+}
+
+/* ── Mobile Responsive Layout ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .desktop-sidebar {
+    display: none !important;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 16px !important;
+  }
+
+  .topbar-actions {
+    gap: 6px !important;
+  }
+
+  .topbar-actions button {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .topbar-actions button span[aria-hidden] {
+    display: none;
+  }
+
+  .page-header {
+    padding: 16px 0 !important;
+  }
+
+  .page-header h1 {
+    font-size: 18px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+
+  .mobile-sidebar-overlay {
+    display: none !important;
+  }
 }

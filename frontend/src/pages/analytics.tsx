@@ -210,6 +210,16 @@ export default function AnalyticsPage() {
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "20px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Analytics
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          Insights and spending analysis
+        </div>
+      </header>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "20px" }}>
         <section
           role="region"

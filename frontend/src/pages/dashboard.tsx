@@ -31,6 +31,16 @@ export function DashboardPage() {
 
   return (
     <div>
+      {/* Page Header */}
+      <header className="page-header" style={{ marginBottom: "24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+          Overview
+        </h1>
+        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+          February 2026
+        </div>
+      </header>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "28px" }}>
         <StatCard label="Month Total"    value={fmt(totalMonth)}          sub="↑ 12% vs last month"                  delay={0} />
         <StatCard label="My Expenses"    value={fmt(myTotal)}             sub={`${myExpenses.length} transactions`}  accent="#0ea5e9" delay={0.05} />

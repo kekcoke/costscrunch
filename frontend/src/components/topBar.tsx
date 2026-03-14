@@ -2,15 +2,11 @@
 import type { TopBarProps } from "../models/interfaceProps";
 import ThemeSlider from "./themeSlider";
 
-const PAGE_TITLES: Record<string, string> = {
-  dashboard: "Overview",
-  expenses:  "All Expenses",
-  groups:    "Groups & Splits",
-  analytics: "Analytics",
-  settings:  "Settings",
-};
+interface ExtendedTopBarProps extends TopBarProps {
+  onMenuClick?: () => void;
+}
 
-export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
+export default function TopBar({ activeTab, onScan, onAdd, onMenuClick }: ExtendedTopBarProps) {
   return (
     <header
       style={{
@@ -22,22 +18,31 @@ export default function TopBar({ activeTab, onScan, onAdd }: TopBarProps) {
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}
     >
-      <div>
-        <h1
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {/* Mobile menu button */}
+        <button
+          className="mobile-menu-btn"
+          onClick={onMenuClick}
+          aria-label="Open menu"
           style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "20px", fontWeight: 700,
-            letterSpacing: "-0.5px", margin: 0,
+            display: "none",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "36px",
+            height: "36px",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "18px",
+            padding: 0,
           }}
         >
-          {PAGE_TITLES[activeTab] ?? activeTab}
-        </h1>
-        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "2px" }}>
-          February 2026
-        </div>
+          ☰
+        </button>
       </div>
 
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <div className="topbar-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <ThemeSlider />
 
         <button
