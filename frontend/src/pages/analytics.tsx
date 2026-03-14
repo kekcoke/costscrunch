@@ -226,7 +226,7 @@ export default function AnalyticsPage() {
           aria-label="Filters"
           style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "18px" }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-4, repeat(4, minmax(0,1fr)))", gap: "10px" }}>
             <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
               Period
               <select
