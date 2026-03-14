@@ -157,6 +157,10 @@ select {
   font-family: var(--font-display);
 }
 
+.show-mobile-inline {
+  display: none;
+}
+
 /* ── Vite root mount ─────────────────────────────────────────────────────────── */
 #root {
   min-height: 100vh;
@@ -190,8 +194,12 @@ select {
     font-size: 12px !important;
   }
 
-  .topbar-actions button span[aria-hidden] {
-    display: none;
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .show-mobile-inline {
+    display: inline !important;
   }
 
   .page-header {

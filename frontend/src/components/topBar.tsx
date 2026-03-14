@@ -54,7 +54,8 @@ export default function TopBar({ activeTab, onScan, onAdd, onMenuClick }: Extend
             color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer",
           }}
         >
-          <span aria-hidden>📷</span> Scan Receipt
+          <span aria-hidden>📷</span>
+          <span className="hide-mobile"> Scan Receipt</span>
         </button>
 
         <button
@@ -67,7 +68,8 @@ export default function TopBar({ activeTab, onScan, onAdd, onMenuClick }: Extend
             fontSize: "13px", cursor: "pointer",
           }}
         >
-          + Add Expense
+          <span className="show-mobile-inline">+</span>
+          <span className="hide-mobile"> Add Expense</span>
         </button>
       </div>
     </header>
