@@ -12,7 +12,20 @@ import sharp from "sharp";
 import { Readable } from "stream";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
-const s3 = new S3Client({});
+// Support LocalStack endpoint for integration testing
+const s3 = new S3Client(
+  process.env.AWS_ENDPOINT_URL
+    ? {
+        endpoint: process.env.AWS_ENDPOINT_URL,
+        forcePathStyle: true,
+        region: process.env.AWS_REGION ?? "us-east-1",
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "test",
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "test",
+        },
+      }
+    : {}
+);
 
 const UPLOADS_BUCKET = process.env.BUCKET_UPLOADS_NAME!;
 const PROCESSED_BUCKET = process.env.BUCKET_PROCESSED_NAME!;
