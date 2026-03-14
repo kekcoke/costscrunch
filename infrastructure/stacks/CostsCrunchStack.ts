@@ -140,7 +140,7 @@ export class CostsCrunchStack extends Stack {
                 },
             ],
             lifecycleRules: [
-                { expiration: Duration.days(7) }, // Auto-delete after 7 days (processed files moved to processed bucket)
+                { expiration: Duration.days(3) }, // Auto-delete after 7 days (processed files moved to processed bucket)
             ],
         });
 
@@ -152,11 +152,19 @@ export class CostsCrunchStack extends Stack {
             versioned: true,
             enforceSSL: true,
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-            lifecycleRules: [
-                { transitions: [
-                    { storageClass: s3.StorageClass.INTELLIGENT_TIERING, transitionAfter: Duration.days(15) } ] },
-                    { expiration: Duration.days(30), noncurrentVersionExpiration: Duration.days(7) },
-                ],
+            lifecycleRules: 
+            [
+                { 
+                    transitions: [
+                    { 
+                        storageClass: s3.StorageClass.INTELLIGENT_TIERING, 
+                        transitionAfter: Duration.days(15) 
+                    } 
+                ], 
+                expiration: Duration.days(30), 
+                noncurrentVersionExpiration: Duration.days(7) 
+                },
+            ],
         });
 
         // Receipts bucket: for Textract analysis results (now secondary)

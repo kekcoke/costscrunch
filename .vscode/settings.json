@@ -61,5 +61,8 @@
   "workbench.editorAssociations": {
     "*.test.ts": "default",
     "*.test.tsx": "default"
-  }
+  },
+  "cSpell.words": [
+    "localstack"
+  ]
 }
