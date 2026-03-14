@@ -117,6 +117,7 @@ import {
 // (vitest.setup.unit.ts may already set these globally).
 const TABLE_NAME_MAIN         = process.env.TABLE_NAME_MAIN;
 const EVENT_BUS_NAME          = process.env.EVENT_BUS_NAME;
+const BUCKET_UPLOADS_NAME     = process.env.BUCKET_UPLOADS_NAME ?? "costscrunch-dev-uploads-000000000000";
 const BUCKET_RECEIPTS_NAME    = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
 
 let snsTopic: string;
@@ -245,7 +246,7 @@ describe("handleUploadUrl", () => {
     expect(createPresignedPost).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        Bucket:     BUCKET_RECEIPTS_NAME,
+        Bucket:     BUCKET_UPLOADS_NAME,
         Conditions: expect.arrayContaining([
           ["content-length-range", 1, 10 * 1024 * 1024],
           ["eq", "$Content-Type", "image/jpeg"],
@@ -280,17 +281,17 @@ describe("handleUploadUrl", () => {
       fields:    { policy: "abc" },
       expenseId: expect.any(String),
       scanId:    expect.any(String),
-      key:       expect.stringMatching(new RegExp(`^receipts/${TEST_USER_ID}/`)),
+      key:       expect.stringMatching(new RegExp(`^uploads/${TEST_USER_ID}/`)),
     });
   });
 
-  it("key follows receipts/{userId}/{expenseId}/{scanId}/{filename} format", async () => {
+  it("key follows uploads/{userId}/{expenseId}/{scanId}/{filename} format", async () => {
     const result = await handler(makeUploadUrlEvent());
     const { key } = JSON.parse((result as any).body);
     const parts   = key.split("/");
 
     expect(parts).toHaveLength(5);
-    expect(parts[0]).toBe("receipts");
+    expect(parts[0]).toBe("uploads");
     expect(parts[1]).toBe(TEST_USER_ID);
     expect(parts[4]).toBe("receipt.jpg");
   });

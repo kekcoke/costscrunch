@@ -1,8 +1,8 @@
 // ─── CostsCrunch — S3 Initiator Lambda ──────────────────────────────────────────
-// Triggered by: S3 PUT on receipts/ prefix
+// Triggered by: S3 PUT on processed bucket (receipts/ prefix after preprocessing)
 // Responsibility: write the initial scan record, then hand off to Textract async.
 // Textract publishes to SNS on completion → sns-webhook.ts picks up from there.
-// Pipeline: S3 → [this file] → Textract (async) → SNS → sns-webhook.ts
+// Pipeline: UploadsBucket → image-preprocess → ProcessedBucket → [this file] → Textract
 
 import { S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
@@ -58,17 +58,18 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
   const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string | undefined;
   if (!userId) return err("Unauthorized", 401);
 
-  const allowedMimes = ["image/jpeg", "image/png", "application/pdf"];
+  const allowedMimes = ["image/jpeg", "image/png", "image/heic", "application/pdf"];
   if (!allowedMimes.includes(body.contentType)) {
-    return err("Invalid file type. Allowed: JPG, PNG, PDF");
+    return err("Invalid file type. Allowed: JPG, PNG, HEIC, PDF");
   }
 
   const expenseId = ulid();
   const scanId = ulid();
-  const key = `receipts/${userId}/${expenseId}/${scanId}/${body.filename}`;
+  // Upload to uploads bucket with uploads/ prefix — preprocessing Lambda will move to processed bucket
+  const key = `uploads/${userId}/${expenseId}/${scanId}/${body.filename}`;
 
   const { url, fields } = await createPresignedPost(s3, {
-    Bucket: process.env.BUCKET_RECEIPTS_NAME!,
+    Bucket: process.env.BUCKET_UPLOADS_NAME!,
     Key: key,
     Conditions: [
       ["content-length-range", 1, MAX_FILE_SIZE],

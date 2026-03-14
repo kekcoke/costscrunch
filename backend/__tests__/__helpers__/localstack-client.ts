@@ -61,6 +61,8 @@ export const logs = new CloudWatchLogsClient(getBaseConfig());
 export const TABLE_NAME_MAIN  = process.env.TABLE_NAME_MAIN  ?? "costscrunch-dev-main";
 export const TABLE_NAME_CONNECTIONS = process.env.TABLE_NAME_CONNECTIONS 
   ?? "costscrunch-dev-connections";
+export const BUCKET_UPLOADS_NAME = process.env.BUCKET_UPLOADS_NAME ?? "costscrunch-dev-uploads-000000000000";
+export const BUCKET_PROCESSED_NAME = process.env.BUCKET_PROCESSED_NAME ?? "costscrunch-dev-processed-000000000000";
 export const BUCKET_RECEIPTS_NAME = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
 export const BUCKET_ASSETS_NAME = process.env.BUCKET_ASSETS_NAME ?? "costscrunch-dev-assets-000000000000";
 export const EVENT_BUS_NAME   = process.env.EVENT_BUS_NAME ?? "costscrunch-dev-events";

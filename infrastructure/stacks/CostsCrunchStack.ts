@@ -123,6 +123,51 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ── S3 Buckets ────────────────────────────────────────────────
+        // Upload bucket: initial user uploads (triggers image-preprocess Lambda)
+        const uploadsBucket = new s3.Bucket(this, "UploadsBucket", {
+            bucketName: `${prefix}-uploads-${this.account}`,
+            encryption: s3.BucketEncryption.KMS_MANAGED,
+            encryptionKey: kmsKey,
+            versioned: false,
+            enforceSSL: true,
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            cors: [
+                {
+                    allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
+                    allowedOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
+                    allowedHeaders: ["*"],
+                    maxAge: 3600,
+                },
+            ],
+            lifecycleRules: [
+                { expiration: Duration.days(3) }, // Auto-delete after 7 days (processed files moved to processed bucket)
+            ],
+        });
+
+        // Processed bucket: compressed images (triggers receipts Lambda)
+        const processedBucket = new s3.Bucket(this, "ProcessedBucket", {
+            bucketName: `${prefix}-processed-${this.account}`,
+            encryption: s3.BucketEncryption.KMS_MANAGED,
+            encryptionKey: kmsKey,
+            versioned: true,
+            enforceSSL: true,
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            lifecycleRules: 
+            [
+                { 
+                    transitions: [
+                    { 
+                        storageClass: s3.StorageClass.INTELLIGENT_TIERING, 
+                        transitionAfter: Duration.days(15) 
+                    } 
+                ], 
+                expiration: Duration.days(30), 
+                noncurrentVersionExpiration: Duration.days(7) 
+                },
+            ],
+        });
+
+        // Receipts bucket: for Textract analysis results (now secondary)
         const receiptsBucket = new s3.Bucket(this, "ReceiptsBucket", {
             bucketName: `${prefix}-receipts-${this.account}`,
             encryption: s3.BucketEncryption.KMS_MANAGED,
@@ -140,8 +185,8 @@ export class CostsCrunchStack extends Stack {
             ],
             lifecycleRules: [
                 { transitions: [
-                    { storageClass: s3.StorageClass.INTELLIGENT_TIERING, transitionAfter: Duration.days(30) } ] },
-                    { expiration: Duration.days(365), noncurrentVersionExpiration: Duration.days(90) },
+                    { storageClass: s3.StorageClass.INTELLIGENT_TIERING, transitionAfter: Duration.days(15) } ] },
+                    { expiration: Duration.days(30), noncurrentVersionExpiration: Duration.days(7) },
                 ],
         });
 
@@ -302,6 +347,8 @@ export class CostsCrunchStack extends Stack {
             TABLE_NAME_MAIN:      table.tableName,
             TABLE_NAME_CONNECTIONS: connTable.tableName,   // ws-notifier reads connection records
             EVENT_BUS_NAME:  eventBus.eventBusName,
+            BUCKET_UPLOADS_NAME: uploadsBucket.bucketName,
+            BUCKET_PROCESSED_NAME: processedBucket.bucketName,
             BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
@@ -338,6 +385,20 @@ export class CostsCrunchStack extends Stack {
             entry: "backend/src/lambdas/groups/index.ts",
             functionName: `${prefix}-groups`,
             environment: { ...sharedEnv },
+        });
+
+        // ── Image Preprocessing Lambda ────────────────────────────────────────────
+        // Triggered by S3 uploads, compresses images, and uploads to processed bucket.
+        // Higher memory/timeout for image processing workloads.
+        const imagePreprocessLambda = new NodejsFunction(this, "ImagePreprocessLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/image-preprocess/index.ts",
+            functionName: `${prefix}-image-preprocess`,
+            memorySize: 2048,  // 2GB for image processing
+            timeout: Duration.seconds(60),  // 60s for large images
+            environment: {
+                ...sharedEnv,
+            },
         });
 
         const receiptsLambda = new NodejsFunction(this, "ReceiptsLambda", {
@@ -411,7 +472,12 @@ export class CostsCrunchStack extends Stack {
         connTable.grantReadWriteData(wsNotifierLambda);
 
         // S3
-        receiptsBucket.grantPut(receiptsLambda);       // presigned POST generation
+        // Image preprocessing: read from uploads, write to processed
+        uploadsBucket.grantRead(imagePreprocessLambda);
+        processedBucket.grantPut(imagePreprocessLambda);
+        
+        // Receipts: presigned POST generation for processed bucket
+        processedBucket.grantPut(receiptsLambda);       // presigned POST generation
         receiptsBucket.grantRead(snsWebhookLambda);    // Textract reads from here (via IAM role)
 
         // EventBridge
@@ -454,6 +520,7 @@ export class CostsCrunchStack extends Stack {
 
         // KMS
         kmsKey.grantEncryptDecrypt(expensesLambda);
+        kmsKey.grantEncryptDecrypt(imagePreprocessLambda);
         kmsKey.grantEncryptDecrypt(receiptsLambda);
         kmsKey.grantEncryptDecrypt(snsWebhookLambda);
         kmsKey.grantEncryptDecrypt(groupsLambda);
@@ -465,10 +532,17 @@ export class CostsCrunchStack extends Stack {
             resources: ["*"],
         }));
 
-        // ── S3 → Lambda Event Source (receipt initiation) ────────────────────────
-        // receiptsLambda is triggered by S3; it starts the async Textract job.
+        // ── S3 → Lambda Event Sources ────────────────────────────────────────────────
+        // Image preprocessing: triggered by uploads to the uploads bucket
+        imagePreprocessLambda.addEventSource(new lambdaEventSources.S3EventSource(uploadsBucket, {
+            events: [s3.EventType.OBJECT_CREATED],
+            filters: [{ prefix: "uploads/" }],
+        }));
+
+        // Receipts: triggered by uploads to the processed bucket (compressed images)
+        // Starts the async Textract job.
         // On completion Textract publishes to textractTopic → snsWebhookLambda.
-        receiptsLambda.addEventSource(new lambdaEventSources.S3EventSource(receiptsBucket, {
+        receiptsLambda.addEventSource(new lambdaEventSources.S3EventSource(processedBucket, {
             events: [s3.EventType.OBJECT_CREATED],
             filters: [{ prefix: "receipts/" }],
         }));
@@ -682,6 +756,8 @@ export class CostsCrunchStack extends Stack {
         new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId, exportName: `${prefix}-user-pool-id` });
         new CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId, exportName: `${prefix}-client-id` });
         new CfnOutput(this, "TableName", { value: table.tableName, exportName: `${prefix}-table` });
+        new CfnOutput(this, "UploadsBucket", { value: uploadsBucket.bucketName, exportName: `${prefix}-uploads-bucket` });
+        new CfnOutput(this, "ProcessedBucket", { value: processedBucket.bucketName, exportName: `${prefix}-processed-bucket` });
         new CfnOutput(this, "ReceiptsBucket", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` });
         new CfnOutput(this, "WsApiUrl",       { value: wsStage.url,               exportName: `${prefix}-ws-url` });
         new CfnOutput(this, "ConnTableName",  { value: connTable.tableName,        exportName: `${prefix}-conn-table` });
