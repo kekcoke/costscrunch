@@ -123,6 +123,75 @@ export function GroupsPage() {
           <div style={{ fontSize: "12px", textAlign: "center" }}>Split expenses with team members, family, or friends</div>
         </div>
       </div>
+      <div>
+      {isModalOpen && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, animation: "fadeIn 0.2s ease" }}>
+          <div className="modal-content" style={{ background: "var(--color-surface)", width: "100%", maxWidth: "400px", borderRadius: "20px", border: "1px solid var(--color-border)", overflow: "hidden", animation: "fadeUp 0.3s ease" }}>
+            <div style={{ padding: "24px", borderBottom: "1px solid var(--color-border-dim)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0, fontSize: "18px", fontFamily: "var(--font-display)" }}>New Group</h2>
+              <button onClick={resetForm} style={{ background: "none", border: "none", color: "var(--color-text-dim)", cursor: "pointer", fontSize: "20px" }}>&times;</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} style={{ padding: "24px" }}>
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>Group Name</label>
+                <input 
+                  autoFocus
+                  type="text" 
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Summer Trip 2024"
+                  style={{ width: "100%", background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "12px", color: "var(--color-text)", fontSize: "14px" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>Theme Color</label>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#0ea5e9"].map(c => (
+                    <button 
+                      key={c}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color: c })}
+                      style={{ width: "32px", height: "32px", borderRadius: "50%", background: c, border: formData.color === c ? "2px solid white" : "none", cursor: "pointer", padding: 0 }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {errorMsg && (
+                <div style={{ padding: "12px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "8px", color: "var(--color-red)", fontSize: "12px", marginBottom: "20px" }}>
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              {status === "success" && (
+                <div style={{ padding: "12px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "8px", color: "var(--color-green)", fontSize: "12px", marginBottom: "20px" }}>
+                  ✅ Group created successfully!
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button 
+                  type="button" 
+                  onClick={resetForm}
+                  style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", fontWeight: 600, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={status === "submitting" || status === "success"}
+                  style={{ flex: 2, padding: "12px", borderRadius: "10px", border: "none", background: "var(--color-indigo)", color: "white", fontWeight: 600, cursor: "pointer", opacity: status === "submitting" ? 0.7 : 1 }}
+                >
+                  {status === "submitting" ? "Creating..." : "Create Group"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 }
