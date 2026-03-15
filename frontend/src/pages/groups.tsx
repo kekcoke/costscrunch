@@ -1,13 +1,49 @@
 // ─── CostsCrunch — GroupsPage ─────────────────────────────────────────────────
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import "./groups.css";
 import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
+import { groupsApi } from "../services/api";
 import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
 import type { Expense } from "../models/types";
 
 export function GroupsPage() {
   const expenses = useExpenseStore(selectExpenses);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: "", color: "#6366f1" });
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const resetForm = () => {
+    setFormData({ name: "", color: "#6366f1" });
+    setStatus("idle");
+    setErrorMsg("");
+    setIsModalOpen(false);
+  };
+
+  const handleSubmit = async (e: React.SubmitEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) return setErrorMsg("Group name is required");
+
+    setStatus("submitting");
+    setErrorMsg("");
+
+    try {
+      await groupsApi.create({
+        name: formData.name,
+        color: formData.color,
+        members: [], // Default to creator
+        memberCount: 1
+      });
+      setStatus("success");
+      setTimeout(resetForm, 1500);
+    } catch (err: any) {
+      setStatus("error");
+      setErrorMsg(err.message || "Failed to create group");
+    }
+  };
 
   // Index expenses by groupId once per expenses change rather than re-filtering
   // inside every group's render pass.
@@ -77,6 +113,7 @@ export function GroupsPage() {
         <div
           role="button"
           tabIndex={0}
+          onClick={() => setIsModalOpen(true)}
           style={{ border: "2px dashed var(--color-border)", borderRadius: "18px", padding: "40px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", cursor: "pointer", color: "var(--color-text-dimmer)" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#6366f1"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--color-border)"; }}
