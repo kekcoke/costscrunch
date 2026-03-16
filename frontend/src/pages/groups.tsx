@@ -6,9 +6,13 @@ import { groupsApi } from "../services/api";
 import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
 import type { Expense } from "../models/types";
+import GroupDetail from "../components/groups/groupDetail";
 
 export function GroupsPage() {
   const expenses = useExpenseStore(selectExpenses);
+
+  // View State
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,6 +59,14 @@ export function GroupsPage() {
     }
     return map;
   }, [expenses]);
+
+  if (selectedGroupId) {
+    return (
+      <div className="groups-container">
+        <GroupDetail groupId={selectedGroupId} onBack={() => setSelectedGroupId(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="groups-container">
@@ -103,7 +115,10 @@ export function GroupsPage() {
                   </div>
                 ))}
               </div>
-              <button style={{ width: "100%", marginTop: "12px", background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
+              <button 
+                onClick={() => setSelectedGroupId(g.id)}
+                style={{ width: "100%", marginTop: "12px", background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+              >
                 View Group →
               </button>
             </div>

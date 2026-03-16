@@ -6,8 +6,8 @@ import { fetchAuthSession } from "@aws-amplify/auth";
 import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
-  GetExpensesQuery, InitiateUploadResponse,
-} from "../../../backend/src/shared/models/types";
+  GetExpensesQuery, InitiateUploadResponse
+} from "../models/types.js"
 import type { ExpenseSummaryStats } from "../models/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.costscrunch.io";
