@@ -13,7 +13,6 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
       .then((data) => setGroup(data))
       .finally(() => setLoading(false));
   }, [groupId]);
-
   if (loading) return <LoadingSpinner size="40px" />;
   if (!group) return <div>Group not found.</div>;
 

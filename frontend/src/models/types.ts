@@ -2,6 +2,8 @@
 // Single source of truth for most domain models used across frontend.
 // Backend should export matching types from backend/src/shared/models/types.ts.
 
+import type { ReactNode } from "react";
+
 export type ExpenseStatus = "approved" | "pending" | "rejected" | "draft";
 export type CategoryName = "Groceries" | "Travel" | "Software" | "Meals" | "Office" | "Equipment" | "Other";
 export type ExpenseSource = "manual" | "scan" | "bank_sync" | "api";
@@ -191,4 +193,14 @@ export interface WsScanCompletedMessage {
   category:     string;
   confidence:   number;
   processingMs: number;
+}
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  children: ReactNode;
+  headerActions?: ReactNode;
+  maxWidth?: string;
 }

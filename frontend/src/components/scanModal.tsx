@@ -1,5 +1,6 @@
 // ─── CostsCrunch — ScanModal Component ───────────────────────────────────────
 import { useState, useRef } from "react";
+import Modal from "./modal";
 import { CATEGORIES } from "../models/constants";
 import { SCAN_MOCK_RESULTS } from './../mocks/results'
 import type { ScanModalProps } from "../models/interfaceProps";
@@ -121,68 +122,30 @@ export default function ScanModal({ onClose, onAdd, userId = "user1", userName =
   };
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.75)",
-        backdropFilter: "blur(8px)",
-        zIndex: 1000,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "20px",
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={stage === "result" ? "✅ Receipt Scanned" : stage === "manual" ? "✏️ Manual Entry" : "📷 Scan Receipt"}
+      subtitle={stageSubtitle[stage]}
+      headerActions={
+        (stage === "result" || stage === "manual") && (
+          <button
+            onClick={resetToIdle}
+            aria-label="New Scan"
+            style={{
+              background: "#1e3048", border: "none", color: "#64748b",
+              width: "32px", height: "32px", borderRadius: "8px",
+              cursor: "pointer", fontSize: "16px",
+            }}
+          >
+            ↺
+          </button>
+        )
+      }
     >
-      <div
-        style={{
-          background: "#0f1724",
-          border: "1px solid #1e3048",
-          borderRadius: "20px",
-          width: "100%", maxWidth: "520px",
-          overflow: "hidden",
-          boxShadow: "0 40px 80px rgba(0,0,0,0.6)",
-        }}
-      >
-        {/* Header */}
-        <div style={{ padding: "24px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 700, color: "var(--color-text)" }}>
-              {stage === "result" ? "✅ Receipt Scanned" : stage === "manual" ? "✏️ Manual Entry" : "📷 Scan Receipt"}
-            </div>
-            <div style={{ fontSize: "12px", color: "#64748b", marginTop: "3px" }}>
-              {stageSubtitle[stage]}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            {(stage === "result" || stage === "manual") && (
-              <button
-                onClick={resetToIdle}
-                aria-label="New Scan"
-                style={{
-                  background: "#1e3048", border: "none", color: "#64748b",
-                  width: "32px", height: "32px", borderRadius: "8px",
-                  cursor: "pointer", fontSize: "16px",
-                }}
-              >
-                ↺
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                background: "#1e3048", border: "none", color: "#64748b",
-                width: "32px", height: "32px", borderRadius: "8px",
-                cursor: "pointer", fontSize: "16px",
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <div style={{ padding: "24px 28px 28px" }}>
-          {/* Drop Zone */}
-          {stage === "idle" && (
+      {/* Drop Zone */}
+      <div>
+        {stage === "idle" && (
             <>
               <div
                 role="button"
@@ -352,7 +315,6 @@ export default function ScanModal({ onClose, onAdd, userId = "user1", userName =
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
