@@ -2,12 +2,24 @@
 # Services mocked: DynamoDB, S3, SES, SQS, SNS, EventBridge, Lambda, Textract,
 #                  SSM, CloudFront, Cognito, ElastiCache, KMS, IAM, Logs, WAF
 #
-# Usage:
-#   Build:  docker compose -f docker-compose.localstack.yml build
-#   Start:  docker compose -f docker-compose.localstack.yml up -d
+# Usage (Option 2 — full LocalStack):
+#   sam build --template infrastructure/sam/template.yaml
+#   docker compose -f docker-compose.localstack.yml \
+#     -f infrastructure/localstack/opt2/docker-compose.opt2.yml up -d
+#
+# Usage (Option 3 — SAM CLI + LocalStack data only):
+#   docker compose -f docker-compose.localstack.yml up -d
+#   sam local start-api \
+#     --template infrastructure/sam/template.yaml \
+#     --env-vars infrastructure/sam/env.json \
+#     --docker-network costscrunch-local \
+#     --port 4000
+#   # Then: VITE_API_URL=http://localhost:4000
+#
+# General:
 #   Stop:   docker compose -f docker-compose.localstack.yml down
 #   Logs:   docker compose -f docker-compose.localstack.yml logs -f localstack
-#   Reset:  docker compose -f docker-compose.localstack.yml down -v && docker compose -f docker-compose.localstack.yml up -d
+#   Reset:  docker compose -f docker-compose.localstack.yml down -v
 
 services:
   localstack:
@@ -30,6 +42,10 @@ services:
       - EAGER_SERVICE_LOADING=1
       - DATA_DIR=/var/lib/localstack
       - DISABLE_CORS_HEADERS=0
+      - APP_URL=${VITE_APP_URL:-http://localhost:3000}
+      - EXTRA_CORS_ALLOWED_ORIGINS=http://localhost:3000
+    networks:
+      - costscrunch-local
     volumes:
       - localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
@@ -54,10 +70,18 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
+      - APP_URL=${VITE_APP_URL:-http://localhost:3000}
     volumes:
       - ./localstack:/localstack  # Seed scripts to initialize LocalStack services
     entrypoint: ["/bin/bash", "/localstack/dev/setup.sh"]
     restart: "no"                 # Run once and exit
+    networks:
+      - costscrunch-local
+
+networks:
+  costscrunch-local:
+    name: costscrunch-local
+    driver: bridge
   
 volumes:
   localstack-data:

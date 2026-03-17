@@ -40,6 +40,7 @@ BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
 EVENT_BUS_NAME="costscrunch-dev-events"
 PREFIX="costscrunch-dev"
 FROM_EMAIL="noreply@costscrunch.dev"
+APP_URL="${APP_URL:-http://localhost:3000}"
 
 echo "🔧 costscrunch LocalStack seed starting..."
 
@@ -154,14 +155,14 @@ $AWS s3api put-bucket-encryption \
   }' \
   --no-cli-pager 2>/dev/null || true
 
-# CORS: PUT + GET only, localhost for dev (matches CDK dev mode "*")
+# CORS: PUT + GET only, origin from APP_URL (matches CDK dev mode "*")
 $AWS s3api put-bucket-cors \
   --bucket "$BUCKET_UPLOADS_NAME" \
   --cors-configuration '{
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
+      "AllowedOrigins": ["'"$APP_URL"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
@@ -257,14 +258,14 @@ $AWS s3api put-bucket-encryption \
   }' \
   --no-cli-pager 2>/dev/null || true
 
-# CORS: PUT + GET only, localhost:3000 + localhost:5173 for Vite dev server (matches CDK dev mode "*")
+# CORS: PUT + GET only, origin from APP_URL (matches CDK dev mode "*")
 $AWS s3api put-bucket-cors \
   --bucket "$BUCKET_RECEIPTS_NAME" \
   --cors-configuration '{
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
+      "AllowedOrigins": ["'"$APP_URL"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
@@ -367,8 +368,8 @@ $AWS dynamodb put-item \
     "entityType":   {"S": "COGNITO_CLIENT"},
     "clientId":     {"S": "'"$MOCK_CLIENT_ID"'"},
     "clientName":   {"S": "'"${PREFIX}-web"'"},
-    "callbackUrls": {"L": [{"S": "http://localhost:3000/callback"}]},
-    "logoutUrls":   {"L": [{"S": "http://localhost:3000/logout"}]},
+    "callbackUrls": {"L": [{"S": "'"$APP_URL"'/callback"}]},
+    "logoutUrls":   {"L": [{"S": "'"$APP_URL"'/logout"}]},
     "createdAt":    {"S": "2026-01-01T00:00:00.000Z"}
   }' \
   --no-cli-pager 2>/dev/null || true
