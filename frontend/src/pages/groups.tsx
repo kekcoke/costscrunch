@@ -1,15 +1,18 @@
 // ─── CostsCrunch — GroupsPage ─────────────────────────────────────────────────
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./groups.css";
 import { useExpenseStore, selectExpenses } from "../stores/useExpenseStore";
+import { useGroupStore } from "../stores/useGroupStore";
 import { groupsApi } from "../services/api";
-import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt, fmtDate } from "../helpers/utils";
 import type { Expense } from "../models/types";
 import GroupDetail from "../components/groups/groupDetail";
 
 export function GroupsPage() {
   const expenses = useExpenseStore(selectExpenses);
+  const { groups, loading: groupsLoading, fetchGroups } = useGroupStore();
+
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
   // View State
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -81,7 +84,9 @@ export function GroupsPage() {
       </header>
 
       <div className="group-grid">
-        {MOCK_GROUPS.map((g) => (
+        {groupsLoading && groups.length === 0 ? (
+          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--color-text-dim)" }}>Loading groups…</div>
+        ) : groups.map((g) => (
           <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "16px", borderBottom: "1px solid var(--color-border-dim)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

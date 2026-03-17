@@ -17,6 +17,7 @@ import StatCard   from "../src/components/statCard.js";
 import ExpenseRow from "../src/components/expenseRow.js";
 import DonutChart from "../src/components/charts/donutChart";
 import ScanModal  from "../src/components/scanModal.js";
+import GroupDetail from "../src/components/groups/groupDetail";
 import { MOCK_EXPENSES } from "../src/mocks/expenses";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -225,5 +226,59 @@ describe("useExpenseStore", () => {
 
     // Verify that the search state itself is updated
     expect(state.search).toBe("Starbucks");
+  });
+});
+
+// ── GroupDetail CRUD ──────────────────────────────────────────────────────────
+describe("<GroupDetail />", () => {
+  const onBack = vi.fn();
+  const mockGroup = { id: "g1", name: "Housemates", members: 3, color: "#6366f1" };
+
+  beforeEach(() => {
+    vi.mock("../src/services/api", () => ({
+      groupsApi: {
+        get: vi.fn(() => Promise.resolve({ id: "g1", name: "Housemates", members: 3, color: "#6366f1" })),
+        addMember: vi.fn(() => Promise.resolve({ added: true })),
+        update: vi.fn(() => Promise.resolve({})),
+      }
+    }));
+  });
+
+  it("renders group details and members", async () => {
+    render(<GroupDetail groupId="g1" onBack={onBack} />);
+    expect(await screen.findByText("Housemates")).toBeInTheDocument();
+    expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
+  });
+
+  it("opens add member modal and submits successfully", async () => {
+    render(<GroupDetail groupId="g1" onBack={onBack} />);
+    const addButton = await screen.findByText("+ Add Member");
+    await userEvent.click(addButton);
+
+    expect(screen.getByText("Add Group Member")).toBeInTheDocument();
+    
+    await userEvent.type(screen.getByPlaceholderText(/john@example.com/i), "test@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /Add Member/i }));
+
+    expect(await screen.findByText(/Member added successfully/i)).toBeInTheDocument();
+  });
+
+  it("shows error when adding member without email", async () => {
+    render(<GroupDetail groupId="g1" onBack={onBack} />);
+    await userEvent.click(await screen.findByText("+ Add Member"));
+    await userEvent.click(screen.getByRole("button", { name: /Add Member/i }));
+
+    expect(screen.getByText(/Email is required/i)).toBeInTheDocument();
+  });
+
+  it("opens delete confirmation and handles removal", async () => {
+    render(<GroupDetail groupId="g1" onBack={onBack} />);
+    const removeButtons = await screen.findAllByText("Remove");
+    await userEvent.click(removeButtons[0]);
+
+    expect(screen.getByText(/Are you sure you want to remove/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Confirm Remove/i }));
+
+    expect(await screen.findByText(/Member removed/i)).toBeInTheDocument();
   });
 });

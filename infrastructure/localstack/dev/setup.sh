@@ -552,7 +552,7 @@ $AWS dynamodb put-item \
     "timezone":  {"S": "America/New_York"},
     "locale":    {"S": "en-US"},
     "plan":      {"S": "pro"},
-    "notificationPrefs": {"M": {
+    "notificationPreferences": {"M": {
       "email":           {"BOOL": true},
       "push":            {"BOOL": false},
       "sms":             {"BOOL": false},
@@ -561,6 +561,225 @@ $AWS dynamodb put-item \
     "createdAt":    {"S": "2026-01-01T00:00:00.000Z"},
     "updatedAt":    {"S": "2026-01-01T00:00:00.000Z"},
     "lastActiveAt": {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "📦 Seeding test group (Household)"
+MOCK_GROUP_ID="group-001"
+$AWS dynamodb put-item \
+  --table-name "$TABLE_NAME_MAIN" \
+  --item '{
+    "pk":         {"S": "GROUP#'"$MOCK_GROUP_ID"'"},
+    "sk":         {"S": "PROFILE#'"$MOCK_GROUP_ID"'"},
+    "gsi1pk":     {"S": "OWNER#test-user-001"},
+    "gsi1sk":     {"S": "GROUP#'"$MOCK_GROUP_ID"'"},
+    "entityType": {"S": "GROUP"},
+    "groupId":    {"S": "'"$MOCK_GROUP_ID"'"},
+    "name":       {"S": "Household Expenses"},
+    "type":       {"S": "household"},
+    "ownerId":    {"S": "test-user-001"},
+    "color":      {"S": "#6366f1"},
+    "memberCount":{"N": "3"},
+    "currency":   {"S": "USD"},
+    "active":     {"BOOL": true},
+    "totalSpend": {"N": "1250.50"},
+    "createdAt":  {"S": "2026-01-01T00:00:00.000Z"},
+    "updatedAt":  {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Add test user to group membership
+$AWS dynamodb put-item \
+  --table-name "$TABLE_NAME_MAIN" \
+  --item '{
+    "pk":         {"S": "USER#test-user-001"},
+    "sk":         {"S": "GROUP_MEMBER#'"$MOCK_GROUP_ID"'"},
+    "entityType": {"S": "GROUP_MEMBER"},
+    "userId":     {"S": "test-user-001"},
+    "groupId":    {"S": "'"$MOCK_GROUP_ID"'"},
+    "role":       {"S": "owner"},
+    "joinedAt":   {"S": "2026-01-01T00:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "📦 Seeding group expenses"
+for i in 1 2; do
+  EXP_ID="exp-group-00$i"
+  MERCHANT=$([ $i -eq 1 ] && echo "Whole Foods" || echo "Electric Bill")
+  AMOUNT=$([ $i -eq 1 ] && echo "85.20" || echo "142.00")
+  CAT=$([ $i -eq 1 ] && echo "Groceries" || echo "Utilities")
+  
+  $AWS dynamodb put-item \
+    --table-name "$TABLE_NAME_MAIN" \
+    --item '{
+      "pk":           {"S": "GROUP#'"$MOCK_GROUP_ID"'"},
+      "sk":           {"S": "EXPENSE#'"$EXP_ID"'"},
+      "gsi1pk":       {"S": "STATUS#approved"},
+      "gsi1sk":       {"S": "DATE#2026-03-10#'"$EXP_ID"'"},
+      "entityType":   {"S": "EXPENSE"},
+      "expenseId":    {"S": "'"$EXP_ID"'"},
+      "ownerId":      {"S": "test-user-001"},
+      "groupId":      {"S": "'"$MOCK_GROUP_ID"'"},
+      "merchant":     {"S": "'"$MERCHANT"'"},
+      "amount":       {"N": "'"$AMOUNT"'"},
+      "currency":     {"S": "USD"},
+      "amountUSD":    {"N": "'"$AMOUNT"'"},
+      "category":     {"S": "'"$CAT"'"},
+      "date":         {"S": "2026-03-10"},
+      "status":       {"S": "approved"},
+      "source":       {"S": "manual"},
+      "createdAt":    {"S": "2026-03-10T10:00:00.000Z"},
+      "updatedAt":    {"S": "2026-03-10T10:00:00.000Z"}
+    }' \
+    --no-cli-pager 2>/dev/null || true
+done
+
+# ── Seed mock groups (matches frontend/src/mocks/groups.ts) ─────────────────
+echo "📦 Seeding mock groups (g1, g2, g3)"
+for GROUP_DEF in "g1:Q1 Offsite:8:4287.50:535.93:#6366f1" "g2:Acme Corp:3:12403.18:4134.39:#f59e0b" "g3:Home:2:3241.00:1620.50:#10b981"; do
+  IFS=':' read -r G_ID G_NAME G_MEMBERS G_TOTAL G_MYSHARE G_COLOR <<< "$GROUP_DEF"
+
+  $AWS dynamodb put-item \
+    --table-name "$TABLE_NAME_MAIN" \
+    --item '{
+      "pk":         {"S": "GROUP#'"$G_ID"'"},
+      "sk":         {"S": "PROFILE#'"$G_ID"'"},
+      "gsi1pk":     {"S": "OWNER#test-user-001"},
+      "gsi1sk":     {"S": "GROUP#'"$G_ID"'"},
+      "entityType": {"S": "GROUP"},
+      "groupId":    {"S": "'"$G_ID"'"},
+      "name":       {"S": "'"$G_NAME"'"},
+      "type":       {"S": "shared"},
+      "ownerId":    {"S": "test-user-001"},
+      "color":      {"S": "'"$G_COLOR"'"},
+      "memberCount":{"N": "'"$G_MEMBERS"'"},
+      "currency":   {"S": "USD"},
+      "active":     {"BOOL": true},
+      "totalSpend": {"N": "'"$G_TOTAL"'"},
+      "createdAt":  {"S": "2026-01-01T00:00:00.000Z"},
+      "updatedAt":  {"S": "2026-01-01T00:00:00.000Z"}
+    }' \
+    --no-cli-pager 2>/dev/null || true
+
+  # Add test user as group member
+  $AWS dynamodb put-item \
+    --table-name "$TABLE_NAME_MAIN" \
+    --item '{
+      "pk":         {"S": "USER#test-user-001"},
+      "sk":         {"S": "GROUP_MEMBER#'"$G_ID"'"},
+      "entityType": {"S": "GROUP_MEMBER"},
+      "userId":     {"S": "test-user-001"},
+      "groupId":    {"S": "'"$G_ID"'"},
+      "role":       {"S": "owner"},
+      "joinedAt":   {"S": "2026-01-01T00:00:00.000Z"}
+    }' \
+    --no-cli-pager 2>/dev/null || true
+done
+
+# ── Seed mock expenses (matches frontend/src/mocks/expenses.ts) ──────────────
+echo "📦 Seeding mock expenses (e1, e2, e3)"
+
+# e1 — Personal expense, no group
+$AWS dynamodb put-item \
+  --table-name "$TABLE_NAME_MAIN" \
+  --item '{
+    "pk":           {"S": "USER#test-user-001"},
+    "sk":           {"S": "EXPENSE#e1"},
+    "gsi1pk":       {"S": "STATUS#approved"},
+    "gsi1sk":       {"S": "DATE#2026-03-01#e1"},
+    "entityType":   {"S": "EXPENSE"},
+    "expenseId":    {"S": "e1"},
+    "ownerId":      {"S": "test-user-001"},
+    "groupId":      {"NULL": true},
+    "merchant":     {"S": "Whole Foods Market"},
+    "description":  {"S": "Weekly groceries"},
+    "amount":       {"N": "142.87"},
+    "currency":     {"S": "USD"},
+    "amountUSD":    {"N": "142.87"},
+    "category":     {"S": "Groceries"},
+    "subcategory":  {"S": "Food"},
+    "tags":         {"L": [{"S": "groceries"}, {"S": "personal"}]},
+    "date":         {"S": "2026-03-01"},
+    "status":       {"S": "approved"},
+    "approvedAt":   {"S": "2026-02-28T14:20:00Z"},
+    "reimbursedAt": {"S": "2026-03-01T09:00:00Z"},
+    "receipt":      {"BOOL": true},
+    "receiptKey":   {"S": "receipts/e1-wholefoods.pdf"},
+    "source":       {"S": "manual"},
+    "addedBy":      {"S": "You"},
+    "reimbursable": {"BOOL": true},
+    "createdAt":    {"S": "2026-03-01T10:00:00.000Z"},
+    "updatedAt":    {"S": "2026-03-01T10:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# e2 — Group expense under g1 (Q1 Offsite), with equal split
+$AWS dynamodb put-item \
+  --table-name "$TABLE_NAME_MAIN" \
+  --item '{
+    "pk":           {"S": "USER#test-user-001"},
+    "sk":           {"S": "EXPENSE#e2"},
+    "gsi1pk":       {"S": "STATUS#approved"},
+    "gsi1sk":       {"S": "DATE#2026-03-01#e2"},
+    "entityType":   {"S": "EXPENSE"},
+    "expenseId":    {"S": "e2"},
+    "ownerId":      {"S": "test-user-001"},
+    "groupId":      {"S": "g1"},
+    "merchant":     {"S": "Delta Airlines"},
+    "description":  {"S": "NYC → SFO"},
+    "amount":       {"N": "428"},
+    "currency":     {"S": "USD"},
+    "amountUSD":    {"N": "428"},
+    "category":     {"S": "Travel"},
+    "subcategory":  {"S": "Flights"},
+    "tags":         {"L": [{"S": "travel"}, {"S": "business"}]},
+    "date":         {"S": "2026-03-01"},
+    "status":       {"S": "approved"},
+    "receipt":      {"BOOL": true},
+    "splitMethod":  {"S": "equal"},
+    "splits":       {"L": [
+      {"M": {"userId": {"S": "test-user-001"}, "amount": {"N": "214"}, "percentage": {"N": "50"}, "shares": {"N": "1"}}},
+      {"M": {"userId": {"S": "user2"}, "amount": {"N": "214"}, "percentage": {"N": "50"}, "shares": {"N": "1"}}}
+    ]},
+    "projectCode":  {"S": "Q1-OFFSITE"},
+    "costCenter":   {"S": "MARKETING"},
+    "source":       {"S": "manual"},
+    "addedBy":      {"S": "You"},
+    "reimbursable": {"BOOL": true},
+    "createdAt":    {"S": "2026-03-01T10:00:00.000Z"},
+    "updatedAt":    {"S": "2026-03-01T10:00:00.000Z"}
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# e3 — Group expense under g2 (Acme Corp), added by another user
+$AWS dynamodb put-item \
+  --table-name "$TABLE_NAME_MAIN" \
+  --item '{
+    "pk":           {"S": "USER#user3"},
+    "sk":           {"S": "EXPENSE#e3"},
+    "gsi1pk":       {"S": "STATUS#approved"},
+    "gsi1sk":       {"S": "DATE#2026-03-01#e3"},
+    "entityType":   {"S": "EXPENSE"},
+    "expenseId":    {"S": "e3"},
+    "ownerId":      {"S": "user3"},
+    "groupId":      {"S": "g2"},
+    "merchant":     {"S": "AWS Console"},
+    "amount":       {"N": "1204.33"},
+    "currency":     {"S": "USD"},
+    "amountUSD":    {"N": "1204.33"},
+    "category":     {"S": "Software"},
+    "subcategory":  {"S": "Cloud Services"},
+    "tags":         {"L": [{"S": "software"}, {"S": "infra"}]},
+    "date":         {"S": "2026-03-01"},
+    "status":       {"S": "approved"},
+    "approvedAt":   {"S": "2026-02-26T11:30:00Z"},
+    "projectCode":  {"S": "ACME-CLOUD"},
+    "costCenter":   {"S": "ENGINEERING"},
+    "source":       {"S": "scan"},
+    "addedBy":      {"S": "Sarah K."},
+    "reimbursable": {"BOOL": true},
+    "createdAt":    {"S": "2026-03-01T10:00:00.000Z"},
+    "updatedAt":    {"S": "2026-03-01T10:00:00.000Z"}
   }' \
   --no-cli-pager 2>/dev/null || true
 

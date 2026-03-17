@@ -1,13 +1,13 @@
 // ─── CostsCrunch — DashboardPage ─────────────────────────────────────────────
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   useExpenseStore,
   selectExpenses,
   selectPending,
   selectMyExpenses,
 } from "../stores/useExpenseStore";
+import { useGroupStore } from "../stores/useGroupStore";
 import { CATEGORIES } from "../models/constants";
-import { MOCK_GROUPS } from "../mocks/groups";
 import { fmt } from "../helpers/utils";
 import { StatCard, ExpenseRow, DonutChart } from "../components";
 
@@ -15,6 +15,9 @@ export function DashboardPage() {
   const expenses   = useExpenseStore(selectExpenses);
   const pending    = useExpenseStore(selectPending);
   const myExpenses = useExpenseStore(selectMyExpenses);
+  const { groups, fetchGroups } = useGroupStore();
+
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
   const totalMonth = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const myTotal    = useMemo(() => myExpenses.reduce((s, e) => s + e.amount, 0), [myExpenses]);
@@ -45,7 +48,7 @@ export function DashboardPage() {
         <StatCard label="Month Total"    value={fmt(totalMonth)}          sub="↑ 12% vs last month"                  delay={0} />
         <StatCard label="My Expenses"    value={fmt(myTotal)}             sub={`${myExpenses.length} transactions`}  accent="#0ea5e9" delay={0.05} />
         <StatCard label="Pending Review" value={String(pending.length)}   sub={`${fmt(pendingAmt)} to approve`}      accent="#f59e0b" delay={0.1} />
-        <StatCard label="Active Groups"  value={String(MOCK_GROUPS.length)} sub="3 shared budgets"                   accent="#10b981" delay={0.15} />
+        <StatCard label="Active Groups"  value={String(groups.length)} sub={`${groups.length} shared budgets`}          accent="#10b981" delay={0.15} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-dashboard, 1fr 360px)", gap: "20px", marginBottom: "28px" }}>
@@ -67,7 +70,7 @@ export function DashboardPage() {
       <div style={{ animation: "fadeUp 0.5s 0.3s both" }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "15px", marginBottom: "16px" }}>Group Budgets</div>
         <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-3, repeat(3, 1fr))", gap: "16px" }}>
-          {MOCK_GROUPS.map((g) => (
+          {groups.map((g) => (
             <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}22`, borderRadius: "14px", padding: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
                 <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: g.color }} />
