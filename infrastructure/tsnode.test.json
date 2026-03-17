@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@shared/*": ["../backend/src/shared/*"],
+      "@lambdas/*": ["../backend/src/lambdas/*"]
+    }
+  },
+  "include": [
+    "__tests__/**/*.ts",
+    "sam/**/*.ts"
+  ]
+}
