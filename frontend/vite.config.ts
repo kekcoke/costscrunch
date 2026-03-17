@@ -1,9 +1,19 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(() => {
+  // .env.test is only auto-loaded in vitest mode; load explicitly for dev too
+  const { VITE_API_URL } = loadEnv("test", resolve(__dirname, ".."));
+
+  return {
+  // Load .env files from monorepo root (e.g. .env.test)
+  envDir: resolve(__dirname, ".."),
+  // Inject VITE_API_URL from .env.test into import.meta.env for all modes
+  define: {
+    "import.meta.env.VITE_API_URL": JSON.stringify(VITE_API_URL),
+  },
   plugins: [react()],
 
   resolve: {
@@ -56,4 +66,5 @@ export default defineConfig(() => ({
       exclude: ["src/**/*.d.ts", "src/mocks/**"],
     },
   },
-}));
+  };
+});
