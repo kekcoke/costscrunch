@@ -27,6 +27,9 @@ else
 fi
 echo "🔧 Using SAM template: $TEMPLATE (arch: $ARCH)"
 
+# SAM's esbuild bundler requires esbuild on PATH — use the one from backend devDependencies
+export PATH="$PROJECT_ROOT/backend/node_modules/.bin:$PATH"
+
 sam build --template-file "$TEMPLATE"
 
 # 4. Start local API (Lambda on host, proxying data to LocalStack)
