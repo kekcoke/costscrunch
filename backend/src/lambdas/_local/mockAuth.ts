@@ -5,11 +5,14 @@
  * into the event before passing it to the real handler.
  * This lets handlers call getAuth(event) without a real Cognito pool.
  */
-const MOCK_CLAIMS: Record<string, string> = {
-  sub: process.env.MOCK_USER_SUB || "00000000-0000-0000-0000-test-user-001",
-  email: process.env.MOCK_USER_EMAIL || "test@costscrunch.dev",
-  "cognito:groups": process.env.MOCK_USER_GROUPS || "pro",
-};
+// Read env vars at call time so tests can override them after import
+function getMockClaims(): Record<string, string> {
+  return {
+    sub: process.env.MOCK_USER_SUB || "00000000-0000-0000-0000-test-user-001",
+    email: process.env.MOCK_USER_EMAIL || "test@costscrunch.dev",
+    "cognito:groups": process.env.MOCK_USER_GROUPS || "pro",
+  };
+}
 
 export function withMockAuth(
   handler: (event: any, context: any) => Promise<any>,
@@ -22,7 +25,7 @@ export function withMockAuth(
       event.requestContext = {
         ...event.requestContext,
         authorizer: {
-          jwt: { claims: { ...MOCK_CLAIMS } },
+          jwt: { claims: { ...getMockClaims() } },
         },
       };
     }

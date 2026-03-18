@@ -17,6 +17,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "dev": "npx tsx watch src/server.ts",
     "dev:sam": "sam local start-api --port 4000 --env-vars env.local.json",
+    "build:local": "node scripts/bundle-local.mjs",
     "clean": "rm -rf dist .esbuild"
   },
   "dependencies": {
