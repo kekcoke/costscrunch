@@ -13,7 +13,7 @@ echo "🚀 [1/8] Starting base LocalStack (data layer)..."
 cd "$PROJECT_ROOT/infrastructure"
 
 # Start LocalStack and the seed container
-docker compose -f docker-compose.localstack.yml up -d --force-recreate
+docker compose -f docker-compose.localstack.yml up -d
 echo "   ↳ Containers started"
 
 echo "⏳ [2/8] Waiting for LocalStack edge port..."
@@ -40,14 +40,13 @@ echo "   ✅ Data seed complete"
 echo "   ↳ Settling (2s)..."
 sleep 2
 
-echo "🚀 [3/8] Applying opt2 Lambda executor overrides..."
-docker compose -f docker-compose.localstack.yml -f localstack/opt2/docker-compose.opt2.yml up -d
-
-echo "⏳ [3b/8] Waiting for container exec readiness..."
-until docker exec costscrunch-localstack echo "ready" >/dev/null 2>&1; do
+# LAMBDA_EXECUTOR is set in the base docker-compose, so Lambda execution is ready.
+echo "🚀 [3/8] Waiting for LocalStack to be fully ready..."
+until curl -sf http://localhost:4566/_localstack/health > /dev/null 2>&1; do
   sleep 2
 done
-echo "   ✅ Container ready"
+sleep 5
+echo "   ✅ LocalStack ready"
 
 echo "🔨 [4/8] Building local Lambda bundles..."
 cd "$PROJECT_ROOT/backend"
