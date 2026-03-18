@@ -215,11 +215,45 @@ add_route ANY /analytics AnalyticsFunction
 
 # ── CORS ────────────────────────────────────────────────────────────────────
 echo "📦 Configuring CORS"
-# In v1, CORS is typically handled by OPTIONS methods or Lambda headers.
-# For simplicity in LocalStack, we add an OPTIONS method to every resource.
+# Each OPTIONS mock must return Access-Control headers. Without the integration
+# response / method response blocks below, API GW returns 200 but zero CORS headers.
+ALLOW_ORIGIN="http://localhost:3000,http://localhost:3001"
+ALLOW_METHODS="GET,POST,PUT,PATCH,DELETE,OPTIONS"
+ALLOW_HEADERS="Content-Type,Authorization,X-Requested-With,Accept,Origin"
+
 for RES in $($AWS apigateway get-resources --rest-api-id "$API_ID" --query 'items[].id' --output text); do
-  $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES" --http-method OPTIONS --authorization-type "NONE" 2>/dev/null || true
-  $AWS apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES" --http-method OPTIONS --type MOCK 2>/dev/null || true
+  $AWS apigateway put-method \
+    --rest-api-id "$API_ID" --resource-id "$RES" \
+    --http-method OPTIONS --authorization-type "NONE" 2>/dev/null || true
+
+  $AWS apigateway put-integration \
+    --rest-api-id "$API_ID" --resource-id "$RES" \
+    --http-method OPTIONS --type MOCK \
+    --request-templates '{"application/json": "{\"statusCode\": 200}"}' \
+    2>/dev/null || true
+
+  # Tell API GW to return the CORS headers on the 200 response
+  $AWS apigateway put-integration-response \
+    --rest-api-id "$API_ID" --resource-id "$RES" \
+    --http-method OPTIONS --status-code 200 \
+    --response-parameters "{
+      \"method.response.header.Access-Control-Allow-Origin\": \"'$ALLOW_ORIGIN'\",
+      \"method.response.header.Access-Control-Allow-Methods\": \"'$ALLOW_METHODS'\",
+      \"method.response.header.Access-Control-Allow-Headers\": \"'$ALLOW_HEADERS'\"
+    }" \
+    2>/dev/null || true
+
+  # Register the 200 + headers as a valid method response
+  $AWS apigateway put-method-response \
+    --rest-api-id "$API_ID" --resource-id "$RES" \
+    --http-method OPTIONS --status-code 200 \
+    --response-models '{"application/json": "Empty"}' \
+    --response-parameters "{
+      \"method.response.header.Access-Control-Allow-Origin\": false,
+      \"method.response.header.Access-Control-Allow-Methods\": false,
+      \"method.response.header.Access-Control-Allow-Headers\": false
+    }" \
+    2>/dev/null || true
 done
 
 # ── Deploy ──────────────────────────────────────────────────────────────────
