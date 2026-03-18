@@ -96,7 +96,7 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
 // REST API v1 sends actual paths ("/groups/g1"), not template patterns ("/groups/{id}").
 // This normalizes the route so the handler can use a single set of route checks.
 function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
-  if (routeKey) return { route: `${method} ${routeKey}`, params: {} };
+  if (routeKey) return { route: routeKey, params: {} };
 
   // Strip trailing slash
   const p = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
