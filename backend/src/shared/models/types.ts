@@ -309,7 +309,15 @@ export interface ApiEvent {
   pathParameters?: Record<string, string>;
   queryStringParameters?: Record<string, string>;
   body?: string;
+  // REST API v1 fields
+  httpMethod?: string;
+  path?: string;
+  routeKey?: string;
   requestContext: {
+    http?: {
+      method: string;
+      path: string;
+    };
     authorizer: {
       jwt: {
         claims: {
@@ -319,5 +327,6 @@ export interface ApiEvent {
         };
       };
     };
+    requestId?: string;
   };
 }
