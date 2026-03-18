@@ -232,7 +232,6 @@ describe("useExpenseStore", () => {
 // ── GroupDetail CRUD ──────────────────────────────────────────────────────────
 describe("<GroupDetail />", () => {
   const onBack = vi.fn();
-  const mockGroup = { id: "g1", name: "Housemates", members: 3, color: "#6366f1" };
 
   beforeEach(() => {
     vi.mock("../src/services/api", () => ({

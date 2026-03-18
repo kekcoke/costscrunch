@@ -41,8 +41,7 @@ export function GroupsPage() {
       await groupsApi.create({
         name: formData.name,
         color: formData.color,
-        members: [], // Default to creator
-        memberCount: 1
+        members: 0, // Default to creator
       });
       setStatus("success");
       setTimeout(resetForm, 1500);
