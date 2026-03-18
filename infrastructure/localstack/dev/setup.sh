@@ -394,6 +394,9 @@ done
 
 # Seed test user — sub is stable so dependent records stay consistent
 MOCK_USER_SUB="00000000-0000-0000-0000-test-user-001"
+# In local dev, we use the sub as the primary userId for simplicity
+MOCK_USER_ID="$MOCK_USER_SUB"
+
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
@@ -542,13 +545,13 @@ echo "📦 Seeding test user profile"
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":        {"S": "USER#test-user-001"},
-    "sk":        {"S": "PROFILE#test-user-001"},
+    "pk":        {"S": "USER#'"$MOCK_USER_ID"'"},
+    "sk":        {"S": "PROFILE#'"$MOCK_USER_ID"'"},
     "gsi1pk":    {"S": "EMAIL#test@costscrunch.dev"},
-    "gsi1sk":    {"S": "USER#test-user-001"},
+    "gsi1sk":    {"S": "USER#'"$MOCK_USER_ID"'"},
     "entityType":{"S": "USER"},
-    "userId":    {"S": "test-user-001"},
-    "cognitoSub":{"S": "00000000-0000-0000-0000-test-user-001"},
+    "userId":    {"S": "'"$MOCK_USER_ID"'"},
+    "cognitoSub":{"S": "'"$MOCK_USER_SUB"'"},
     "email":     {"S": "test@costscrunch.dev"},
     "name":      {"S": "Test User"},
     "currency":  {"S": "USD"},
@@ -574,13 +577,13 @@ $AWS dynamodb put-item \
   --item '{
     "pk":         {"S": "GROUP#'"$MOCK_GROUP_ID"'"},
     "sk":         {"S": "PROFILE#'"$MOCK_GROUP_ID"'"},
-    "gsi1pk":     {"S": "OWNER#test-user-001"},
+    "gsi1pk":     {"S": "OWNER#'"$MOCK_USER_ID"'"},
     "gsi1sk":     {"S": "GROUP#'"$MOCK_GROUP_ID"'"},
     "entityType": {"S": "GROUP"},
     "groupId":    {"S": "'"$MOCK_GROUP_ID"'"},
     "name":       {"S": "Household Expenses"},
     "type":       {"S": "household"},
-    "ownerId":    {"S": "test-user-001"},
+    "ownerId":    {"S": "'"$MOCK_USER_ID"'"},
     "color":      {"S": "#6366f1"},
     "memberCount":{"N": "3"},
     "currency":   {"S": "USD"},
@@ -595,10 +598,10 @@ $AWS dynamodb put-item \
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":         {"S": "USER#test-user-001"},
+    "pk":         {"S": "USER#'"$MOCK_USER_ID"'"},
     "sk":         {"S": "GROUP_MEMBER#'"$MOCK_GROUP_ID"'"},
     "entityType": {"S": "GROUP_MEMBER"},
-    "userId":     {"S": "test-user-001"},
+    "userId":     {"S": "'"$MOCK_USER_ID"'"},
     "groupId":    {"S": "'"$MOCK_GROUP_ID"'"},
     "role":       {"S": "owner"},
     "joinedAt":   {"S": "2026-01-01T00:00:00.000Z"}
@@ -621,7 +624,7 @@ for i in 1 2; do
       "gsi1sk":       {"S": "DATE#2026-03-10#'"$EXP_ID"'"},
       "entityType":   {"S": "EXPENSE"},
       "expenseId":    {"S": "'"$EXP_ID"'"},
-      "ownerId":      {"S": "test-user-001"},
+      "ownerId":      {"S": "'"$MOCK_USER_ID"'"},
       "groupId":      {"S": "'"$MOCK_GROUP_ID"'"},
       "merchant":     {"S": "'"$MERCHANT"'"},
       "amount":       {"N": "'"$AMOUNT"'"},
@@ -668,10 +671,10 @@ for GROUP_DEF in "g1:Q1 Offsite:8:4287.50:535.93:#6366f1" "g2:Acme Corp:3:12403.
   $AWS dynamodb put-item \
     --table-name "$TABLE_NAME_MAIN" \
     --item '{
-      "pk":         {"S": "USER#test-user-001"},
+      "pk":         {"S": "USER#'"$MOCK_USER_ID"'"},
       "sk":         {"S": "GROUP_MEMBER#'"$G_ID"'"},
       "entityType": {"S": "GROUP_MEMBER"},
-      "userId":     {"S": "test-user-001"},
+      "userId":     {"S": "'"$MOCK_USER_ID"'"},
       "groupId":    {"S": "'"$G_ID"'"},
       "role":       {"S": "owner"},
       "joinedAt":   {"S": "2026-01-01T00:00:00.000Z"}
@@ -686,13 +689,13 @@ echo "📦 Seeding mock expenses (e1, e2, e3)"
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":           {"S": "USER#test-user-001"},
+    "pk":           {"S": "USER#'"$MOCK_USER_ID"'"},
     "sk":           {"S": "EXPENSE#e1"},
     "gsi1pk":       {"S": "STATUS#approved"},
     "gsi1sk":       {"S": "DATE#2026-03-01#e1"},
     "entityType":   {"S": "EXPENSE"},
     "expenseId":    {"S": "e1"},
-    "ownerId":      {"S": "test-user-001"},
+    "ownerId":      {"S": "'"$MOCK_USER_ID"'"},
     "groupId":      {"NULL": true},
     "merchant":     {"S": "Whole Foods Market"},
     "description":  {"S": "Weekly groceries"},
@@ -720,13 +723,13 @@ $AWS dynamodb put-item \
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":           {"S": "USER#test-user-001"},
+    "pk":           {"S": "USER#'"$MOCK_USER_ID"'"},
     "sk":           {"S": "EXPENSE#e2"},
     "gsi1pk":       {"S": "STATUS#approved"},
     "gsi1sk":       {"S": "DATE#2026-03-01#e2"},
     "entityType":   {"S": "EXPENSE"},
     "expenseId":    {"S": "e2"},
-    "ownerId":      {"S": "test-user-001"},
+    "ownerId":      {"S": "'"$MOCK_USER_ID"'"},
     "groupId":      {"S": "g1"},
     "merchant":     {"S": "Delta Airlines"},
     "description":  {"S": "NYC → SFO"},
@@ -741,7 +744,7 @@ $AWS dynamodb put-item \
     "receipt":      {"BOOL": true},
     "splitMethod":  {"S": "equal"},
     "splits":       {"L": [
-      {"M": {"userId": {"S": "test-user-001"}, "amount": {"N": "214"}, "percentage": {"N": "50"}, "shares": {"N": "1"}}},
+      {"M": {"userId": {"S": "'"$MOCK_USER_ID"'"}, "amount": {"N": "214"}, "percentage": {"N": "50"}, "shares": {"N": "1"}}},
       {"M": {"userId": {"S": "user2"}, "amount": {"N": "214"}, "percentage": {"N": "50"}, "shares": {"N": "1"}}}
     ]},
     "projectCode":  {"S": "Q1-OFFSITE"},
