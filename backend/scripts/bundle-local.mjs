@@ -24,10 +24,12 @@ const __dirname = dirname(__filename);
 const root = join(__dirname, '../');
 
 const functions = [
-  { name: 'GroupsFunction',    entry: 'src/lambdas/_local/groups.ts' },
-  { name: 'ExpensesFunction',  entry: 'src/lambdas/_local/expenses.ts' },
-  { name: 'ReceiptsFunction',  entry: 'src/lambdas/_local/receipts.ts' },
-  { name: 'AnalyticsFunction', entry: 'src/lambdas/_local/analytics.ts' },
+  { name: 'GroupsFunction',      entry: 'src/lambdas/_local/groups.ts' },
+  { name: 'ExpensesFunction',    entry: 'src/lambdas/_local/expenses.ts' },
+  { name: 'ReceiptsFunction',    entry: 'src/lambdas/_local/receipts.ts' },
+  { name: 'AnalyticsFunction',   entry: 'src/lambdas/_local/analytics.ts' },
+  { name: 'SnsWebhookFunction',  entry: 'src/lambdas/sns-webhook/index.ts' },
+  { name: 'WsNotifierFunction',  entry: 'src/lambdas/web-socket-notifier/index.ts' },
 ];
 
 async function build() {

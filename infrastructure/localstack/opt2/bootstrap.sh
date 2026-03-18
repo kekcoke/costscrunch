@@ -108,8 +108,8 @@ deploy_function "GroupsFunction"      "index.handler"
 deploy_function "ExpensesFunction"    "index.handler"
 deploy_function "ReceiptsFunction"    "index.handler"
 deploy_function "AnalyticsFunction"   "index.handler"
-deploy_function "SnsWebhookFunction"  "src/lambdas/receipts/sns-webhook.handler"
-deploy_function "WsNotifierFunction"  "src/lambdas/receipts/ws-notifier.handler"
+deploy_function "SnsWebhookFunction"  "index.handler"
+deploy_function "WsNotifierFunction"  "index.handler"
 
 # ── SNS Subscription (Textract Completion) ──────────────────────────────────
 echo "📦 Subscribing SnsWebhookFunction to Textract topic"
