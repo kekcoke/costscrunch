@@ -1,4 +1,4 @@
-# ─── Option 2 override — enable Lambda execution inside LocalStack ────────────
+# ─── Option 2 override — enable Lambda execution inside LocalStack ───────────
 #
 # This file extends the base docker-compose.localstack.yml service with
 # Lambda executor settings. It does NOT start a separate container.
@@ -13,13 +13,7 @@
 services:
   localstack:
     environment:
-      # Enable Lambda execution inside the LocalStack container
+      # Enable Lambda execution inside the LocalStack container (docker-reuse =
+      # run Lambda in a sibling container on the same Docker host)
       - LAMBDA_EXECUTOR=docker-reuse
       - LAMBDA_REMOTE_DOCKER=true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-networks:
-  costscrunch-local:
-    external: true
-    name: costscrunch-local

@@ -48,6 +48,7 @@ services:
       - costscrunch-local
     volumes:
       - localstack-data:/var/lib/localstack
+      - localstack-tmp:/tmp  # Lambda zip files survive container restarts
       - /var/run/docker.sock:/var/run/docker.sock
       # - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
       # - ./localstack/scripts:/etc/localstack/scripts  # Custom scripts for service setup
@@ -87,3 +88,5 @@ networks:
 volumes:
   localstack-data:
     name: costscrunch-localstack-data
+  localstack-tmp:
+    name: costscrunch-localstack-tmp
