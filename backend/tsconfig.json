@@ -17,9 +17,9 @@
     ],
     "paths": {
       "@shared/*": ["./src/shared/*"],
-      "@lambdas/*": ["./src/lambdas/*"] // Added to match tsconfig.test.json
+      "@lambdas/*": ["./src/lambdas/*"]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "__tests__", "dist-test"]
+  "include": ["src/**/*", "__tests__/**/*.ts", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "dist-test"]
 }
