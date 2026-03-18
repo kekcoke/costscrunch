@@ -1,26 +1,25 @@
-# ─── Option 2 override — deploy Lambda + API GW inside LocalStack ────────────
-# Requires: sam build --template infrastructure/sam/template.yaml
+# ─── Option 2 override — enable Lambda execution inside LocalStack ────────────
 #
-# Usage:
-#   sam build --template infrastructure/sam/template.yaml
+# This file extends the base docker-compose.localstack.yml service with
+# Lambda executor settings. It does NOT start a separate container.
+#
+# Usage (via setup/localstack.sh or npm run dev:opt2):
 #   docker compose -f docker-compose.localstack.yml \
-#     -f infrastructure/localstack/opt2/docker-compose.opt2.yml up -d
+#     -f localstack/opt2/docker-compose.opt2.yml up -d
 #
-# Endpoints available at http://localhost:4566/restapis/<api-id>/local/_user_request_/
-# Check API ID: docker compose logs localstack 2>&1 | grep "Created API"
+# Lambda + API GW are provisioned by bootstrap.sh (run via docker exec).
+# Endpoints: http://localhost:4566/restapis/<api-id>/local/_user_request_/
 
 services:
   localstack:
     environment:
-      # Enable Lambda execution via Docker-in-Docker
+      # Enable Lambda execution inside the LocalStack container
       - LAMBDA_EXECUTOR=docker-reuse
       - LAMBDA_REMOTE_DOCKER=true
-      # Ensure Lambda service is loaded
-      - SERVICES=dynamodb,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,secretsmanager,ssm,events,apigateway,cloudfront
     volumes:
-      # Mount SAM build artifacts for Lambda deployment
-      - ../../../.aws-sam:/opt/sam-build:ro
-      # Mount bootstrap script as LocalStack init hook
-      - ./bootstrap.sh:/etc/localstack/init/ready.d/99-bootstrap.sh:ro
-      # Mount backend source for Lambda container code access
-      - ../../../backend:/opt/backend:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+networks:
+  costscrunch-local:
+    external: true
+    name: costscrunch-local

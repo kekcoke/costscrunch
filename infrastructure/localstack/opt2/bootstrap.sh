@@ -1,27 +1,41 @@
 #!/usr/bin/env bash
-# ─── CostsCrunch — LocalStack Lambda + API GW Bootstrap ────────────────────
+# ─── CostsCrunch — LocalStack Lambda + API GW Bootstrap (v1 REST API) ──────
 # Runs inside LocalStack container via init/ready.d/ after services are healthy.
 # Works together with setup.sh (data seeding) — this script handles compute only.
 #
 # Prerequisites:
 #   - setup.sh has already seeded DynamoDB, S3, SSM parameters
-#   - SAM build artifacts exist at /opt/sam-build/
+#   - Lambda build artifacts exist at /opt/lambda-build/
 #
 # This script creates:
-#   IAM execution role, 6 Lambda functions, HTTP API, 16 routes, CORS, SNS subscription
+#   IAM execution role, 6 Lambda functions, REST API (v1), resources, methods, integrations, CORS, SNS subscription
 
 set -euo pipefail
 
-AWS="aws --endpoint-url=http://localhost:4566 --region us-east-1"
+# Use absolute path to avoid "command not found" in some container environments
+AWS="/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1"
 API_NAME="costscrunch-dev-api"
 ROLE_NAME="costscrunch-dev-lambda-role"
 LAMBDA_BUILD="/opt/lambda-build"
 
 echo "🔧 Lambda + API GW bootstrap starting..."
 
+# ── Sync: Wait for data seed to be visible inside LocalStack ────────────────
+# This ensures that compute resources are created only after the data layer is stable.
+echo "⏳ Waiting for data layer to be ready (seed verification)..."
+MAX_SYNC_RETRIES=30
+for i in $(seq 1 $MAX_SYNC_RETRIES); do
+  # Check if our main DynamoDB table exists and has data
+  if $AWS dynamodb describe-table --table-name "costscrunch-dev-main" >/dev/null 2>&1; then
+    echo "   ✅ Data layer verified."
+    break
+  fi
+  [ $i -eq $MAX_SYNC_RETRIES ] && echo "❌ Data layer sync timed out." && exit 1
+  sleep 2
+done
+
 # ── IAM Role ────────────────────────────────────────────────────────────────
 echo "📦 Creating IAM execution role"
-# Trust policy allows LocalStack's Lambda service to assume this role
 $AWS iam create-role \
   --role-name "$ROLE_NAME" \
   --assume-role-policy-document '{
@@ -32,9 +46,8 @@ $AWS iam create-role \
       "Action": "sts:AssumeRole"
     }]
   }' \
-  --no-cli-pager 2>/dev/null || echo "  ↳ Role already exists, skipping"
+  2>/dev/null || echo "  ↳ Role already exists, skipping"
 
-# Basic execution policy — LocalStack doesn't enforce but Lambda expects it
 $AWS iam put-role-policy \
   --role-name "$ROLE_NAME" \
   --policy-name "LambdaBasicExecution" \
@@ -51,19 +64,19 @@ $AWS iam put-role-policy \
       { "Effect": "Allow", "Action": ["bedrock:InvokeModel"], "Resource": "*" }
     ]
   }' \
-  --no-cli-pager 2>/dev/null || true
+  2>/dev/null || true
 
 ROLE_ARN="arn:aws:iam::000000000000:role/${ROLE_NAME}"
 echo "  ↳ Role ARN: $ROLE_ARN"
 
-# ── Helper: deploy Lambda from SAM build artifact ───────────────────────────
+# ── Helper: deploy Lambda from build artifact ──────────────────────────────
 deploy_function() {
   local NAME=$1
   local HANDLER=$2
   local BUILD_DIR="${LAMBDA_BUILD}/${NAME}"
 
   if [ ! -d "$BUILD_DIR" ]; then
-    echo "  ⚠️  Build artifact not found: $BUILD_DIR (run 'sam build' first)"
+    echo "  ⚠️  Build artifact not found: $BUILD_DIR"
     return 1
   fi
 
@@ -92,12 +105,12 @@ deploy_function() {
       "TEXTRACT_ROLE_ARN":"arn:aws:iam::000000000000:role/test-role",
       "EVENT_BUS_NAME":"costscrunch-dev-events"
     }' \
-    --no-cli-pager 2>/dev/null && echo "  ✅ $NAME created" || echo "  ↳ $NAME already exists, updating..."
+    2>/dev/null && echo "  ✅ $NAME created" || echo "  ↳ $NAME already exists, updating..."
 
   $AWS lambda update-function-code \
     --function-name "$NAME" \
     --zip-file "fileb://${ZIP_PATH}" \
-    --no-cli-pager 2>/dev/null || true
+    2>/dev/null || true
 
   rm -f "$ZIP_PATH"
 }
@@ -111,145 +124,110 @@ deploy_function "AnalyticsFunction"   "index.handler"
 deploy_function "SnsWebhookFunction"  "index.handler"
 deploy_function "WsNotifierFunction"  "index.handler"
 
-# ── SNS Subscription (Textract Completion) ──────────────────────────────────
+# ── SNS Subscription ────────────────────────────────────────────────────────
 echo "📦 Subscribing SnsWebhookFunction to Textract topic"
 $AWS sns subscribe \
   --topic-arn "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion" \
   --protocol lambda \
   --notification-endpoint "arn:aws:lambda:us-east-1:000000000000:function:SnsWebhookFunction" \
-  --no-cli-pager 2>/dev/null || true
+  2>/dev/null || true
 
-# ── HTTP API ─────────────────────────────────────────────────────────────────
-echo "📦 Creating HTTP API"
-API_ID=$($AWS apigatewayv2 create-api \
+# ── REST API (v1) ──────────────────────────────────────────────────────────
+echo "📦 Creating REST API"
+API_ID=$($AWS apigateway create-rest-api \
   --name "$API_NAME" \
-  --protocol-type HTTP \
-  --no-cli-pager \
-  --query 'ApiId' \
+  --endpoint-configuration types=REGIONAL \
+  --query 'id' \
   --output text 2>/dev/null || echo "")
 
 if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-  API_ID=$($AWS apigatewayv2 get-apis \
-    --no-cli-pager \
-    --query "Items[?Name=='${API_NAME}'].ApiId | [0]" \
+  API_ID=$($AWS apigateway get-rest-apis \
+    --query "items[?name=='${API_NAME}'].id | [0]" \
     --output text)
   echo "  ↳ Existing API: $API_ID"
 else
   echo "  ✅ Created API: $API_ID"
 fi
 
-# ── Helper: create route + integration ──────────────────────────────────────
+ROOT_RES_ID=$($AWS apigateway get-resources \
+  --rest-api-id "$API_ID" \
+  --query "items[?path=='/'].id | [0]" \
+  --output text)
+
+# ── Helper: add route ───────────────────────────────────────────────────────
 add_route() {
   local METHOD=$1
-  local PATH=$2
+  local ROUTE_PATH=$2
   local FUNCTION=$3
 
-  INTEGRATION_ID=$($AWS apigatewayv2 create-integration \
-    --api-id "$API_ID" \
-    --integration-type AWS_PROXY \
-    --integration-uri "arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}" \
-    --payload-format-version 2.0 \
-    --no-cli-pager \
-    --query 'IntegrationId' \
-    --output text)
+  # Simple path mapping: creating resources one level deep or proxy
+  # For local dev simplicity, we create a proxy resource for each top-level path
+  local PATH_PART=${ROUTE_PATH#/}
+  PATH_PART=${PATH_PART%%/*}
+  
+  # Use tr -d '\r' to ensure clean variable values from aws cli output
+  local RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/$PATH_PART'].id | [0]" --output text | tr -d '\r')
+  if [ "$RES_ID" = "None" ] || [ -z "$RES_ID" ]; then
+    # Use a small sleep to avoid "Too Many Requests" errors during rapid creation
+    sleep 0.5
+    RES_ID=$($AWS apigateway create-resource --rest-api-id "$API_ID" --parent-id "$ROOT_RES_ID" --path-part "$PATH_PART" --query 'id' --output text 2>/dev/null | tr -d '\r')
+    # If it still failed, try to fetch it one last time (might have been created by race)
+    if [ -z "$RES_ID" ]; then
+        RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/$PATH_PART'].id | [0]" --output text | tr -d '\r')
+    fi
+  fi
 
-  $AWS apigatewayv2 create-route \
-    --api-id "$API_ID" \
-    --route-key "${METHOD} ${PATH}" \
-    --target "integrations/${INTEGRATION_ID}" \
-    --no-cli-pager 2>/dev/null || true
+  # If it has a subpath or variable, create a proxy {proxy+}
+  if [[ "$PATH" == *"{"* ]] || [[ "$PATH" == */*/* ]]; then
+    local PROXY_RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/$PATH_PART/{proxy+}'].id | [0]" --output text | tr -d '\r')
+    if [ "$PROXY_RES_ID" = "None" ] || [ -z "$PROXY_RES_ID" ]; then
+      PROXY_RES_ID=$($AWS apigateway create-resource --rest-api-id "$API_ID" --parent-id "$RES_ID" --path-part "{proxy+}" --query 'id' --output text | tr -d '\r')
+    fi
+    RES_ID=$PROXY_RES_ID
+    METHOD="ANY"
+  fi
 
-  # Grant API GW permission to invoke the Lambda
+  $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES_ID" --http-method "$METHOD" --authorization-type "NONE" 2>/dev/null || true
+  
+  $AWS apigateway put-integration \
+    --rest-api-id "$API_ID" \
+    --resource-id "$RES_ID" \
+    --http-method "$METHOD" \
+    --type AWS_PROXY \
+    --integration-http-method POST \
+    --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}/invocations" \
+    2>/dev/null || true
+
   $AWS lambda add-permission \
     --function-name "$FUNCTION" \
-    --statement-id "api-${METHOD}-${PATH//\//-}" \
+    --statement-id "api-${API_ID}-${RES_ID}-${METHOD}" \
     --action lambda:InvokeFunction \
     --principal apigateway.amazonaws.com \
-    --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/*${PATH}" \
-    --no-cli-pager 2>/dev/null || true
+    --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*" \
+    2>/dev/null || true
 }
 
-# ── Routes ──────────────────────────────────────────────────────────────────
 echo "📦 Creating routes"
-
-# Groups
-add_route GET    /groups                        GroupsFunction
-add_route POST   /groups                        GroupsFunction
-add_route GET    /groups/{id}                   GroupsFunction
-add_route PATCH  /groups/{id}                   GroupsFunction
-add_route GET    /groups/{id}/balances          GroupsFunction
-add_route POST   /groups/{id}/members           GroupsFunction
-add_route DELETE /groups/{id}/members/{userId}  GroupsFunction
-
-# Expenses
-add_route GET    /expenses           ExpensesFunction
-add_route POST   /expenses           ExpensesFunction
-add_route GET    /expenses/{id}      ExpensesFunction
-add_route PATCH  /expenses/{id}      ExpensesFunction
-add_route DELETE /expenses/{id}      ExpensesFunction
-
-# Receipts
-add_route POST   /receipts/upload-url         ReceiptsFunction
-add_route GET    /receipts/{expenseId}/scan    ReceiptsFunction
-
-# Analytics
-add_route GET    /analytics/summary   AnalyticsFunction
-add_route GET    /analytics/trends    AnalyticsFunction
-add_route GET    /analytics/chartData AnalyticsFunction
+add_route ANY /groups GroupsFunction
+add_route ANY /expenses ExpensesFunction
+add_route ANY /receipts ReceiptsFunction
+add_route ANY /analytics AnalyticsFunction
 
 # ── CORS ────────────────────────────────────────────────────────────────────
 echo "📦 Configuring CORS"
-APP_URL="${APP_URL:-http://localhost:3000}"
-APP_URL_OPT3="http://localhost:3001"
-
-# Create $default route for OPTIONS preflight
-DEFAULT_INTEGRATION=$($AWS apigatewayv2 create-integration \
-  --api-id "$API_ID" \
-  --integration-type MOCK \
-  --no-cli-pager \
-  --query 'IntegrationId' \
-  --output text)
-
-$AWS apigatewayv2 create-route \
-  --api-id "$API_ID" \
-  --route-key '$default' \
-  --target "integrations/${DEFAULT_INTEGRATION}" \
-  --no-cli-pager 2>/dev/null || true
-
-$AWS apigatewayv2 update-api \
-  --api-id "$API_ID" \
-  --cors-configuration '{
-    "AllowOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "*"],
-    "AllowMethods": ["GET","POST","PATCH","DELETE","OPTIONS"],
-    "AllowHeaders": ["*"],
-    "MaxAge": 3600,
-    "AllowCredentials": false
-  }' \
-  --no-cli-pager 2>/dev/null || true
+# In v1, CORS is typically handled by OPTIONS methods or Lambda headers.
+# For simplicity in LocalStack, we add an OPTIONS method to every resource.
+for RES in $($AWS apigateway get-resources --rest-api-id "$API_ID" --query 'items[].id' --output text); do
+  $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES" --http-method OPTIONS --authorization-type "NONE" 2>/dev/null || true
+  $AWS apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES" --http-method OPTIONS --type MOCK 2>/dev/null || true
+done
 
 # ── Deploy ──────────────────────────────────────────────────────────────────
 echo "📦 Deploying API"
-$AWS apigatewayv2 create-deployment \
-  --api-id "$API_ID" \
-  --no-cli-pager 2>/dev/null || true
-
-STAGE_ID=$($AWS apigatewayv2 get-stages \
-  --api-id "$API_ID" \
-  --no-cli-pager \
-  --query "Items[?StageName=='local'].StageId | [0]" \
-  --output text 2>/dev/null || echo "")
-
-if [ -z "$STAGE_ID" ] || [ "$STAGE_ID" = "None" ] || [ "$STAGE_ID" = "" ]; then
-  $AWS apigatewayv2 create-stage \
-    --api-id "$API_ID" \
-    --stage-name local \
-    --no-cli-pager 2>/dev/null || true
-fi
+$AWS apigateway create-deployment --rest-api-id "$API_ID" --stage-name local 2>/dev/null || true
 
 API_URL="http://localhost:4566/restapis/${API_ID}/local/_user_request_"
 echo ""
 echo "✅✅✅ Lambda + API GW bootstrap complete!"
 echo "  API endpoint: $API_URL"
-echo ""
-echo "To use this URL from your frontend, set:"
 echo "  VITE_API_URL=$API_URL"

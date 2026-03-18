@@ -71,6 +71,7 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - APP_URL=${VITE_APP_URL:-http://localhost:3000,http://localhost:3001}
+      - RUN_ID
     volumes:
       - ./localstack:/localstack  # Seed scripts to initialize LocalStack services
     entrypoint: ["/bin/bash", "/localstack/dev/setup.sh"]

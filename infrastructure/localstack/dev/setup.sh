@@ -786,9 +786,10 @@ $AWS dynamodb put-item \
   }' \
   --no-cli-pager 2>/dev/null || true
 
-echo ""
-echo "✅✅✅ LocalStack seed complete! Resources available at http://localhost:4566"
-echo ""
+# Ensure watermark is visible for the host setup script
+echo "--------------------------------------------------"
+echo "✅✅✅ LocalStack seed complete! [ID: ${RUN_ID:-none}]"
+echo "--------------------------------------------------"
 echo "Resource summary:"
 echo "  DynamoDB main table:  $TABLE_NAME_MAIN"
 echo "  DynamoDB conn table:  $TABLE_NAME_DYNAMO_CONNECTIONS"
