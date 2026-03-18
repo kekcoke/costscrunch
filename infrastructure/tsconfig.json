@@ -23,8 +23,16 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": ".",
-    "baseUrl": "."
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@lambdas/*": ["../backend/src/lambdas/*"]
+    },
+    "types": [
+      "node",
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest"
+    ]
   },
   "include": ["stacks/**/*", "__tests__/**/*", "bin/**/*"],
   "exclude": ["node_modules", "dist"]
