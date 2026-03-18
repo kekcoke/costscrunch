@@ -92,15 +92,58 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
   return transactions;
 }
 
+// ─── Path matcher for REST API v1 ─────────────────────────────────────────────
+// REST API v1 sends actual paths ("/groups/g1"), not template patterns ("/groups/{id}").
+// This normalizes the route so the handler can use a single set of route checks.
+function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
+  if (routeKey) return { route: `${method} ${routeKey}`, params: {} };
+
+  // Strip trailing slash
+  const p = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+  const segments = p.split("/").filter(Boolean); // e.g. ["groups", "g1", "balances"]
+
+  const params: Record<string, string> = {};
+
+  // Match known patterns (most specific first)
+  if (segments.length === 4 && segments[0] === "groups" && segments[2] === "members") {
+    params.id = segments[1]; params.userId = segments[3];
+    return { route: `${method} /groups/{id}/members/{userId}`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "members") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/members`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "balances") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/balances`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "settle") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/settle`, params };
+  }
+  if (segments.length === 2 && segments[0] === "groups") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}`, params };
+  }
+  if (segments.length === 1 && segments[0] === "groups") {
+    return { route: `${method} /groups`, params };
+  }
+
+  return { route: `${method} ${p}`, params };
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?: string }) => {
+export const handler = async (event: ApiEvent) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
   const method = event.httpMethod || event.requestContext?.http?.method || "";
   const path = event.path || event.requestContext?.http?.path || "";
-  const route = event.routeKey || `${method} ${path}`;
+  const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey);
 
   const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
-  const { id: groupId, userId: memberUserId } = event.pathParameters || {};
+  // Prefer explicit pathParameters (from HTTP API v2 / Express adapter), fall back to parsed params
+  const mergedParams = { ...pathParams, ...event.pathParameters };
+  const groupId = mergedParams.id;
+  const memberUserId = mergedParams.userId;
 
   logger.appendKeys({ userId: auth.userId, route, groupId });
 
@@ -180,6 +223,43 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
     }));
     if (!result.Item) return err("Group not found", 404);
     return ok(result.Item);
+  }
+
+  // ── PATCH /groups/:id ────────────────────────────────────────────────────
+  if (route === "PATCH /groups/{id}" && groupId) {
+    const body = JSON.parse(event.body || "{}");
+    const now = new Date().toISOString();
+
+    const updates: string[] = ["updatedAt = :now"];
+    const values: Record<string, any> = { ":now": now };
+    const names: Record<string, string> = {};
+
+    const allowedFields = ["name", "description", "type", "color", "iconEmoji", "currency",
+      "approvalRequired", "approvalThreshold", "requireReceipts", "requireReceiptsAbove",
+      "policyId", "costCenters", "projectCodes", "budgets", "active"] as const;
+
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updates.push(`#${field} = :${field}`);
+        names[`#${field}`] = field;
+        values[`:${field}`] = body[field];
+      }
+    }
+
+    if (updates.length === 1) return err("No valid fields to update");
+
+    const result = await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: `SET ${updates.join(", ")}`,
+      ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+      ExpressionAttributeValues: values,
+      ReturnValues: "ALL_NEW",
+      ConditionExpression: "attribute_exists(pk)",
+    }));
+
+    metrics.addMetric("GroupUpdated", MetricUnit.Count, 1);
+    return ok(result.Attributes);
   }
 
   // ── GET /groups/:id/balances ──────────────────────────────────────────────

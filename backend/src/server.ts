@@ -81,15 +81,13 @@ app.delete('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
 
 // Routes - Groups
 app.get('/groups', lambdaAdapter(groupsHandler, '/groups'));
-app.get('/groups/:id', lambdaAdapter(groupsHandler, '/{id}'));
-app.patch('/groups/:id', lambdaAdapter(groupsHandler, '/{id}'));
-
 app.post('/groups', lambdaAdapter(groupsHandler, '/groups'));
-app.post('/groups/:id/members', lambdaAdapter(groupsHandler, '/{id}/members'));
-app.delete('/groups/:id/members/:userId', lambdaAdapter(groupsHandler, '/{id}/members/{userId}'));
-
-app.post('/groups/:id/settle', lambdaAdapter(groupsHandler, '/{id}/settle'));
-app.get('/groups/:id/balances', lambdaAdapter(groupsHandler, '/{id}/balances'));
+app.get('/groups/:id', lambdaAdapter(groupsHandler, '/groups/{id}'));
+app.patch('/groups/:id', lambdaAdapter(groupsHandler, '/groups/{id}'));
+app.get('/groups/:id/balances', lambdaAdapter(groupsHandler, '/groups/{id}/balances'));
+app.post('/groups/:id/members', lambdaAdapter(groupsHandler, '/groups/{id}/members'));
+app.delete('/groups/:id/members/:userId', lambdaAdapter(groupsHandler, '/groups/{id}/members/{userId}'));
+app.post('/groups/:id/settle', lambdaAdapter(groupsHandler, '/groups/{id}/settle'));
 
 // Startup
 app.listen(PORT, () => {
