@@ -200,6 +200,7 @@ add_route GET    /analytics/chartData AnalyticsFunction
 # ── CORS ────────────────────────────────────────────────────────────────────
 echo "📦 Configuring CORS"
 APP_URL="${APP_URL:-http://localhost:3000}"
+APP_URL_OPT3="http://localhost:3001"
 
 # Create $default route for OPTIONS preflight
 DEFAULT_INTEGRATION=$($AWS apigatewayv2 create-integration \
@@ -218,7 +219,7 @@ $AWS apigatewayv2 create-route \
 $AWS apigatewayv2 update-api \
   --api-id "$API_ID" \
   --cors-configuration '{
-    "AllowOrigins": ["'"$APP_URL"'", "*"],
+    "AllowOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "*"],
     "AllowMethods": ["GET","POST","PATCH","DELETE","OPTIONS"],
     "AllowHeaders": ["*"],
     "MaxAge": 3600,

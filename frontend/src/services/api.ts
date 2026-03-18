@@ -26,8 +26,15 @@ export class ApiError extends Error {
 
 // ─── Authenticated base fetch ─────────────────────────────────────────────────
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const { tokens } = await fetchAuthSession();
-  const token = tokens?.accessToken?.toString();
+  // In local dev (MOCK_AUTH=true), Amplify is not configured — skip auth gracefully.
+  // The Lambda _local/ handlers inject fake Cognito claims via withMockAuth().
+  let token: string | undefined;
+  try {
+    const { tokens } = await fetchAuthSession();
+    token = tokens?.accessToken?.toString();
+  } catch {
+    // No Cognito session — local dev mode, proceed without token
+  }
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,

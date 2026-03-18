@@ -34,6 +34,9 @@ sam build --template-file "$TEMPLATE"
 
 # 4. Start local API (Lambda on host, proxying data to LocalStack)
 # Frontend connects to http://localhost:3001
+export VITE_API_URL="http://localhost:3001"
+echo "🌐 VITE_API_URL=$VITE_API_URL (run 'cd frontend && npm run dev' in a second terminal)"
+
 sam local start-api \
   --template-file "$TEMPLATE" \
   --env-vars env.json \

@@ -4,8 +4,9 @@ import { resolve } from "path";
 
 // https://vite.dev/config/
 export default defineConfig(() => {
-  // .env.test is only auto-loaded in vitest mode; load explicitly for dev too
-  const { VITE_API_URL } = loadEnv("test", resolve(__dirname, ".."));
+  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env.test
+  const envFromFile = loadEnv("test", resolve(__dirname, ".."));
+  const VITE_API_URL = process.env.VITE_API_URL ?? envFromFile.VITE_API_URL;
 
   return {
   // Load .env files from monorepo root (e.g. .env.test)

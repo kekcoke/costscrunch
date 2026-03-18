@@ -29,10 +29,20 @@ docker cp "$PROJECT_ROOT/infrastructure/localstack/opt2/bootstrap.sh" costscrunc
 docker cp "$PROJECT_ROOT/backend/dist/lambda/." costscrunch-localstack:/opt/lambda-build
 
 # 6. Run bootstrap inside the LocalStack container (creates Lambda + API GW)
-docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
+#    Capture output to extract the real API_ID
+BOOTSTRAP_OUTPUT=$(docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh 2>&1)
+echo "$BOOTSTRAP_OUTPUT"
 
-# 7. Set frontend API URL (API_ID printed by bootstrap.sh above)
-export VITE_API_URL="http://localhost:4566/restapis/{API_ID}/local/_user_request_"
+# 7. Extract API_ID from bootstrap output and set VITE_API_URL
+API_ID=$(echo "$BOOTSTRAP_OUTPUT" | grep -oP 'restapis/\K[a-zA-Z0-9]+(?=/local)')
+if [ -z "$API_ID" ]; then
+  echo "⚠️  Could not extract API_ID from bootstrap output — fetching from LocalStack"
+  API_ID=$(aws --endpoint-url=http://localhost:4566 --region us-east-1 apigatewayv2 get-apis \
+    --query "Items[?Name=='costscrunch-dev-api'].ApiId | [0]" \
+    --output text)
+fi
+export VITE_API_URL="http://localhost:4566/restapis/${API_ID}/local/_user_request_"
+echo "🌐 VITE_API_URL=$VITE_API_URL"
 
 # 8. Start frontend
 cd "$PROJECT_ROOT/frontend" && npm run dev
