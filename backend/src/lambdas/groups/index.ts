@@ -19,13 +19,20 @@ const FROM_EMAIL = process.env.FROM_EMAIL!;
 const logger = new Logger({ serviceName: "groups" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" });
 
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With,Accept,Origin",
+};
+
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
-  headers: { "Content-Type": "application/json" },
+  headers: CORS_HEADERS,
 });
 const err = (msg: string, statusCode = 400) => ({
   statusCode, body: JSON.stringify({ error: msg }),
-  headers: { "Content-Type": "application/json" },
+  headers: CORS_HEADERS,
 });
 
 // ─── Balance Calculator ───────────────────────────────────────────────────────
@@ -87,7 +94,11 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?: string }) => {
-  const route = event.routeKey || "";
+  // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
+  const method = event.httpMethod || event.requestContext?.http?.method || "";
+  const path = event.path || event.requestContext?.http?.path || "";
+  const route = event.routeKey || `${method} ${path}`;
+
   const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
   const { id: groupId, userId: memberUserId } = event.pathParameters || {};
 
