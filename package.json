@@ -18,7 +18,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json}\"",
     "db:seed": "node scripts/seed-dev.js",
-    "load-test": "k6 run tests/load/main.js"
+    "load-test": "k6 run tests/load/main.js",
+    "dev:opt2": "bash setup/localstack.sh",
+    "dev:opt3": "bash setup/localstack-opt3.sh"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
