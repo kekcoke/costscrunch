@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CostsCrunch local dev API — SAM CLI (ARM64 Optimized)
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+    Timeout: 30
+    Environment:
+      Variables:
+        AWS_ENDPOINT_URL: http://host.docker.internal:4566
+        AWS_ACCESS_KEY_ID: test
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_REGION: us-east-1
+        MOCK_AUTH: "true"
+        TABLE_NAME_MAIN: costscrunch-dev-main
+        TABLE_NAME_CONNECTIONS: costscrunch-dev-connections
+        EVENT_BUS_NAME: costscrunch-dev-events
+  HttpApi:
+    CorsConfiguration:
+      AllowOrigins:
+        - "*"
+      AllowMethods:
+        - GET
+        - POST
+        - PATCH
+        - DELETE
+        - OPTIONS
+      AllowHeaders:
+        - "*"
+      MaxAge: 3600
+
+Resources:
+  GroupsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/_local/groups.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: src/lambdas/_local/groups.handler
+      Environment:
+        Variables:
+          FROM_EMAIL: noreply@costscrunch.dev
+      Events:
+        ListGroups:
+          Type: HttpApi
+          Properties:
+            Path: /groups
+            Method: GET
+        CreateGroup:
+          Type: HttpApi
+          Properties:
+            Path: /groups
+            Method: POST
+        GetGroup:
+          Type: HttpApi
+          Properties:
+            Path: /groups/{id}
+            Method: GET
+        UpdateGroup:
+          Type: HttpApi
+          Properties:
+            Path: /groups/{id}
+            Method: PATCH
+        GetGroupBalances:
+          Type: HttpApi
+          Properties:
+            Path: /groups/{id}/balances
+            Method: GET
+        AddGroupMember:
+          Type: HttpApi
+          Properties:
+            Path: /groups/{id}/members
+            Method: POST
+        RemoveGroupMember:
+          Type: HttpApi
+          Properties:
+            Path: /groups/{id}/members/{userId}
+            Method: DELETE
+
+  ExpensesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/_local/expenses.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: src/lambdas/_local/expenses.handler
+      Events:
+        ListExpenses:
+          Type: HttpApi
+          Properties:
+            Path: /expenses
+            Method: GET
+        CreateExpense:
+          Type: HttpApi
+          Properties:
+            Path: /expenses
+            Method: POST
+        GetExpense:
+          Type: HttpApi
+          Properties:
+            Path: /expenses/{id}
+            Method: GET
+        UpdateExpense:
+          Type: HttpApi
+          Properties:
+            Path: /expenses/{id}
+            Method: PATCH
+        DeleteExpense:
+          Type: HttpApi
+          Properties:
+            Path: /expenses/{id}
+            Method: DELETE
+
+  ReceiptsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/_local/receipts.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: src/lambdas/_local/receipts.handler
+      Environment:
+        Variables:
+          BUCKET_UPLOADS_NAME: costscrunch-dev-uploads-000000000000
+          TEXTRACT_SNS_TOPIC_ARN: arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion
+          TEXTRACT_ROLE_ARN: arn:aws:iam::000000000000:role/test-role
+      Events:
+        UploadUrl:
+          Type: HttpApi
+          Properties:
+            Path: /receipts/upload-url
+            Method: POST
+        GetScanStatus:
+          Type: HttpApi
+          Properties:
+            Path: /receipts/{expenseId}/scan
+            Method: GET
+
+  AnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/_local/analytics.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: src/lambdas/_local/analytics.handler
+      Events:
+        Summary:
+          Type: HttpApi
+          Properties:
+            Path: /analytics/summary
+            Method: GET
+        Trends:
+          Type: HttpApi
+          Properties:
+            Path: /analytics/trends
+            Method: GET
+        ChartData:
+          Type: HttpApi
+          Properties:
+            Path: /analytics/chartData
+            Method: GET
