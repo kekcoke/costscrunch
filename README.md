@@ -28,7 +28,8 @@
      ├── sns-webhook/    Textract completion → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends
-     └── notifications/  SES + Pinpoint push/SMS
+     ├── notifications/  SES + Pinpoint push/SMS
+     └── health/         Monitoring + CI/CD smoke tests
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
 📦 S3 (uploads + processed + receipts + assets, KMS encrypted)
@@ -287,6 +288,9 @@ Receipts
 Analytics
   GET    /analytics/summary?period=month|quarter|year
   GET    /analytics/trends
+
+Monitoring
+  GET    /health                      isolated health check
 ```
 
 ---
