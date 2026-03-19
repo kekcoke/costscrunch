@@ -28,9 +28,9 @@ Globals:
   Api:
     Cors:
       AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization,X-Requested-With,Accept,Origin'"
+      AllowHeaders: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
       AllowOrigin: "'*'"
-      MaxAge: "'3600'"
+      MaxAge: "'86400'"
     GatewayResponses:
       DEFAULT_4XX:
         ResponseParameters:
