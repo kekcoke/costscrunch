@@ -372,7 +372,7 @@ export const handler = async (event: ApiEvent) => {
   }
 
   // ── DELETE /groups/:id/members/:userId ───────────────────────────────
-  else if (route === "DELETE /groups/{id}/members/{userId}" && groupId && memberUserId) {
+  if (route === "DELETE /groups/{id}/members/{userId}" && groupId && memberUserId) {
     // 1. Get Group and Expenses to check balances
     const [groupRes, expensesRes] = await Promise.all([
       ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
