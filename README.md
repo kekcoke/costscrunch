@@ -605,6 +605,7 @@ npm run deploy:dev
 | `CODECOV_TOKEN` | Codecov coverage upload token | CI |
 | `SEMGREP_APP_TOKEN` | Semgrep SAST token | CI |
 | `VITE_API_URL` | Frontend API URL | CI |
+| `VITE_APP_URL` | Frontend URL | CI |
 | `VITE_USER_POOL_ID` | Cognito User Pool ID | CI |
 | `VITE_USER_POOL_CLIENT_ID` | Cognito Client ID | CI |
 | `STAGING_URL` | Staging base URL for E2E | CD |
