@@ -196,7 +196,33 @@ export const handler = async (event: ApiEvent) => {
       updatedAt: now,
     };
 
-    await ddb.send(new PutCommand({ TableName: TABLE, Item: group, ConditionExpression: "attribute_not_exists(pk)" }));
+    // Transactionally create group and owner membership
+    await ddb.send(new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName: TABLE,
+            Item: group,
+            ConditionExpression: "attribute_not_exists(pk)",
+          },
+        },
+        {
+          Put: {
+            TableName: TABLE,
+            Item: {
+              pk: `USER#${auth.userId}`,
+              sk: `GROUP_MEMBER#${id}`,
+              entityType: "GROUP_MEMBER",
+              groupId: id,
+              userId: auth.userId,
+              role: "owner",
+              joinedAt: now,
+            },
+          },
+        },
+      ],
+    }));
+
     metrics.addMetric("GroupCreated", MetricUnit.Count, 1);
     return ok(group, 201);
   }
