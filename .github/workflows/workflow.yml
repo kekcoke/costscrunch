@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  AWS_REGION: us-east-1
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-frontend:
+    name: Frontend · Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci -w frontend
+      - name: TypeScript check
+        run: npm run typecheck -w frontend
+      - name: Lint
+        run: npm run lint -w frontend
+      - name: Run tests
+        run: npm run test -w frontend
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  quality-backend:
+    name: Backend · Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci -w backend
+      - name: TypeScript check
+        run: npm run typecheck -w backend
+      - name: Lint
+        run: npm run lint -w backend
+      - name: Run unit tests
+        run: npm run test:ut -w backend
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  quality-infrastructure:
+    name: Infrastructure · Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci -w infrastructure
+      - name: TypeScript check
+        run: npm run typecheck -w infrastructure
+      - name: Lint
+        run: npm run lint -w infrastructure
+      - name: Run tests
+        run: npm run test -w infrastructure
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/typescript
+            p/react
+            p/nodejs
+            p/aws-lambda
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: Secrets scan — Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [quality-frontend, quality-backend, quality-infrastructure, security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install all dependencies
+        run: npm ci
+      - name: Build backend
+        run: npm run build -w backend
+      - name: Build frontend
+        run: npm run build -w frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - name: CDK Synth
+        run: npm run synth -w infrastructure
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            backend/dist/
+            frontend/dist/
+            infrastructure/cdk.out/
+
+  integration:
+    name: Integration Tests (LocalStack)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci -w backend
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+      - name: Run LocalStack
+        run: |
+          cd infrastructure
+          docker compose -f docker-compose.localstack.yml up -d
+      - name: Wait & Provision (Option 2)
+        run: |
+          # Wait for LS health
+          for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
+          
+          # Run Bootstrap (Compute Layer)
+          docker exec costscrunch-localstack mkdir -p /opt/bootstrap /opt/lambda-build
+          docker cp infrastructure/localstack/opt2/bootstrap.sh costscrunch-localstack:/opt/bootstrap/bootstrap.sh
+          docker cp backend/dist/lambda/. costscrunch-localstack:/opt/lambda-build/
+          docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
+      - name: Run Integration Suite
+        run: |
+          # Fetch dynamic API_ID for REST v1
+          API_ID=$(docker exec costscrunch-localstack /usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1 apigateway get-rest-apis --query "items[?name=='costscrunch-dev-api'].id | [-1]" --output text)
+          echo "Running against API: $API_ID"
+          API_ID=$API_ID npm run test:ig -w backend
