@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Group } from "../../models/types";
+import type { Group, GroupMember } from "../../models/types";
 import { groupsApi } from "../../services/api";
 import { LoadingSpinner } from "../spinner";
 import Modal from "../modal";
@@ -9,19 +9,30 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // View State
+  const [isEditing, setIsEditing] = useState(false);
+
   // UI State for CRUD
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<{id: string, name: string} | null>(null);
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
   
-  // Form State
+  // Form States
   const [addForm, setAddForm] = useState({ name: "", email: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", color: "" });
   const [status, setStatus] = useState<{ type: "success" | "error" | "warn", msg: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchGroup = () => {
     groupsApi.get(groupId)
-      .then((data) => setGroup(data))
+      .then((data) => {
+        setGroup(data);
+        setEditForm({
+          name: data.name,
+          description: data.description || "",
+          color: data.color,
+        });
+      })
       .finally(() => setLoading(false));
   };
 
@@ -51,16 +62,12 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   };
 
   const handleDeleteMember = async () => {
-    if (!selectedMember) return;
+    const memberId = selectedMember?.userId;
+    if (!memberId) return;
+
     setSubmitting(true);
     try {
-      // Note: groupsApi.removeMember wasn't in the provided snippets, 
-      // but following the pattern for CRUD requested.
-      // Assuming a standard DELETE /groups/:id/members/:memberId
-      await groupsApi.update(groupId, { 
-        // Logic would normally be a specific endpoint, but using update as fallback if specific delete missing
-      });
-      
+      await groupsApi.deleteMember(groupId, memberId);
       setStatus({ type: "success", msg: "Member removed." });
       setTimeout(() => {
         setIsDeleteModalOpen(false);
@@ -75,10 +82,110 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
     }
   };
 
+  const handleUpdateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setStatus(null);
+    try {
+      await groupsApi.update(groupId, editForm);
+      setStatus({ type: "success", msg: "Group updated successfully!" });
+      setTimeout(() => {
+        setIsEditing(false);
+        setStatus(null);
+        fetchGroup();
+      }, 1500);
+    } catch (err: any) {
+      setStatus({ type: "error", msg: err.message || "Update failed" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner size="40px" />;
   if (!group) return <div>Group not found.</div>;
 
   const members = group.members || [];
+
+  if (isEditing) {
+    return (
+      <div style={{ animation: "fadeUp 0.4s both" }}>
+        <button 
+          onClick={() => { setIsEditing(false); setStatus(null); }} 
+          style={{ background: "none", border: "none", color: "var(--color-indigo)", cursor: "pointer", fontWeight: 600, marginBottom: "20px", padding: 0 }}
+        >
+          ← Back to Group Detail
+        </button>
+
+        <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "20px", border: "1px solid var(--color-border-dim)" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "24px", marginBottom: "24px" }}>Update Group Settings</h2>
+          
+          <form onSubmit={handleUpdateGroup} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>Group Name</label>
+              <input 
+                type="text" 
+                value={editForm.name} 
+                onChange={e => setEditForm({...editForm, name: e.target.value})}
+                style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "var(--color-surface-2)", color: "white" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>Description</label>
+              <textarea 
+                value={editForm.description} 
+                onChange={e => setEditForm({...editForm, description: e.target.value})}
+                style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "var(--color-surface-2)", color: "white", minHeight: "80px", resize: "vertical" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "8px" }}>Theme Color</label>
+              <div style={{ display: "flex", gap: "10px" }}>
+                {["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#0ea5e9"].map(c => (
+                  <button 
+                    key={c}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, color: c })}
+                    style={{ width: "32px", height: "32px", borderRadius: "50%", background: c, border: editForm.color === c ? "2px solid white" : "none", cursor: "pointer", padding: 0 }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {status && (
+              <div style={{ 
+                padding: "12px", borderRadius: "10px", fontSize: "14px", fontWeight: 500,
+                background: status.type === "success" ? "rgba(16, 185, 129, 0.15)" : status.type === "warn" ? "rgba(245, 158, 11, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                color: status.type === "success" ? "#10b981" : status.type === "warn" ? "#f59e0b" : "#ef4444",
+                border: `1px solid ${status.type === "success" ? "#10b98133" : status.type === "warn" ? "#f59e0b33" : "#ef444433"}`
+              }}>
+                {status.type === "success" ? "✅ " : status.type === "warn" ? "⚠️ " : "❌ "}
+                {status.msg}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
+              <button 
+                type="button" 
+                onClick={() => setIsEditing(false)}
+                style={{ flex: 1, padding: "14px", borderRadius: "12px", border: "1px solid var(--color-border)", background: "transparent", color: "white", fontWeight: 600, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={submitting}
+                style={{ flex: 2, padding: "14px", borderRadius: "12px", border: "none", background: "var(--color-indigo)", color: "white", fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}
+              >
+                {submitting ? "Saving..." : "Submit Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
@@ -93,17 +200,28 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
           <div style={{ color: "var(--color-text-dim)", marginTop: "4px" }}>{group.memberCount} Members Total</div>
         </div>
         
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          style={{ 
-            background: "var(--color-indigo)", color: "white", border: "none", 
-            padding: "10px 18px", borderRadius: "10px", fontWeight: 600, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: "8px"
-          }}
-        >
-          <span className="mobile-hide">+ Add Member</span>
-          <span className="mobile-only">+</span>
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button 
+            onClick={() => setIsEditing(true)}
+            style={{ 
+              background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)", 
+              padding: "10px 18px", borderRadius: "10px", fontWeight: 600, cursor: "pointer"
+            }}
+          >
+            Update Group
+          </button>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            style={{ 
+              background: "var(--color-indigo)", color: "white", border: "none", 
+              padding: "10px 18px", borderRadius: "10px", fontWeight: 600, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "8px"
+            }}
+          >
+            <span className="mobile-hide">+ Add Member</span>
+            <span className="mobile-only">+</span>
+          </button>
+        </div>
       </div>
 
       {/* Row 2: Members List */}
@@ -119,7 +237,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
                 <div style={{ fontWeight: 600 }}>{m.name}</div>
                 <div style={{ fontSize: "11px", color: "var(--color-text-dim)" }}>{m.role.charAt(0).toUpperCase() + m.role.slice(1)}</div>
               </div>
-              {m.role !== "Owner" && (
+              {m.role.toLowerCase() !== "owner" && (
                 <button 
                   onClick={() => { setSelectedMember(m); setIsDeleteModalOpen(true); }}
                   style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "none", padding: "8px", borderRadius: "8px", cursor: "pointer" }}

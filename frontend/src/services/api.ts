@@ -180,6 +180,14 @@ export const groupsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  deleteMember: (
+    groupId: string,
+    userId: string
+  ): Promise<{ deleted: unknown }> => 
+    apiFetch<{ deleted: unknown }>(`/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    })
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
