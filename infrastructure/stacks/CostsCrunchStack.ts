@@ -41,6 +41,7 @@ export class CostsCrunchStack extends Stack {
         const isProd = environment === "prod";
         const prefix = `costscrunch-${environment}`;
         const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
+        const VITE_APP_URL = process.env.VITE_APP_URL;
 
         // ── KMS Key ─────────────────────────────────────────────────────────────
         const kmsKey = new kms.Key(this, "CostsCrunchKey", {
@@ -134,7 +135,7 @@ export class CostsCrunchStack extends Stack {
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
-                    allowedOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
+                    allowedOrigins: isProd ? [`${VITE_APP_URL}`] : ["*"],
                     allowedHeaders: ["*"],
                     maxAge: 3600,
                 },
@@ -178,7 +179,7 @@ export class CostsCrunchStack extends Stack {
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
-                    allowedOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
+                    allowedOrigins: isProd ? [`${VITE_APP_URL}`] : ["*"],
                     allowedHeaders: ["*"],
                     maxAge: 3600,
                 },
@@ -683,12 +684,19 @@ export class CostsCrunchStack extends Stack {
             identitySource: ["$request.header.Authorization"],
         });
 
+        // ── CORS — single source of truth (mirrored in server.ts for local dev) ─────
+        const CORS_ALLOW_ORIGINS = isProd ? [`${VITE_APP_URL}`] : ["*"];
+        const CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+        const CORS_ALLOW_HEADERS = ["Authorization", "Content-Type", "X-Idempotency-Key"];
+
         const api = new apigwv2.HttpApi(this, "Api", {
             apiName: `${prefix}-api`,
             corsPreflight: {
-                allowOrigins: isProd ? [`https://app.costscrunch.com`] : ["*"],
-                allowMethods: [apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST, apigwv2.CorsHttpMethod.PUT, apigwv2.CorsHttpMethod.DELETE],
-                allowHeaders: ["Authorization", "Content-Type", "X-Idempotency-Key"],
+                allowOrigins: CORS_ALLOW_ORIGINS,
+                allowMethods: CORS_ALLOW_METHODS.map(m =>
+                    apigwv2.CorsHttpMethod[m as keyof typeof apigwv2.CorsHttpMethod]
+                ),
+                allowHeaders: CORS_ALLOW_HEADERS,
                 maxAge: Duration.hours(24),
             }
         });
@@ -727,6 +735,23 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/chartData", analyticsLambda);
 
+        // ── CloudFront Response Headers Policy (CORS for all /api/* responses) ──────
+        // Adds CORS headers at the CDN layer — covers 4XX/5XX errors from API GW
+        // that never reach Lambda, making per-handler CORS headers unnecessary.
+        const corsHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'CorsPolicy', {
+            responseHeadersPolicyName: `${prefix}-cors`, 
+            comment: 'Add CORS headers at CDN layer',
+            corsBehavior: {
+                accessControlAllowOrigins: CORS_ALLOW_ORIGINS,
+                accessControlAllowHeaders: [],
+                accessControlAllowMethods: CORS_ALLOW_METHODS,
+                accessControlExposeHeaders: CORS_ALLOW_HEADERS,
+                accessControlAllowCredentials: false,
+                accessControlMaxAge: Duration.seconds(86400),
+                originOverride: true
+            }
+        });
+
         // ── CloudFront Distribution ──────────────────────────────────────────────
         const distribution = new cloudfront.Distribution(this, "CfDistribution", {
             comment: `${prefix} CDN`,
@@ -743,6 +768,7 @@ export class CostsCrunchStack extends Stack {
                 cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
                 originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+                responseHeadersPolicy: corsHeadersPolicy,
                 },
             },
             webAclId: wafAcl.attrArn,
