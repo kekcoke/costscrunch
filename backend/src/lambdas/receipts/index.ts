@@ -16,6 +16,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { Logger } from "@aws-lambda-powertools/logger";
+import { logger as internalLogger } from "../../utils/logger.js";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
@@ -96,7 +97,7 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
   });
   
   if (process.env.DEBUG_EVENT === "true") {
-    console.log("FULL_EVENT_DEBUG:", JSON.stringify(event, null, 2));
+    internalLogger.debug("FULL_EVENT_DEBUG", { event });
   }
 
   // ─── Route by event shape ──────────────────────────────────────────────────
