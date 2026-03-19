@@ -16,7 +16,7 @@ import { resolve } from "path";
 
 export default defineConfig({
   test: {
-    include: ["__tests__/opt3/**/*.test.ts", "__tests__/opt2/**/*.test.ts"],
+    include: ["__tests__/**/*.test.ts"],
     environment: "node",
     globals: true,
     // Integration tests need longer timeouts
