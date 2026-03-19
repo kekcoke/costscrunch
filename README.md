@@ -465,7 +465,7 @@ docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
 # 6. Set frontend API URL
 export VITE_API_URL="http://localhost:4566/restapis/{API_ID}/local/_user_request_"
 # API_ID is printed by bootstrap.sh. If CORS blocks persist, run the enforcer:
-docker exec costscrunch-localstack enable-cors {API_ID}
+docker exec costscrunch-localstack bash /localstack/opt2/enable-cors.sh {API_ID}
 
 # 7. Start frontend
 cd ../frontend && npm run dev
