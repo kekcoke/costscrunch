@@ -172,7 +172,8 @@ jobs:
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} --paths "/*"
       - name: Smoke test production
         run: |
-          curl -f https://app.costscrunch.io/health || exit 1
+          # Verify health endpoint with 30s timeout and fail on non-200
+          curl -f --max-time 30 ${{env.VITE_APP_URL}}/health || exit 1
           echo "Production health check passed ✅"
       - name: Notify Slack
         uses: 8398a7/action-slack@v3
