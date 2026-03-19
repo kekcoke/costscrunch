@@ -388,6 +388,13 @@ export class CostsCrunchStack extends Stack {
             environment: { ...sharedEnv },
         });
 
+        const healthLambda = new NodejsFunction(this, "HealthLambda", {
+            ...sharedLambdaProps as any,
+            entry: "backend/src/lambdas/health/index.ts",
+            functionName: `${prefix}-health`,
+            environment: { ...sharedEnv },
+        });
+
         // ── Image Preprocessing Lambda ────────────────────────────────────────────
         // Triggered by S3 uploads, compresses images, and uploads to processed bucket.
         // Higher memory/timeout for image processing workloads.
@@ -734,6 +741,7 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/chartData", analyticsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/health", healthLambda);
 
         // ── CloudFront Response Headers Policy (CORS for all /api/* responses) ──────
         // Adds CORS headers at the CDN layer — covers 4XX/5XX errors from API GW

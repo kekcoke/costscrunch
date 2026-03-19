@@ -28,7 +28,8 @@
      ├── sns-webhook/    Textract completion → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends
-     └── notifications/  SES + Pinpoint push/SMS
+     ├── notifications/  SES + Pinpoint push/SMS
+     └── health/         Monitoring + CI/CD smoke tests
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
 📦 S3 (uploads + processed + receipts + assets, KMS encrypted)
@@ -287,6 +288,9 @@ Receipts
 Analytics
   GET    /analytics/summary?period=month|quarter|year
   GET    /analytics/trends
+
+Monitoring
+  GET    /health                      isolated health check
 ```
 
 ---
@@ -601,6 +605,7 @@ npm run deploy:dev
 | `CODECOV_TOKEN` | Codecov coverage upload token | CI |
 | `SEMGREP_APP_TOKEN` | Semgrep SAST token | CI |
 | `VITE_API_URL` | Frontend API URL | CI |
+| `VITE_APP_URL` | Frontend URL | CI |
 | `VITE_USER_POOL_ID` | Cognito User Pool ID | CI |
 | `VITE_USER_POOL_CLIENT_ID` | Cognito Client ID | CI |
 | `STAGING_URL` | Staging base URL for E2E | CD |
