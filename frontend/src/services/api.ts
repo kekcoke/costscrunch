@@ -187,7 +187,10 @@ export const groupsApi = {
   ): Promise<{ deleted: unknown }> => 
     apiFetch<{ deleted: unknown }>(`/groups/${groupId}/members/${userId}`, {
       method: "DELETE",
-    })
+    }),
+
+  delete: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/groups/${id}`, { method: "DELETE" }),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

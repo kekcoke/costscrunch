@@ -499,3 +499,68 @@ describe("DELETE /groups/{id}/members/{userId}", () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+// ── DELETE /groups/:id ───────────────────────────────────────────────────────
+describe("DELETE /groups/{id}", () => {
+  const groupId = "g1";
+  const event = makeEvent({
+    routeKey: "DELETE /groups/{id}",
+    pathParameters: { id: groupId },
+    requestContext: {
+      authorizer: { jwt: { claims: { sub: "user-owner" } } }
+    }
+  });
+
+  it("successfully soft-deletes group if requester is owner and balances are zero", async () => {
+    ddbMock
+      .on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } })
+      .on(QueryCommand).resolves({ Items: [] })
+      .on(UpdateCommand).resolves({});
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).deleted).toBe(true);
+    
+    // Check if UpdateCommand was called with active: false
+    expect(ddbMock).toHaveReceivedCommandWith(UpdateCommand, {
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: expect.stringContaining("active = :false"),
+    });
+  });
+
+  it("fails if requester is not the owner", async () => {
+    const nonOwnerEvent = makeEvent({
+      routeKey: "DELETE /groups/{id}",
+      pathParameters: { id: groupId },
+      requestContext: {
+        authorizer: { jwt: { claims: { sub: "user-stranger" } } }
+      }
+    });
+
+    ddbMock.on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } });
+
+    const res = await handler(nonOwnerEvent as any);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toMatch(/owner/i);
+  });
+
+  it("fails if there are outstanding balances", async () => {
+    const expenses = [{
+      pk: "GROUP#g1", sk: "EXPENSE#e1",
+      ownerId: "user-a", amount: 60, status: "approved",
+      splits: [
+        { userId: "user-a", amount: 20 },
+        { userId: "user-b", amount: 20 },
+        { userId: "user-c", amount: 20 },
+      ],
+    }];
+
+    ddbMock
+      .on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } })
+      .on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/outstanding balances/i);
+  });
+});

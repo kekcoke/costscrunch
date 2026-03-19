@@ -431,5 +431,55 @@ export const handler = async (event: ApiEvent) => {
     return ok({ deleted: true });
   }
 
+  // ── DELETE /groups/:id ────────────────────────────────────────────────────
+  if (route === "DELETE /groups/{id}" && groupId) {
+    const [groupRes, expensesRes] = await Promise.all([
+      ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
+      ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" },
+      })),
+    ]);
+
+    const group = groupRes.Item as Group;
+    if (!group) return err("Group not found", 404);
+
+    // 1. Must be owner
+    if (group.ownerId !== auth.userId) {
+      return err("Only the group owner can delete the group", 403);
+    }
+
+    const expenses = expensesRes.Items || [];
+
+    // 2. No pending expenses
+    const hasPending = expenses.some(e => e.status === "pending");
+    if (hasPending) {
+      return err("Cannot delete group with pending expenses. Please approve or reject them first.", 400);
+    }
+
+    // 3. No outstanding dues (balances must be zero)
+    const balances = calculateBalances(expenses, group.members);
+    const hasDues = Object.values(balances).some(b => Math.abs(b) > 0.01);
+    if (hasDues) {
+      return err("Cannot delete group with outstanding balances. All members must be settled.", 400);
+    }
+
+    // 4. Soft delete (set active = false)
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: "SET active = :false, updatedAt = :now, deletedAt = :now",
+      ExpressionAttributeValues: {
+        ":false": false,
+        ":now": new Date().toISOString(),
+      },
+      ConditionExpression: "attribute_exists(pk)",
+    }));
+
+    metrics.addMetric("GroupDeleted", MetricUnit.Count, 1);
+    return ok({ deleted: true });
+  }
+
   return err("Route not found", 404);
 };

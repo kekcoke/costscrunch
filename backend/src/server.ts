@@ -84,6 +84,7 @@ app.get('/groups', lambdaAdapter(groupsHandler, '/groups'));
 app.post('/groups', lambdaAdapter(groupsHandler, '/groups'));
 app.get('/groups/:id', lambdaAdapter(groupsHandler, '/groups/{id}'));
 app.patch('/groups/:id', lambdaAdapter(groupsHandler, '/groups/{id}'));
+app.delete('/groups/:id', lambdaAdapter(groupsHandler, '/groups/{id}'));
 app.get('/groups/:id/balances', lambdaAdapter(groupsHandler, '/groups/{id}/balances'));
 app.post('/groups/:id/members', lambdaAdapter(groupsHandler, '/groups/{id}/members'));
 app.delete('/groups/:id/members/:userId', lambdaAdapter(groupsHandler, '/groups/{id}/members/{userId}'));

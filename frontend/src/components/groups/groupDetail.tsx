@@ -15,6 +15,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   // UI State for CRUD
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
   
   // Form States
@@ -77,6 +78,22 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
       }, 1500);
     } catch (err: any) {
       setStatus({ type: "error", msg: "Failed to remove member." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    setSubmitting(true);
+    setStatus(null);
+    try {
+      await groupsApi.delete(groupId);
+      setStatus({ type: "success", msg: "Group deleted successfully. Redirecting..." });
+      setTimeout(() => {
+        onBack(); // Go back to groups list
+      }, 2000);
+    } catch (err: any) {
+      setStatus({ type: "error", msg: err.message || "Failed to delete group" });
     } finally {
       setSubmitting(false);
     }
