@@ -19,20 +19,13 @@ const FROM_EMAIL = process.env.FROM_EMAIL!;
 const logger = new Logger({ serviceName: "groups" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" });
 
-const CORS_HEADERS = {
-  "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With,Accept,Origin",
-};
-
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
-  headers: CORS_HEADERS,
+  headers: { "Content-Type": "application/json" },
 });
 const err = (msg: string, statusCode = 400) => ({
   statusCode, body: JSON.stringify({ error: msg }),
-  headers: CORS_HEADERS,
+  headers: { "Content-Type": "application/json" },
 });
 
 // ─── Balance Calculator ───────────────────────────────────────────────────────
