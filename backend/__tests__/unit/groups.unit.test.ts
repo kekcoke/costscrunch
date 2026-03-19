@@ -439,3 +439,63 @@ describe("POST /groups/{id}/members", () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+// ── DELETE /groups/:id/members/:userId ───────────────────────────────────────
+describe("DELETE /groups/{id}/members/{userId}", () => {
+  const event = makeEvent({
+    routeKey: "DELETE /groups/{id}/members/{userId}",
+    pathParameters: { id: "g1", userId: "user-b" }
+  });
+
+  it("successfully removes a member with zero balance", async () => {
+    ddbMock
+      .on(GetCommand).resolves({ Item: SAMPLE_GROUP })
+      .on(QueryCommand).resolves({ Items: [] }) // No expenses = zero balance
+      .on(TransactWriteCommand).resolves({});
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).deleted).toBe(true);
+    expect(ddbMock).toHaveReceivedCommand(TransactWriteCommand);
+  });
+
+  it("fails to remove the group owner", async () => {
+    const ownerEvent = makeEvent({
+      routeKey: "DELETE /groups/{id}/members/{userId}",
+      pathParameters: { id: "g1", userId: "user-a" } // Alice is owner in SAMPLE_GROUP
+    });
+
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
+
+    const res = await handler(ownerEvent as any);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toMatch(/owner/i);
+  });
+
+  it("fails if member has unsettled balance", async () => {
+    // Bob owes $20
+    const expenses = [{
+      pk: "GROUP#g1", sk: "EXPENSE#e1",
+      ownerId: "user-a", amount: 60, status: "approved",
+      splits: [
+        { userId: "user-a", amount: 20 },
+        { userId: "user-b", amount: 20 },
+        { userId: "user-c", amount: 20 },
+      ],
+    }];
+
+    ddbMock
+      .on(GetCommand).resolves({ Item: SAMPLE_GROUP })
+      .on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/unsettled balance/i);
+  });
+
+  it("returns 404 if group does not exist", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: undefined });
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(404);
+  });
+});

@@ -4,7 +4,7 @@
 //         POST /groups/:id/settle, GET /groups/:id/balances
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
@@ -369,6 +369,66 @@ export const handler = async (event: ApiEvent) => {
 
     metrics.addMetric("MemberAdded", MetricUnit.Count, 1);
     return ok({ added: newMember });
+  }
+
+  // ── DELETE /groups/:id/members/:userId ───────────────────────────────
+  else if (route === "DELETE /groups/{id}/members/{userId}" && groupId && memberUserId) {
+    // 1. Get Group and Expenses to check balances
+    const [groupRes, expensesRes] = await Promise.all([
+      ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
+      ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" },
+      })),
+    ]);
+
+    const group = groupRes.Item as Group;
+    if (!group) return err("Group not found", 404);
+
+    // 2. Find member index in the denormalized list
+    const memberIndex = group.members.findIndex(m => m.userId === memberUserId);
+    if (memberIndex === -1) return err("Member not found in group", 404);
+
+    // 3. Prevent removing the owner
+    if (group.members[memberIndex].role === "owner") {
+      return err("Cannot remove the group owner", 403);
+    }
+
+    // 4. Integrity check: Balance must be zero
+    const balances = calculateBalances(expensesRes.Items || [], group.members);
+    const userBalance = balances[memberUserId] || 0;
+    if (Math.abs(userBalance) > 0.01) {
+      return err(`Cannot remove member with unsettled balance (${userBalance.toFixed(2)})`, 400);
+    }
+
+    // 5. Atomic removal
+    await ddb.send(new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+            UpdateExpression: `REMOVE members[${memberIndex}] SET memberCount = memberCount - :one, updatedAt = :now`,
+            ConditionExpression: `members[${memberIndex}].userId = :uid`,
+            ExpressionAttributeValues: { 
+              ":one": 1, 
+              ":now": new Date().toISOString(),
+              ":uid": memberUserId 
+            },
+          },
+        },
+        {
+          Delete: {
+            TableName: TABLE,
+            Key: { pk: `USER#${memberUserId}`, sk: `GROUP_MEMBER#${groupId}` },
+          },
+        },
+      ],
+    }));
+
+    metrics.addMetric("MemberRemoved", MetricUnit.Count, 1);
+    return ok({ deleted: true });
   }
 
   return err("Route not found", 404);
