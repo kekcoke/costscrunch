@@ -3,8 +3,8 @@
 //          Lambda Functions, ElastiCache, CloudFront, WAF, EventBridge,
 //          SNS (Textract completion) + Pinpoint
 
-import { Stack, StackProps, Duration, RemovalPolicy, CfnOutput } from "aws-cdk-lib";
-import { Construct } from "constructs";
+import { Stack, StackProps, Duration, RemovalPolicy, CfnOutput, Aspects, Annotations } from "aws-cdk-lib";
+import { Construct, IConstruct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -775,6 +775,31 @@ export class CostsCrunchStack extends Stack {
             minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
             });
+
+        // ── Security Guard: block MOCK_AUTH in non-dev environments ──────────────
+        // OWASP ASVS v4.0 V13.1 — fail synthesis if any Lambda has MOCK_AUTH set
+        // outside dev. This catches accidental env-var injection in the CDK stack
+        // even though MOCK_AUTH is currently only set via SAM/LocalStack locally.
+        if (environment !== "dev") {
+            Annotations.of(this).addInfo(
+                `Scanning all Lambda functions for MOCK_AUTH env-var (stage=${environment})`
+            );
+            Aspects.of(this).add({
+                visit(node: IConstruct) {
+                    if (node instanceof lambda.Function) {
+                        const fnEnv = (node as any).environment as Record<string, string> | undefined;
+                        if (fnEnv && "MOCK_AUTH" in fnEnv) {
+                            Annotations.of(node).addError(
+                                `MOCK_AUTH environment variable found on ${node.node.path}. ` +
+                                `Mock authentication bypasses MUST NOT be deployed to ${environment}. ` +
+                                "Remove MOCK_AUTH from this function's environment. " +
+                                "See OWASP ASVS v4.0 control V13.1."
+                            );
+                        }
+                    }
+                },
+            });
+        }
 
         // ── Outputs ───────────────────────────────────────────────────────────────
         new CfnOutput(this, "ApiUrl", { value: api.url!, exportName: `${prefix}-api-url` });

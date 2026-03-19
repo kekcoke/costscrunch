@@ -18,6 +18,17 @@ export function withMockAuth(
   handler: (event: any, context: any) => Promise<any>,
 ): (event: any, context: any) => Promise<any> {
   return async (event: any, context: any) => {
+    // OWASP ASVS v4.0 V13.1 — mock auth must never be active outside dev
+    if (
+      process.env.MOCK_AUTH === "true" &&
+      process.env.ENVIRONMENT !== "dev"
+    ) {
+      throw new Error(
+        `MOCK_AUTH is enabled in a non-dev environment (ENVIRONMENT=${process.env.ENVIRONMENT}). ` +
+        "Refusing to process request. See OWASP ASVS v4.0 control V13.1.",
+      );
+    }
+
     if (
       process.env.MOCK_AUTH === "true" &&
       !event.requestContext?.authorizer?.jwt?.claims?.sub
