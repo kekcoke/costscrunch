@@ -16,7 +16,7 @@
         ↓
 🔑 Cognito (JWT auth + MFA + PKCE)
         ↓
-🔀 API Gateway HTTP API v2 (throttled: 10K req/s)
+🔀 API Gateway REST API v1 (Standardized for LocalStack parity)
         ↓
 ⚡ ElastiCache Redis (response cache + sessions)
         ↓
@@ -41,155 +41,30 @@
 ## Repository Structure
 ```
 costscrunch
-├── ai/
-│   ├── adapters/
-│   ├── references/
-│   │   └── REFERENCES.md
-│   ├── skills/
-│   │   └── SKILLS.md
-│   └── system/
+├── ai/                      # Agent prompts, domain skills, and system configs
 ├── backend/
-│   ├── .DS_Store
-│   ├── __tests__/
-│   │   ├── .DS_Store
-│   │   ├── __config__/
-│   │   │   └── testConfig.ts
-│   │   ├── __helpers__/
-│   │   │   └── localstack-client.ts                  # localstack mock environment
-│   │   ├── integration/
-│   │   ├── __mocks__/
-│   │   │   ├── .DS_Store
-│   │   │   ├── @aws-lambda-powertools/
-│   │   │   │   ├── index.ts
-│   │   │   │   ├── logger.ts
-│   │   │   │   ├── metrics.ts
-│   │   │   │   └── tracer.ts
-│   │   │   └── eventBridge.ts
-│   │   ├── integration/
-│   │   │   ├── analytics.integration.test.ts
-│   │   │   ├── expenses.integration.test.ts
-│   │   │   └── receipts.integration.test.ts
-│   │   ├── setup/
-│   │   │   ├── setupTestEnv.ts
-│   │   │   ├── vitest.setup.integration.ts
-│   │   │   └── vitest.setup.unit.ts
-│   │   └── unit/
-│   │       ├── analytics.unit.test.ts
-│   │       ├── expenses.unit.test.ts
-│   │       ├── groups.unit.test.ts
-│   │       ├── receipts.unit.test.ts
-│   │       ├── sns-webhook.unit.test.ts
-│   │       └── web-socket-notifier.unit.test.ts
-│   ├── package.json
+│   ├── __tests__/           # Unit (mocked) and Integration (LocalStack) suites
 │   ├── src/
-│   │   ├── .DS_Store
-│   │   ├── lambdas/                                  # lambda handlers
-│   │   │   ├── .DS_Store
-│   │   │   ├── analytics/
-│   │   │   │   ├── .DS_Store
-│   │   │   │   └── index.ts
-│   │   │   ├── expenses/
-│   │   │   │   └── index.ts
-│   │   │   ├── groups/
-│   │   │   │   └── index.ts
-│   │   │   ├── notifications/
-│   │   │   │   └── index.ts
-│   │   │   ├── receipts/
-│   │   │   │   └── index.ts
-│   │   │   ├── sns-webhook/
-│   │   │   │   └── index.ts
-│   │   │   └── web-socket-notifier/
-│   │   │       └── index.ts
-│   │   ├── server.ts
-│   │   └── shared/
-│   │       └── models/
-│   │           ├── charts.ts
-│   │           └── types.ts
-│   ├── tsconfig.json
-│   ├── tsconfig.test.json
+│   │   ├── lambdas/         # Service handlers (Groups, Expenses, Analytics, etc.)
+│   │   ├── _local/          # Local dev auth wrappers (mock authorizer)
+│   │   ├── shared/          # Domain models and common types
+│   │   └── server.ts        # Express-to-Lambda adapter for fast dev cycles
 │   └── vite.config.ts
 ├── frontend/
-│   ├── .DS_Store
-│   ├── .gitignore
-│   ├── README.md
-│   ├── __tests__/
-│   │   ├── .DS_Store
-│   │   ├── components.test.tsx
-│   │   └── setup.ts
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package.json
-│   ├── public/
-│   │   └── vite.svg
+│   ├── __tests__/           # Component and Store unit tests (Vitest + RTL)
 │   ├── src/
-│   │   ├── .DS_Store
-│   │   ├── App.css
-│   │   ├── App.tsx
-│   │   ├── assets/
-│   │   │   └── react.svg
-│   │   ├── components/
-│   │   │   ├── donutChart.tsx
-│   │   │   ├── expenseRow.tsx
-│   │   │   ├── index.ts
-│   │   │   ├── scanModal.tsx
-│   │   │   ├── sideBar.tsx
-│   │   │   ├── statCard.tsx
-│   │   │   └── topBar.tsx
-│   │   ├── constants/
-│   │   ├── helpers/
-│   │   │   ├── expense/
-│   │   │   │   └── createExpenseFromForm.ts
-│   │   │   ├── queryString.ts
-│   │   │   └── utils.ts
-│   │   ├── index.css
-│   │   ├── index.html
-│   │   ├── main.tsx                                  # Entrypoint
-│   │   ├── mocks/                                    # Mock data
-│   │   │   ├── expenses.ts
-│   │   │   ├── groups.ts
-│   │   │   └── results.ts
-│   │   ├── models/                                   # Type, schema, constant definitions
-│   │   │   ├── constants.ts
-│   │   │   ├── interfaceProps.ts
-│   │   │   ├── scanForm.ts
-│   │   │   └── types.ts
-│   │   ├── pages/                                    # Route-level pages
-│   │   │   ├── analytics.tsx
-│   │   │   ├── dashboard.tsx
-│   │   │   ├── expenses.tsx
-│   │   │   ├── groups.tsx
-│   │   │   ├── index.tsx
-│   │   │   └── settings.tsx
-│   │   ├── services/
-│   │   │   └── api.ts                                 # Type-safe API client with Amplify auth
-│   │   └── stores/                                    # Zustand state management
-│   │       └── useExpenseStore.ts
-│   ├── tsconfig.app.json
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
+│   │   ├── components/      # UI Building blocks (Modals, Rows, Charts)
+│   │   ├── pages/           # Route containers and view logic
+│   │   ├── services/        # Type-safe API client (Amplify-integrated)
+│   │   ├── stores/          # Zustand state management
+│   │   └── models/          # Frontend-specific type definitions
 │   └── vite.config.ts
 └── infrastructure/
-    ├── .DS_Store
-    ├── .dockerignore
-    ├── __tests__/
-    │   └── localstack/
-    │       ├── dynamodb.test.ts
-    │       ├── eventbridge.test.ts
-    │       ├── health.test.ts
-    │       ├── kms.test.ts
-    │       ├── s3.test.ts
-    │       ├── ses.test.ts
-    │       ├── sns.test.ts
-    │       ├── sqs.test.ts
-    │       └── ssm.test.ts
-    ├── docker-compose.localstack.yml                  # compose file localstack and seeding
-    ├── localstack/
-    │   └── dev/
-    │       └── setup.sh                               # seeds localstack according CostsCruncStack specs
-    ├── package.json
-    ├── stacks/
-    │   └── CostsCrunchStack.ts                         # cloud infra blueprint
-    └── tsconfig.json
+    ├── __tests__/           # REST v1 validation and Data compliance checks
+    ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
+    ├── sam/                 # Local emulation templates (REST v1 / ARM64)
+    ├── stacks/              # CDK Infrastructure-as-Code definitions
+    └── docker-compose.yml   # Multi-container orchestration (LocalStack base)
 ```
 
 ---
@@ -461,23 +336,186 @@ BEDROCK_MODEL_ID=```
 
 ## Local Development
 
+### Prerequisites
 ```bash
-# Prerequisites: Node 20+, AWS CLI, CDK CLI, Docker (for LocalStack)
-npm install -g aws-cdk
-
-# Install all dependencies
+Node 20+, AWS CLI, CDK CLI, Docker (for LocalStack), SAM CLI (for Option 3)
+npm install -g aws-cdk aws-sam-cli
 npm install
+```
 
-# Start LocalStack (Infra testing)
+### Local Request-Response Flows
+
+Understanding how data moves through local environments is critical for troubleshooting routing and CORS.
+
+#### Option 2 Flow (Full LocalStack Compute)
+Standardizes on **REST API v1** to ensure feature parity with free-tier LocalStack.
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant LS_Edge as LocalStack (4566)
+    participant APIGW as API Gateway (v1)
+    participant Lambda as Groups Lambda
+
+    Note over Browser, Lambda: Preflight Flow
+    Browser->>LS_Edge: OPTIONS /groups/123
+    LS_Edge->>APIGW: Match {proxy+}
+    APIGW->>APIGW: Execute MOCK Integration
+    APIGW-->>Browser: 200 OK (CORS Headers)
+
+    Note over Browser, Lambda: Actual Request Flow
+    Browser->>LS_Edge: GET /groups/123
+    LS_Edge->>APIGW: Route to /{proxy+}
+    APIGW->>Lambda: Invoke (AWS_PROXY)
+    Lambda->>Lambda: normalizeRoute(/groups/123) -> {id: "123"}
+    Lambda->>Lambda: Inject MOCK_AUTH claims
+    Lambda-->>Browser: 200 OK + Data + CORS Headers
+```
+
+#### Option 3 Flow (SAM CLI + Express)
+Uses a **Hono-style adapter** to bridge Express and Lambda locally.
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Express as Express (4000)
+    participant Adapter as lambdaAdapter
+    participant Lambda as Lambda Handler
+
+    Browser->>Express: GET /groups/123
+    Express->>Express: cors() Middleware
+    Express->>Adapter: Pass req
+    Adapter->>Adapter: Map req -> Event (V2 Format)
+    Adapter->>Adapter: Inject Auth Claims
+    Adapter->>Lambda: Direct Function Call
+    Lambda-->>Express: Return Result
+    Express-->>Browser: JSON Response
+```
+
+### Key Differences from Production
+
+| Feature | Local (Opt 2/3) | Production (AWS) |
+| :--- | :--- | :--- |
+| **API Version** | **REST API v1** (Hierarchical). | **HTTP API v2** (Flat/Global). |
+| **CORS Enforce** | **Dual-Layer Required**: Gateway Mock + Lambda Headers. | **Single-Layer**: Usually handled by API Gateway "CORS Support" or CloudFront Policies. |
+| **Authorizer** | **Synthetic**: `MOCK_AUTH` wrapper in Lambda or Adapter. | **Managed**: Real Cognito JWT validation, MFA, and Token revocation. |
+| **Routing** | **Manual Bridge**: Requires `normalizeRoute()` to map path segments to templates. | **Native**: AWS handles parameter mapping from URL patterns automatically. |
+| **IAM/WAF** | **CRUD-Only**: Policies exist but are not enforced in LocalStack Free. | **Active**: Strict enforcement of Least Privilege and OWASP Rate Limiting. |
+| **Persistence** | **Ephemeral**: State is lost on container restart unless using volume mounts. | **Durable**: Point-in-Time Recovery and Multi-Region Replication active. |
+
+---
+
+### Three Local Stack Options
+
+The original LocalStack setup only provisioned the **data layer** (DynamoDB, S3, SSM, etc.) — no Lambda functions or API Gateway. This caused 404s when the frontend called API endpoints. Three options now exist, each solving this differently:
+
+| | Option 1 | Option 2 | Option 3 |
+|---|---|---|---|
+| **Compute layer** | ❌ None | ✅ Lambda + API GW inside LocalStack | ✅ SAM CLI local invoke |
+| **Data layer** | ✅ LocalStack (setup.sh) | ✅ LocalStack (setup.sh) | ✅ LocalStack (setup.sh) |
+| **Auth bypass** | N/A | `MOCK_AUTH=true` env var | `MOCK_AUTH=true` + `_local/` wrappers |
+| **Complexity** | Low | Medium | Medium |
+| **Use when** | Testing infra services only | Full local API with LocalStack | Full local API without Docker compute |
+
+---
+
+#### Option 1 — Data Layer Only (Original)
+
+Good for testing DynamoDB, S3, SSM, etc. No API endpoints available.
+
+```bash
+cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+# setup.sh seeds data automatically on container start
+# Frontend will 404 on API calls — this is expected
+```
+
+#### Option 2 — Full LocalStack (Lambda + API GW Inside Container)
+
+Provisions IAM role, 6 Lambda functions, REST API (v1) with hierarchical resource mapping, and automated CORS enforcement. `setup.sh` seeds data; `bootstrap.sh` provisions compute.
+
+```bash
+# 1. Start base LocalStack (data seeding)
+cd infrastructure
+docker compose -f docker-compose.localstack.yml up -d
+
+# 2. Start supplemental compute container (Lambda + API GW)
+docker compose -f localstack/opt2/docker-compose.opt2.yml up -d
+
+until docker exec costscrunch-localstack-seed echo "✅✅✅ LocalStack seed complete!" >/dev/null 2>&1; do
+  sleep 20
+done
+
+# 3. Build Lambda code and mount into container
+cd ../backend
+npm run build   # produces esbuild bundles
+
+# 4. Copy build artifacts into LocalStack's expected SAM build path
+#    bootstrap.sh expects /opt/sam-build/{FunctionName}/ inside the container
+docker exec costscrunch-localstack mkdir -p /opt/bootstrap
+docker exec costscrunch-localstack mkdir -p /opt/sam-build-src
+docker cp "$PROJECT_ROOT/infrastructure/localstack/opt2/bootstrap.sh" costscrunch-localstack:/opt/bootstrap/bootstrap.sh
+docker cp "$PROJECT_ROOT/backend/src" costscrunch-localstack:/opt/sam-build-src
+# (See opt2/README.md for full sam build instructions)
+
+# 5. Run bootstrap inside the Lambda container
+docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
+
+# 6. Set frontend API URL
+export VITE_API_URL="http://localhost:4566/restapis/{API_ID}/local/_user_request_"
+# API_ID is printed by bootstrap.sh. If CORS blocks persist, run the enforcer:
+docker exec costscrunch-localstack enable-cors {API_ID}
+
+# 7. Start frontend
+cd ../frontend && npm run dev
+```
+
+#### Option 3 — SAM CLI Local (Recommended for Development)
+
+Uses `sam local start-api` to run Lambda functions locally, proxying data calls to LocalStack. Requires SAM CLI but no Docker compute setup.
+
+```bash
+# 1. Start LocalStack for data layer only
 cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
 
-# Run Tests (Vitest)
-npm run test        # Runs all unit/integration tests
+# 2. Build SAM template
+cd ../infrastructure/sam
+sam build
 
-# Start frontend
-npm run dev:frontend      # http://localhost:3000
+# 3. Start local API (Lambda functions run locally, data goes to LocalStack)
+sam local start-api \
+  --env-vars env.json \
+  --parameter-overrides 'ParameterKey=AppUrl,ParameterValue=http://localhost:3000'
 
-# Deploy to dev
+# 4. In another terminal — set frontend to SAM's local endpoint
+cd ../../frontend
+export VITE_API_URL="http://localhost:3001"   # SAM default port
+npm run dev
+```
+
+**Key difference:** Option 3's `_local/` handler wrappers import the real handlers and wrap them with `withMockAuth()` middleware, which injects fake Cognito claims when `MOCK_AUTH=true`. This means the same handler code runs locally and in production — only the auth context differs.
+
+---
+
+### Running Tests
+
+```bash
+# Infrastructure tests
+cd infrastructure
+npm test                                        # all infra tests (opt3 runs, opt2 skips without LocalStack)
+npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
+npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)
+npx vitest run __tests__/localstack             # Service-level LocalStack tests
+
+# Backend tests
+cd backend
+npm run test:ut                                 # unit tests
+npm run test:ig                                 # integration tests (requires LocalStack)
+
+# Frontend tests
+cd frontend && npx vitest
+```
+
+### Deploy to AWS
+
+```bash
 npm run deploy:dev
 ```
 
