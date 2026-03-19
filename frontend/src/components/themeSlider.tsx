@@ -48,7 +48,7 @@ export default function ThemeSlider() {
       />
 
       {/* Option buttons */}
-      {THEME_OPTIONS.map((opt, idx) => (
+      {THEME_OPTIONS.map((opt) => (
         <button
           key={opt.mode}
           role="radio"

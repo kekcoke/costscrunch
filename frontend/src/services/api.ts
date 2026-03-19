@@ -6,8 +6,8 @@ import { fetchAuthSession } from "@aws-amplify/auth";
 import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
-  GetExpensesQuery, InitiateUploadResponse,
-} from "../../../backend/src/shared/models/types";
+  GetExpensesQuery, InitiateUploadResponse
+} from "../models/types.js"
 import type { ExpenseSummaryStats } from "../models/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.costscrunch.io";
@@ -26,8 +26,15 @@ export class ApiError extends Error {
 
 // ─── Authenticated base fetch ─────────────────────────────────────────────────
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const { tokens } = await fetchAuthSession();
-  const token = tokens?.accessToken?.toString();
+  // In local dev (MOCK_AUTH=true), Amplify is not configured — skip auth gracefully.
+  // The Lambda _local/ handlers inject fake Cognito claims via withMockAuth().
+  let token: string | undefined;
+  try {
+    const { tokens } = await fetchAuthSession();
+    token = tokens?.accessToken?.toString();
+  } catch {
+    // No Cognito session — local dev mode, proceed without token
+  }
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -173,6 +180,17 @@ export const groupsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  deleteMember: (
+    groupId: string,
+    userId: string
+  ): Promise<{ deleted: unknown }> => 
+    apiFetch<{ deleted: unknown }>(`/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    }),
+
+  delete: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/groups/${id}`, { method: "DELETE" }),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

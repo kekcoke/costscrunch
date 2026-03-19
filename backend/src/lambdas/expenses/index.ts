@@ -12,7 +12,7 @@ import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
-  Expense, ExpenseSummary, GetExpensesQuery,
+  Expense, GetExpensesQuery,
 } from "../../shared/models/types.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────

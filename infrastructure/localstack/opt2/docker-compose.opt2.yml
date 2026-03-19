@@ -1,0 +1,19 @@
+# ─── Option 2 override — enable Lambda execution inside LocalStack ───────────
+#
+# This file extends the base docker-compose.localstack.yml service with
+# Lambda executor settings. It does NOT start a separate container.
+#
+# Usage (via setup/localstack.sh or npm run dev:opt2):
+#   docker compose -f docker-compose.localstack.yml \
+#     -f localstack/opt2/docker-compose.opt2.yml up -d
+#
+# Lambda + API GW are provisioned by bootstrap.sh (run via docker exec).
+# Endpoints: http://localhost:4566/restapis/<api-id>/local/_user_request_/
+
+services:
+  localstack:
+    environment:
+      # Enable Lambda execution inside the LocalStack container (docker-reuse =
+      # run Lambda in a sibling container on the same Docker host)
+      - LAMBDA_EXECUTOR=docker-reuse
+      - LAMBDA_REMOTE_DOCKER=true

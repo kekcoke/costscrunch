@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CostsCrunch local dev API — SAM CLI (Parameterized x86_64)
+
+Parameters:
+  TableNameMain:
+    Type: String
+    Default: costscrunch-dev-main
+  BucketUploadsName:
+    Type: String
+    Default: costscrunch-dev-uploads-000000000000
+  TextractSnsTopicArn:
+    Type: String
+    Default: arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion
+  TextractRoleArn:
+    Type: String
+    Default: arn:aws:iam::000000000000:role/test-role
+  FromEmail:
+    Type: String
+    Default: noreply@costscrunch.dev
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
+    Timeout: 30
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization,X-Requested-With,Accept,Origin'"
+      AllowOrigin: "'*'"
+      MaxAge: "'3600'"
+    GatewayResponses:
+      DEFAULT_4XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
+      DEFAULT_5XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
+
+Resources:
+  GroupsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/groups/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+          FROM_EMAIL: !Ref FromEmail
+      Events:
+        GroupsRoot:
+          Type: Api
+          Properties:
+            Path: /groups
+            Method: ANY
+        GroupsProxy:
+          Type: Api
+          Properties:
+            Path: /groups/{proxy+}
+            Method: ANY
+
+  ExpensesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/expenses/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+      Events:
+        ExpensesRoot:
+          Type: Api
+          Properties:
+            Path: /expenses
+            Method: ANY
+        ExpensesProxy:
+          Type: Api
+          Properties:
+            Path: /expenses/{proxy+}
+            Method: ANY
+
+  ReceiptsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/receipts/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+          BUCKET_UPLOADS_NAME: !Ref BucketUploadsName
+          TEXTRACT_SNS_TOPIC_ARN: !Ref TextractSnsTopicArn
+          TEXTRACT_ROLE_ARN: !Ref TextractRoleArn
+      Events:
+        ReceiptsRoot:
+          Type: Api
+          Properties:
+            Path: /receipts
+            Method: ANY
+        ReceiptsProxy:
+          Type: Api
+          Properties:
+            Path: /receipts/{proxy+}
+            Method: ANY
+
+  AnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/analytics/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+      Events:
+        AnalyticsRoot:
+          Type: Api
+          Properties:
+            Path: /analytics
+            Method: ANY
+        AnalyticsProxy:
+          Type: Api
+          Properties:
+            Path: /analytics/{proxy+}
+            Method: ANY

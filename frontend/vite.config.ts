@@ -1,9 +1,20 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(() => {
+  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env.test
+  const envFromFile = loadEnv("test", resolve(__dirname, ".."));
+  const VITE_API_URL = process.env.VITE_API_URL ?? envFromFile.VITE_API_URL;
+
+  return {
+  // Load .env files from monorepo root (e.g. .env.test)
+  envDir: resolve(__dirname, ".."),
+  // Inject VITE_API_URL from .env.test into import.meta.env for all modes
+  define: {
+    "import.meta.env.VITE_API_URL": JSON.stringify(VITE_API_URL),
+  },
   plugins: [react()],
 
   resolve: {
@@ -36,8 +47,7 @@ export default defineConfig(() => ({
           react:    ["react", "react-dom"],
           router:   ["react-router-dom"],
           query:    ["@tanstack/react-query"],
-          amplify:  ["aws-amplify"],
-          charts:   ["recharts"],
+          amplify:  ["@aws-amplify/auth"],
         },
       },
     },
@@ -56,4 +66,5 @@ export default defineConfig(() => ({
       exclude: ["src/**/*.d.ts", "src/mocks/**"],
     },
   },
-}));
+  };
+});

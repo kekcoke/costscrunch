@@ -82,7 +82,7 @@ export const MOCK_EXPENSES: Expense[] = [
 
   createMockExpense({
     id: "e2",
-    groupId: "group1",
+    groupId: "g1",
     merchant: "Delta Airlines",
     description: "NYC → SFO",
     amount: 428,
@@ -104,7 +104,7 @@ export const MOCK_EXPENSES: Expense[] = [
   createMockExpense({
     id: "e3",
     ownerId: "user3",
-    groupId: "group2",
+    groupId: "g2",
     merchant: "AWS Console",
     amount: 1204.33,
     amountUSD: 1204.33,

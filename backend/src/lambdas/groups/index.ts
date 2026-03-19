@@ -4,12 +4,12 @@
 //         POST /groups/:id/settle, GET /groups/:id/balances
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { ulid } from "ulid";
-import type { ApiEvent, Group, GroupMember } from "../../shared/models/types";
+import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
@@ -19,13 +19,20 @@ const FROM_EMAIL = process.env.FROM_EMAIL!;
 const logger = new Logger({ serviceName: "groups" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" });
 
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With,Accept,Origin",
+};
+
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
-  headers: { "Content-Type": "application/json" },
+  headers: CORS_HEADERS,
 });
 const err = (msg: string, statusCode = 400) => ({
   statusCode, body: JSON.stringify({ error: msg }),
-  headers: { "Content-Type": "application/json" },
+  headers: CORS_HEADERS,
 });
 
 // ─── Balance Calculator ───────────────────────────────────────────────────────
@@ -85,11 +92,58 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
   return transactions;
 }
 
+// ─── Path matcher for REST API v1 ─────────────────────────────────────────────
+// REST API v1 sends actual paths ("/groups/g1"), not template patterns ("/groups/{id}").
+// This normalizes the route so the handler can use a single set of route checks.
+function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
+  if (routeKey) return { route: routeKey, params: {} };
+
+  // Strip trailing slash
+  const p = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+  const segments = p.split("/").filter(Boolean); // e.g. ["groups", "g1", "balances"]
+
+  const params: Record<string, string> = {};
+
+  // Match known patterns (most specific first)
+  if (segments.length === 4 && segments[0] === "groups" && segments[2] === "members") {
+    params.id = segments[1]; params.userId = segments[3];
+    return { route: `${method} /groups/{id}/members/{userId}`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "members") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/members`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "balances") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/balances`, params };
+  }
+  if (segments.length === 3 && segments[0] === "groups" && segments[2] === "settle") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}/settle`, params };
+  }
+  if (segments.length === 2 && segments[0] === "groups") {
+    params.id = segments[1];
+    return { route: `${method} /groups/{id}`, params };
+  }
+  if (segments.length === 1 && segments[0] === "groups") {
+    return { route: `${method} /groups`, params };
+  }
+
+  return { route: `${method} ${p}`, params };
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?: string }) => {
-  const route = event.routeKey || "";
+export const handler = async (event: ApiEvent) => {
+  // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
+  const method = event.httpMethod || event.requestContext?.http?.method || "";
+  const path = event.path || event.requestContext?.http?.path || "";
+  const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey);
+
   const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
-  const { id: groupId, userId: memberUserId } = event.pathParameters || {};
+  // Prefer explicit pathParameters (from HTTP API v2 / Express adapter), fall back to parsed params
+  const mergedParams = { ...pathParams, ...event.pathParameters };
+  const groupId = mergedParams.id;
+  const memberUserId = mergedParams.userId;
 
   logger.appendKeys({ userId: auth.userId, route, groupId });
 
@@ -142,7 +196,33 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
       updatedAt: now,
     };
 
-    await ddb.send(new PutCommand({ TableName: TABLE, Item: group, ConditionExpression: "attribute_not_exists(pk)" }));
+    // Transactionally create group and owner membership
+    await ddb.send(new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName: TABLE,
+            Item: group,
+            ConditionExpression: "attribute_not_exists(pk)",
+          },
+        },
+        {
+          Put: {
+            TableName: TABLE,
+            Item: {
+              pk: `USER#${auth.userId}`,
+              sk: `GROUP_MEMBER#${id}`,
+              entityType: "GROUP_MEMBER",
+              groupId: id,
+              userId: auth.userId,
+              role: "owner",
+              joinedAt: now,
+            },
+          },
+        },
+      ],
+    }));
+
     metrics.addMetric("GroupCreated", MetricUnit.Count, 1);
     return ok(group, 201);
   }
@@ -169,6 +249,43 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
     }));
     if (!result.Item) return err("Group not found", 404);
     return ok(result.Item);
+  }
+
+  // ── PATCH /groups/:id ────────────────────────────────────────────────────
+  if (route === "PATCH /groups/{id}" && groupId) {
+    const body = JSON.parse(event.body || "{}");
+    const now = new Date().toISOString();
+
+    const updates: string[] = ["updatedAt = :now"];
+    const values: Record<string, any> = { ":now": now };
+    const names: Record<string, string> = {};
+
+    const allowedFields = ["name", "description", "type", "color", "iconEmoji", "currency",
+      "approvalRequired", "approvalThreshold", "requireReceipts", "requireReceiptsAbove",
+      "policyId", "costCenters", "projectCodes", "budgets", "active"] as const;
+
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updates.push(`#${field} = :${field}`);
+        names[`#${field}`] = field;
+        values[`:${field}`] = body[field];
+      }
+    }
+
+    if (updates.length === 1) return err("No valid fields to update");
+
+    const result = await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: `SET ${updates.join(", ")}`,
+      ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+      ExpressionAttributeValues: values,
+      ReturnValues: "ALL_NEW",
+      ConditionExpression: "attribute_exists(pk)",
+    }));
+
+    metrics.addMetric("GroupUpdated", MetricUnit.Count, 1);
+    return ok(result.Attributes);
   }
 
   // ── GET /groups/:id/balances ──────────────────────────────────────────────
@@ -252,6 +369,116 @@ export const handler = async (event: ApiEvent & { routeKey?: string; httpMethod?
 
     metrics.addMetric("MemberAdded", MetricUnit.Count, 1);
     return ok({ added: newMember });
+  }
+
+  // ── DELETE /groups/:id/members/:userId ───────────────────────────────
+  if (route === "DELETE /groups/{id}/members/{userId}" && groupId && memberUserId) {
+    // 1. Get Group and Expenses to check balances
+    const [groupRes, expensesRes] = await Promise.all([
+      ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
+      ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" },
+      })),
+    ]);
+
+    const group = groupRes.Item as Group;
+    if (!group) return err("Group not found", 404);
+
+    // 2. Find member index in the denormalized list
+    const memberIndex = group.members.findIndex(m => m.userId === memberUserId);
+    if (memberIndex === -1) return err("Member not found in group", 404);
+
+    // 3. Prevent removing the owner
+    if (group.members[memberIndex].role === "owner") {
+      return err("Cannot remove the group owner", 403);
+    }
+
+    // 4. Integrity check: Balance must be zero
+    const balances = calculateBalances(expensesRes.Items || [], group.members);
+    const userBalance = balances[memberUserId] || 0;
+    if (Math.abs(userBalance) > 0.01) {
+      return err(`Cannot remove member with unsettled balance (${userBalance.toFixed(2)})`, 400);
+    }
+
+    // 5. Atomic removal
+    await ddb.send(new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+            UpdateExpression: `REMOVE members[${memberIndex}] SET memberCount = memberCount - :one, updatedAt = :now`,
+            ConditionExpression: `members[${memberIndex}].userId = :uid`,
+            ExpressionAttributeValues: { 
+              ":one": 1, 
+              ":now": new Date().toISOString(),
+              ":uid": memberUserId 
+            },
+          },
+        },
+        {
+          Delete: {
+            TableName: TABLE,
+            Key: { pk: `USER#${memberUserId}`, sk: `GROUP_MEMBER#${groupId}` },
+          },
+        },
+      ],
+    }));
+
+    metrics.addMetric("MemberRemoved", MetricUnit.Count, 1);
+    return ok({ deleted: true });
+  }
+
+  // ── DELETE /groups/:id ────────────────────────────────────────────────────
+  if (route === "DELETE /groups/{id}" && groupId) {
+    const [groupRes, expensesRes] = await Promise.all([
+      ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
+      ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" },
+      })),
+    ]);
+
+    const group = groupRes.Item as Group;
+    if (!group) return err("Group not found", 404);
+
+    // 1. Must be owner
+    if (group.ownerId !== auth.userId) {
+      return err("Only the group owner can delete the group", 403);
+    }
+
+    const expenses = expensesRes.Items || [];
+
+    // 2. No pending expenses
+    const hasPending = expenses.some(e => e.status === "pending");
+    if (hasPending) {
+      return err("Cannot delete group with pending expenses. Please approve or reject them first.", 400);
+    }
+
+    // 3. No outstanding dues (balances must be zero)
+    const balances = calculateBalances(expenses, group.members);
+    const hasDues = Object.values(balances).some(b => Math.abs(b) > 0.01);
+    if (hasDues) {
+      return err("Cannot delete group with outstanding balances. All members must be settled.", 400);
+    }
+
+    // 4. Soft delete (set active = false)
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: "SET active = :false, updatedAt = :now, deletedAt = :now",
+      ExpressionAttributeValues: {
+        ":false": false,
+        ":now": new Date().toISOString(),
+      },
+      ConditionExpression: "attribute_exists(pk)",
+    }));
+
+    metrics.addMetric("GroupDeleted", MetricUnit.Count, 1);
+    return ok({ deleted: true });
   }
 
   return err("Route not found", 404);

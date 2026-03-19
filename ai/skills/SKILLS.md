@@ -36,7 +36,7 @@ costscrunch
 │   │   │   │   └── tracer.ts
 │   │   │   └── eventBridge.ts
 │   │   ├── integration/
-│   │   │   ├── analytics.api.test.ts
+│   │   │   ├── analytics.integration.test.ts
 │   │   │   ├── expenses.integration.test.ts
 │   │   │   └── receipts.integration.test.ts
 │   │   ├── setup/
@@ -194,14 +194,15 @@ IDs are always ULIDs (sortable, no UUID collisions). Use the `ulid` npm package.
 
 ### 3.2 Lambda handler pattern
 Every Lambda:
-1. Uses Hono as the HTTP router instead of Middy.
+1. Uses a standard router pattern with a `normalizeRoute` helper to bridge REST v1 (actual paths) and dev-server (route keys).
 2. Uses @aws-lambda-powertools/logger, tracer, and metrics.
-3. Uses Hono middleware for:
-    JSON body parsing
-    centralized error handling
-4. Uses hono/aws-lambda adapter to return APIGatewayProxyResultV2 (HTTP v2 format).
-5. Maps Cognito exception names to friendly messages (auth lambda).
-6. Never logs PII in production (use logger.info({ userId }) not { email }).
+3. Includes a `CORS_HEADERS` constant in all response helpers (`ok`, `err`) to pass browser preflight.
+4. Returns APIGatewayProxyResult (REST v1 format).
+5. Implements **Data Integrity Guards**:
+    - Atomic creation (e.g., Group + Member mapping in one `TransactWrite`).
+    - Block-on-Balance: Prevent member/group removal if balances are not settled ($0.00).
+6. Never logs PII in production.
+7. **Daily Changelogs**: Every session involving feature branch changes must conclude with a new entry in `changelog/YYYY-MM-DD.md` summarizing infra, backend, frontend, and test advancements.
 
 ### 3.3 Auth flow
 ```

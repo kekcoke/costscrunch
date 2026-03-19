@@ -236,3 +236,6 @@ ai/tmp/
 
 # Embeddings
 ai/embeddings/
+
+# Local Notes
+notes/

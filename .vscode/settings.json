@@ -64,5 +64,21 @@
   },
   "cSpell.words": [
     "localstack"
+  ],
+  // ─── YAML Settings ──────────────────────────────────────────────────────
+  "yaml.customTags": [
+    "!Ref scalar",
+    "!GetAtt scalar",
+    "!FindInMap scalar",
+    "!Sub scalar",
+    "!If scalar",
+    "!Equals scalar",
+    "!Or scalar",
+    "!And scalar",
+    "!Not scalar",
+    "!NoValue scalar",
+    "!Base64 scalar",
+    "!Cidr scalar"
   ]
+  
 }

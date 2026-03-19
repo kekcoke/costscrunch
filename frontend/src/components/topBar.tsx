@@ -6,7 +6,7 @@ interface ExtendedTopBarProps extends TopBarProps {
   onMenuClick?: () => void;
 }
 
-export default function TopBar({ activeTab, onScan, onAdd, onMenuClick }: ExtendedTopBarProps) {
+export default function TopBar({ onScan, onAdd, onMenuClick }: ExtendedTopBarProps) {
   return (
     <header
       style={{

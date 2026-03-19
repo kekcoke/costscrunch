@@ -20,12 +20,18 @@ const ddbMock = mockClient(DynamoDBDocumentClient);
 const sesMock = mockClient(SESClient);
 
 import { handler } from "../../src/lambdas/groups/index.js";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function makeEvent(overrides: Record<string, unknown> = {}) {
+  const routeKey = (overrides.routeKey as string) || "GET /groups";
+  // Extract path from routeKey for normalizeRoute if not provided
+  const path = (overrides.path as string) || routeKey.split(" ")[1] || "/groups";
+  
   return {
     version: "2.0",
-    routeKey: "GET /groups",
+    routeKey,
+    path,
     body: null,
     pathParameters: {},
     queryStringParameters: {},
@@ -35,9 +41,25 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
           claims: { sub: "user-owner", email: "owner@test.com", "cognito:groups": "" },
         },
       },
+      http: {
+        method: routeKey.split(" ")[0],
+        path: path,
+      }
     },
     ...overrides,
   };
+}
+
+/**
+ * Helper to simulate REST API v1 events (which use httpMethod/path instead of routeKey)
+ */
+function makeV1Event(method: string, path: string, overrides: Record<string, unknown> = {}) {
+  return makeEvent({
+    routeKey: undefined,
+    httpMethod: method,
+    path: path,
+    ...overrides
+  });
 }
 
 const SAMPLE_GROUP = {
@@ -151,6 +173,73 @@ describe("GET /groups/{id}", () => {
   });
 });
 
+// ── PATCH /groups/:id ─────────────────────────────────────────────────────────
+describe("PATCH /groups/{id}", () => {
+  it("updates allowed fields and returns 200", async () => {
+    ddbMock.on(UpdateCommand).resolves({ Attributes: { ...SAMPLE_GROUP, name: "New Name" } });
+
+    const res = await handler(
+      makeEvent({
+        routeKey: "PATCH /groups/{id}",
+        pathParameters: { id: "g1" },
+        body: JSON.stringify({ name: "New Name", color: "#000000" }),
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).name).toBe("New Name");
+    expect(ddbMock).toHaveReceivedCommand(UpdateCommand);
+  });
+
+  it("returns 400 when no valid fields provided", async () => {
+    const res = await handler(
+      makeEvent({
+        routeKey: "PATCH /groups/{id}",
+        pathParameters: { id: "g1" },
+        body: JSON.stringify({ invalidField: "foo" }),
+      }) as any
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/valid fields/);
+  });
+});
+
+// ── Path Normalization (REST API v1 Support) ──────────────────────────────────
+describe("Path Normalization", () => {
+  it("correctly routes GET /groups/g1 (REST v1 style)", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
+
+    // In REST v1, event.path is the actual path, routeKey is missing
+    const res = await handler(makeV1Event("GET", "/groups/g1") as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).groupId).toBe("g1");
+  });
+
+  it("correctly routes GET /groups/g1/balances", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+    const res = await handler(makeV1Event("GET", "/groups/g1/balances") as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty("balances");
+  });
+
+  it("correctly routes POST /groups/g1/members", async () => {
+    ddbMock.on(TransactWriteCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({});
+
+    const res = await handler(
+      makeV1Event("POST", "/groups/g1/members", {
+        body: JSON.stringify({ email: "test@test.com" })
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
 // ── Balance / Debt Minimization Algorithm ─────────────────────────────────────
 // These tests target the pure algorithm exported from the handler module.
 // We invoke GET /groups/{id}/balances with seeded DDB responses.
@@ -168,9 +257,9 @@ describe("GET /groups/{id}/balances — debt minimization", () => {
       .on(QueryCommand).resolves({ Items: [] });
 
     const res = await handler(makeBalancesEvent() as any);
+    expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
 
-    expect(res.statusCode).toBe(200);
     expect(body.settlements).toHaveLength(0);
   });
 
@@ -348,5 +437,130 @@ describe("POST /groups/{id}/members", () => {
 
     // Should still succeed — email failure is caught with logger.warn
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── DELETE /groups/:id/members/:userId ───────────────────────────────────────
+describe("DELETE /groups/{id}/members/{userId}", () => {
+  const event = makeEvent({
+    routeKey: "DELETE /groups/{id}/members/{userId}",
+    pathParameters: { id: "g1", userId: "user-b" }
+  });
+
+  it("successfully removes a member with zero balance", async () => {
+    ddbMock
+      .on(GetCommand).resolves({ Item: SAMPLE_GROUP })
+      .on(QueryCommand).resolves({ Items: [] }) // No expenses = zero balance
+      .on(TransactWriteCommand).resolves({});
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).deleted).toBe(true);
+    expect(ddbMock).toHaveReceivedCommand(TransactWriteCommand);
+  });
+
+  it("fails to remove the group owner", async () => {
+    const ownerEvent = makeEvent({
+      routeKey: "DELETE /groups/{id}/members/{userId}",
+      pathParameters: { id: "g1", userId: "user-a" } // Alice is owner in SAMPLE_GROUP
+    });
+
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
+
+    const res = await handler(ownerEvent as any);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toMatch(/owner/i);
+  });
+
+  it("fails if member has unsettled balance", async () => {
+    // Bob owes $20
+    const expenses = [{
+      pk: "GROUP#g1", sk: "EXPENSE#e1",
+      ownerId: "user-a", amount: 60, status: "approved",
+      splits: [
+        { userId: "user-a", amount: 20 },
+        { userId: "user-b", amount: 20 },
+        { userId: "user-c", amount: 20 },
+      ],
+    }];
+
+    ddbMock
+      .on(GetCommand).resolves({ Item: SAMPLE_GROUP })
+      .on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/unsettled balance/i);
+  });
+
+  it("returns 404 if group does not exist", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: undefined });
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+// ── DELETE /groups/:id ───────────────────────────────────────────────────────
+describe("DELETE /groups/{id}", () => {
+  const groupId = "g1";
+  const event = makeEvent({
+    routeKey: "DELETE /groups/{id}",
+    pathParameters: { id: groupId },
+    requestContext: {
+      authorizer: { jwt: { claims: { sub: "user-owner" } } }
+    }
+  });
+
+  it("successfully soft-deletes group if requester is owner and balances are zero", async () => {
+    ddbMock
+      .on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } })
+      .on(QueryCommand).resolves({ Items: [] })
+      .on(UpdateCommand).resolves({});
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).deleted).toBe(true);
+    
+    // Check if UpdateCommand was called with active: false
+    expect(ddbMock).toHaveReceivedCommandWith(UpdateCommand, {
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+      UpdateExpression: expect.stringContaining("active = :false"),
+    });
+  });
+
+  it("fails if requester is not the owner", async () => {
+    const nonOwnerEvent = makeEvent({
+      routeKey: "DELETE /groups/{id}",
+      pathParameters: { id: groupId },
+      requestContext: {
+        authorizer: { jwt: { claims: { sub: "user-stranger" } } }
+      }
+    });
+
+    ddbMock.on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } });
+
+    const res = await handler(nonOwnerEvent as any);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toMatch(/owner/i);
+  });
+
+  it("fails if there are outstanding balances", async () => {
+    const expenses = [{
+      pk: "GROUP#g1", sk: "EXPENSE#e1",
+      ownerId: "user-a", amount: 60, status: "approved",
+      splits: [
+        { userId: "user-a", amount: 20 },
+        { userId: "user-b", amount: 20 },
+        { userId: "user-c", amount: 20 },
+      ],
+    }];
+
+    ddbMock
+      .on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } })
+      .on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(event as any);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/outstanding balances/i);
   });
 });

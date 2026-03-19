@@ -1,0 +1,22 @@
+.groups-container {
+  animation: fadeUp 0.4s both;
+}
+
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .recent-expenses-desktop {
+    display: none;
+  }
+  .group-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .page-header h1 {
+    font-size: 20px !important;
+  }
+}

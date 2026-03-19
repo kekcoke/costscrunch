@@ -169,7 +169,7 @@ export function initSystemThemeListener() {
   if (typeof window === "undefined" || systemThemeListener) return;
 
   const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  systemThemeListener = (e: MediaQueryListEvent) => {
+  systemThemeListener = () => {
     const state = useThemeStore.getState();
     if (state.mode === "system") {
       // Trigger re-render by setting mode to itself (forces subscribers to update)
