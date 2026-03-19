@@ -395,7 +395,7 @@ sequenceDiagram
 | Feature | Local (Opt 2/3) | Production (AWS) |
 | :--- | :--- | :--- |
 | **API Version** | **REST API v1** (Hierarchical). | **HTTP API v2** (Flat/Global). |
-| **CORS Enforce** | **Dual-Layer Required**: Gateway Mock + Lambda Headers. | **Single-Layer**: Usually handled by API Gateway "CORS Support" or CloudFront Policies. |
+| **CORS Enforce** | **Centralized (Phase 0)**: Handled by Express middleware + `lambdaAdapter` header stripping. | **Single-Layer**: Handled by CloudFront `ResponseHeadersPolicy` + API Gateway `corsPreflight`. |
 | **Authorizer** | **Synthetic**: `MOCK_AUTH` wrapper in Lambda or Adapter. | **Managed**: Real Cognito JWT validation, MFA, and Token revocation. |
 | **Routing** | **Manual Bridge**: Requires `normalizeRoute()` to map path segments to templates. | **Native**: AWS handles parameter mapping from URL patterns automatically. |
 | **IAM/WAF** | **CRUD-Only**: Policies exist but are not enforced in LocalStack Free. | **Active**: Strict enforcement of Least Privilege and OWASP Rate Limiting. |
@@ -508,6 +508,7 @@ npx vitest run __tests__/localstack             # Service-level LocalStack tests
 cd backend
 npm run test:ut                                 # unit tests
 npm run test:ig                                 # integration tests (requires LocalStack)
+npx vitest run __tests__/integration/cors.integration.test.ts # CORS verification (mocked handlers)
 
 # Frontend tests
 cd frontend && npx vitest
