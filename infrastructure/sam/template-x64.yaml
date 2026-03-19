@@ -25,24 +25,23 @@ Globals:
     Architectures:
       - x86_64
     Timeout: 30
-  HttpApi:
-    CorsConfiguration:
-      AllowOrigins:
-        - "*"
-      AllowMethods:
-        - GET
-        - POST
-        - PATCH
-        - DELETE
-        - OPTIONS
-      AllowHeaders:
-        - "*"
-      MaxAge: 3600
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization,X-Requested-With,Accept,Origin'"
+      AllowOrigin: "'*'"
+      MaxAge: "'3600'"
+    GatewayResponses:
+      DEFAULT_4XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
+      DEFAULT_5XX:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Origin: "'*'"
 
 Resources:
-  LocalApi:
-    Type: AWS::Serverless::HttpApi
-
   GroupsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -52,57 +51,25 @@ Resources:
         Sourcemap: true
         Target: es2022
         EntryPoints:
-          - src/lambdas/_local/groups.ts
+          - src/lambdas/groups/index.ts
     Properties:
       CodeUri: ../../backend
-      Handler: src/lambdas/_local/groups.handler
+      Handler: index.handler
       Environment:
         Variables:
           TABLE_NAME_MAIN: !Ref TableNameMain
           FROM_EMAIL: !Ref FromEmail
       Events:
-        ListGroups:
-          Type: HttpApi
+        GroupsRoot:
+          Type: Api
           Properties:
             Path: /groups
-            Method: GET
-            ApiId: !Ref LocalApi
-        CreateGroup:
-          Type: HttpApi
+            Method: ANY
+        GroupsProxy:
+          Type: Api
           Properties:
-            Path: /groups
-            Method: POST
-            ApiId: !Ref LocalApi
-        GetGroup:
-          Type: HttpApi
-          Properties:
-            Path: /groups/{id}
-            Method: GET
-            ApiId: !Ref LocalApi
-        UpdateGroup:
-          Type: HttpApi
-          Properties:
-            Path: /groups/{id}
-            Method: PATCH
-            ApiId: !Ref LocalApi
-        GetGroupBalances:
-          Type: HttpApi
-          Properties:
-            Path: /groups/{id}/balances
-            Method: GET
-            ApiId: !Ref LocalApi
-        AddGroupMember:
-          Type: HttpApi
-          Properties:
-            Path: /groups/{id}/members
-            Method: POST
-            ApiId: !Ref LocalApi
-        RemoveGroupMember:
-          Type: HttpApi
-          Properties:
-            Path: /groups/{id}/members/{userId}
-            Method: DELETE
-            ApiId: !Ref LocalApi
+            Path: /groups/{proxy+}
+            Method: ANY
 
   ExpensesFunction:
     Type: AWS::Serverless::Function
@@ -113,44 +80,24 @@ Resources:
         Sourcemap: true
         Target: es2022
         EntryPoints:
-          - src/lambdas/_local/expenses.ts
+          - src/lambdas/expenses/index.ts
     Properties:
       CodeUri: ../../backend
-      Handler: src/lambdas/_local/expenses.handler
+      Handler: index.handler
       Environment:
         Variables:
           TABLE_NAME_MAIN: !Ref TableNameMain
       Events:
-        ListExpenses:
-          Type: HttpApi
+        ExpensesRoot:
+          Type: Api
           Properties:
             Path: /expenses
-            Method: GET
-            ApiId: !Ref LocalApi
-        CreateExpense:
-          Type: HttpApi
+            Method: ANY
+        ExpensesProxy:
+          Type: Api
           Properties:
-            Path: /expenses
-            Method: POST
-            ApiId: !Ref LocalApi
-        GetExpense:
-          Type: HttpApi
-          Properties:
-            Path: /expenses/{id}
-            Method: GET
-            ApiId: !Ref LocalApi
-        UpdateExpense:
-          Type: HttpApi
-          Properties:
-            Path: /expenses/{id}
-            Method: PATCH
-            ApiId: !Ref LocalApi
-        DeleteExpense:
-          Type: HttpApi
-          Properties:
-            Path: /expenses/{id}
-            Method: DELETE
-            ApiId: !Ref LocalApi
+            Path: /expenses/{proxy+}
+            Method: ANY
 
   ReceiptsFunction:
     Type: AWS::Serverless::Function
@@ -161,10 +108,10 @@ Resources:
         Sourcemap: true
         Target: es2022
         EntryPoints:
-          - src/lambdas/_local/receipts.ts
+          - src/lambdas/receipts/index.ts
     Properties:
       CodeUri: ../../backend
-      Handler: src/lambdas/_local/receipts.handler
+      Handler: index.handler
       Environment:
         Variables:
           TABLE_NAME_MAIN: !Ref TableNameMain
@@ -172,18 +119,16 @@ Resources:
           TEXTRACT_SNS_TOPIC_ARN: !Ref TextractSnsTopicArn
           TEXTRACT_ROLE_ARN: !Ref TextractRoleArn
       Events:
-        UploadUrl:
-          Type: HttpApi
+        ReceiptsRoot:
+          Type: Api
           Properties:
-            Path: /receipts/upload-url
-            Method: POST
-            ApiId: !Ref LocalApi
-        GetScanStatus:
-          Type: HttpApi
+            Path: /receipts
+            Method: ANY
+        ReceiptsProxy:
+          Type: Api
           Properties:
-            Path: /receipts/{expenseId}/scan
-            Method: GET
-            ApiId: !Ref LocalApi
+            Path: /receipts/{proxy+}
+            Method: ANY
 
   AnalyticsFunction:
     Type: AWS::Serverless::Function
@@ -194,29 +139,21 @@ Resources:
         Sourcemap: true
         Target: es2022
         EntryPoints:
-          - src/lambdas/_local/analytics.ts
+          - src/lambdas/analytics/index.ts
     Properties:
       CodeUri: ../../backend
-      Handler: src/lambdas/_local/analytics.handler
+      Handler: index.handler
       Environment:
         Variables:
           TABLE_NAME_MAIN: !Ref TableNameMain
       Events:
-        Summary:
-          Type: HttpApi
+        AnalyticsRoot:
+          Type: Api
           Properties:
-            Path: /analytics/summary
-            Method: GET
-            ApiId: !Ref LocalApi
-        Trends:
-          Type: HttpApi
+            Path: /analytics
+            Method: ANY
+        AnalyticsProxy:
+          Type: Api
           Properties:
-            Path: /analytics/trends
-            Method: GET
-            ApiId: !Ref LocalApi
-        ChartData:
-          Type: HttpApi
-          Properties:
-            Path: /analytics/chartData
-            Method: GET
-            ApiId: !Ref LocalApi
+            Path: /analytics/{proxy+}
+            Method: ANY
