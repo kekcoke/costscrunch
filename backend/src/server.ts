@@ -1,16 +1,29 @@
 import express, { Request, Response } from 'express';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 import bodyParser from 'body-parser';
 import { rawHandler as expensesHandler } from './lambdas/expenses/index.js';
 import { handler as groupsHandler } from './lambdas/groups/index.js';
 import { handler as analyticsHandler } from './lambdas/analytics/index.js';
 import { ulid } from 'ulid';
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Middleware
-app.use(cors());
+// ── CORS — single source of truth for local dev (mirrors CDK CORS_CONFIG) ─────
+// Production: CloudFront ResponseHeadersPolicy handles CORS.
+// SAM local: template-arm.yaml Globals.Api.Cors handles CORS.
+// Express local (this file): handles CORS via middleware.
+const CORS_CONFIG: CorsOptions & {
+  methods: string[];
+  allowedHeaders: string[];
+} = {
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Idempotency-Key"],
+  maxAge: 86400,
+};
+
+app.use(cors(CORS_CONFIG));
 app.use(bodyParser.json());
 
 // Lambda adapter for API Gateway V2 Proxy Events and Middleware
@@ -55,9 +68,26 @@ const lambdaAdapter = (handler: any, routeKeyPattern: string) =>
       
       const responseBody = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
       
+      // Strip CORS headers from Lambda response — let Express middleware be the authority
+      const { "Access-Control-Allow-Origin": _,
+              "Access-Control-Allow-Methods": __,
+              "Access-Control-Allow-Headers": ___,
+              "Access-Control-Allow-Credentials": ____,
+              "Access-Control-Expose-Headers": _____,
+              "Access-Control-Max-Age": ______,
+              ...safeHeaders
+      } = result.headers || {};
+
       res.status(result.statusCode || 200)
-         .set(result.headers || {})
-         .json(responseBody);
+         .set(safeHeaders);
+
+      // Ensure CORS headers are present on actual requests (mirroring CF policy)
+      if (req.headers.origin) {
+        res.setHeader("Access-Control-Allow-Methods", CORS_CONFIG.methods.join(", "));
+        res.setHeader("Access-Control-Allow-Headers", CORS_CONFIG.allowedHeaders.join(", "));
+      }
+
+      res.json(responseBody);
     } catch (error: any) {
       console.error(`[Local Server Error - ${requestId}]:`, error);
       res.status(500).json({ error: "Internal Server Error", message: error.message });
