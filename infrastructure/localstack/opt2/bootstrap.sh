@@ -180,6 +180,7 @@ deploy_function "ReceiptsFunction"    "index.handler"
 deploy_function "AnalyticsFunction"   "index.handler"
 deploy_function "SnsWebhookFunction"  "index.handler"
 deploy_function "WsNotifierFunction"  "index.handler"
+deploy_function "HealthFunction"      "index.handler"
 
 # ── SNS Subscription ────────────────────────────────────────────────────────
 echo "📦 Subscribing SnsWebhookFunction to Textract topic"
@@ -280,12 +281,13 @@ add_route /groups GroupsFunction
 add_route /expenses ExpensesFunction
 add_route /receipts ReceiptsFunction
 add_route /analytics AnalyticsFunction
+add_route /health    HealthFunction
 
 # ── CORS ────────────────────────────────────────────────────────────────────
 echo "📦 Configuring CORS"
 ALLOW_ORIGIN="*"
 ALLOW_METHODS="GET,POST,PUT,PATCH,DELETE,OPTIONS"
-ALLOW_HEADERS="Content-Type,Authorization,X-Requested-With,Accept,Origin"
+ALLOW_HEADERS="Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key"
 
 # Global Gateway Responses for CORS (Catch-all for 4xx/5xx)
 for TYPE in DEFAULT_4XX DEFAULT_5XX; do
@@ -324,9 +326,9 @@ for RES in $($AWS apigateway get-resources --rest-api-id "$API_ID" --query 'item
     --rest-api-id "$API_ID" --resource-id "$RES" \
     --http-method OPTIONS --status-code 200 \
     --response-parameters "{
-      \"method.response.header.Access-Control-Allow-Origin\": false,
-      \"method.response.header.Access-Control-Allow-Methods\": false,
-      \"method.response.header.Access-Control-Allow-Headers\": false
+      \"method.response.header.Access-Control-Allow-Origin\": true,
+      \"method.response.header.Access-Control-Allow-Methods\": true,
+      \"method.response.header.Access-Control-Allow-Headers\": true
     }" \
     2>/dev/null || true
 done

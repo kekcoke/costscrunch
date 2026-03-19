@@ -14,7 +14,7 @@ AWS="/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1"
 # Header values must be wrapped in single quotes inside the JSON string for static mapping
 ORIGIN="'*'"
 METHODS="'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
-HEADERS="'Content-Type,Authorization,X-Requested-With,Accept,Origin'"
+HEADERS="'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
 
 echo "🌐 Enforcing CORS for API: $API_ID"
 
