@@ -8,26 +8,37 @@
 import axios from "axios";
 import { ulid } from "ulid";
 
-// Construction of the REST API URL. LocalStack REST v1 requires the /restapis/ ID prefix.
 const getBaseUrl = () => {
-  const envUrl = process.env.VITE_API_URL || "";
-  if (envUrl.includes("/restapis/")) return envUrl;
+  const envUrl = process.env.VITE_API_URL;
+  // If VITE_API_URL is a full REST API path, use it.
+  if (envUrl && envUrl.includes("/restapis/")) return envUrl;
   
-  // Resolve from API_ID environment variable (passed during test run)
+  // Otherwise, require API_ID and build the path.
   const apiId = process.env.API_ID;
   if (!apiId) {
-    throw new Error("VITE_API_URL or API_ID environment variable must be set for integration tests.");
+    throw new Error("API_ID must be set if VITE_API_URL is not a full REST API endpoint (currently: " + envUrl + ")");
   }
   return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
 };
 
 const API_URL = getBaseUrl();
+console.log(`[TEST_INFO] Targeted API URL: ${API_URL}`);
 
 describe("Groups API Integration", () => {
   let createdGroupId: string;
-  // The local-user-uuid-123 is the simulated sub in server.ts lambdaAdapter
-  const TEST_USER_ID = "local-user-uuid-123";
-  const testGroupName = `Integration Test Group ${ulid()}`;
+  const testGroupName = `IntegTest-${ulid().slice(-6)}`; // Shorter unique name
+
+  // Cleanup after all tests
+  afterAll(async () => {
+    if (createdGroupId) {
+      try {
+        const delRes = await axios.delete(`${API_URL}/groups/${createdGroupId}`);
+        console.log(`[CLEANUP] Deleted group ${createdGroupId} (Status: ${delRes.status})`);
+      } catch (err: any) {
+        console.warn(`[CLEANUP] Failed to delete group ${createdGroupId}: ${err.response?.status || err.message}`);
+      }
+    }
+  });
 
   // 1. POST /groups
   it("should create a new group", async () => {
@@ -41,6 +52,7 @@ describe("Groups API Integration", () => {
     expect(res.data.name).toBe(testGroupName);
     expect(res.data.currency).toBe("EUR");
     createdGroupId = res.data.groupId;
+    expect(createdGroupId).toBeDefined();
   });
 
   // 2. GET /groups
@@ -49,7 +61,6 @@ describe("Groups API Integration", () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.data.items)).toBe(true);
     
-    // Check if our created group is in the memberships (as a GROUP_MEMBER record)
     const hasGroup = res.data.items.some((g: any) => g.groupId === createdGroupId);
     expect(hasGroup).toBe(true);
   });
@@ -86,7 +97,6 @@ describe("Groups API Integration", () => {
     expect(res.status).toBe(200);
     expect(res.data.added.email).toBe("guest@example.com");
 
-    // Verify member count updated in group profile
     const groupRes = await axios.get(`${API_URL}/groups/${createdGroupId}`);
     expect(groupRes.data.memberCount).toBe(2);
   });
