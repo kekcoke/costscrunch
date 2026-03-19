@@ -8,8 +8,18 @@
 import axios from "axios";
 import { ulid } from "ulid";
 
-// Use the full VITE_API_URL if provided (e.g. from setup/localstack.sh), otherwise fallback
-const API_URL = process.env.VITE_API_URL || "http://localhost:4566/restapis/rcw6iqm2hs/local/_user_request_";
+// Construction of the REST API URL. LocalStack REST v1 requires the /restapis/ ID prefix.
+// We prioritize a full URL if provided, otherwise we attempt to build it from known local defaults.
+const getBaseUrl = () => {
+  const envUrl = process.env.VITE_API_URL || "";
+  if (envUrl.includes("/restapis/")) return envUrl;
+  
+  // Default fallback for LocalStack REST v1 (rcw6iqm2hs is the current active ID)
+  const apiId = "rcw6iqm2hs"; 
+  return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
+};
+
+const API_URL = getBaseUrl();
 
 describe("Groups API Integration", () => {
   let createdGroupId: string;
