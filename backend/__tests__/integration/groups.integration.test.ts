@@ -9,13 +9,15 @@ import axios from "axios";
 import { ulid } from "ulid";
 
 // Construction of the REST API URL. LocalStack REST v1 requires the /restapis/ ID prefix.
-// We prioritize a full URL if provided, otherwise we attempt to build it from known local defaults.
 const getBaseUrl = () => {
   const envUrl = process.env.VITE_API_URL || "";
   if (envUrl.includes("/restapis/")) return envUrl;
   
-  // Default fallback for LocalStack REST v1 (rcw6iqm2hs is the current active ID)
-  const apiId = "rcw6iqm2hs"; 
+  // Resolve from API_ID environment variable (passed during test run)
+  const apiId = process.env.API_ID;
+  if (!apiId) {
+    throw new Error("VITE_API_URL or API_ID environment variable must be set for integration tests.");
+  }
   return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
 };
 

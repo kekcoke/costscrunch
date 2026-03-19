@@ -16,6 +16,9 @@ export function GroupsPage() {
 
   // View State
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "type" | "totalSpend" | "monthSpend">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,8 +53,7 @@ export function GroupsPage() {
     }
   };
 
-  // Index expenses by groupId once per expenses change rather than re-filtering
-  // inside every group's render pass.
+  // Index expenses by groupId once per expenses change
   const expensesByGroup = useMemo(() => {
     const map: Record<string, Expense[]> = {};
     for (const e of expenses) {
@@ -60,6 +62,41 @@ export function GroupsPage() {
     }
     return map;
   }, [expenses]);
+
+  // Filtering and Sorting logic
+  const filteredAndSortedGroups = useMemo(() => {
+    // Filter out potential null/undefined items and start with valid array
+    let result = groups.filter(g => !!g);
+
+    // Filter by name - uses safe check for both name and query
+    const query = (searchQuery || "").trim().toLowerCase();
+    if (query) {
+      result = result.filter(g => {
+        const name = (g.name || "").toLowerCase();
+        return name.includes(query);
+      });
+    }
+
+    // Sort by attribute
+    result.sort((a, b) => {
+      // Guard against null objects during sort (redundant but safe)
+      if (!a || !b) return 0;
+
+      let valA = a[sortBy] ?? "";
+      let valB = b[sortBy] ?? "";
+
+      if (typeof valA === "string") {
+        valA = valA.toLowerCase();
+        valB = (valB as string).toLowerCase();
+      }
+
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [groups, searchQuery, sortBy, sortOrder]);
 
   if (selectedGroupId) {
     return (
@@ -81,10 +118,45 @@ export function GroupsPage() {
         </div>
       </header>
 
+      {/* Filter & Sort Controls */}
+      <div className="filter-row" style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ flex: 1, minWidth: "200px" }}>
+          <input 
+            type="text" 
+            placeholder="Search groups by name..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: "14px" }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "12px", color: "var(--color-text-dim)", fontWeight: 500 }}>Sort by:</span>
+          <select 
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as any)}
+            style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: "14px", cursor: "pointer" }}
+          >
+            <option value="name">Name</option>
+            <option value="type">Type</option>
+            <option value="totalSpend">Total Spend</option>
+            <option value="monthSpend">Month Spend</option>
+          </select>
+          <button 
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+            style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "8px 12px", cursor: "pointer", color: "var(--color-text)", fontWeight: 600, fontSize: "14px", minWidth: "40px" }}
+            title={sortOrder === "asc" ? "Ascending" : "Descending"}
+          >
+            {sortOrder === "asc" ? "↑" : "↓"}
+          </button>
+        </div>
+      </div>
+
       <div className="group-grid">
         {groupsLoading && groups.length === 0 ? (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--color-text-dim)" }}>Loading groups…</div>
-        ) : groups.map((g) => (
+        ) : filteredAndSortedGroups.length === 0 ? (
+          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--color-text-dim)" }}>No groups found matching "{searchQuery}"</div>
+        ) : filteredAndSortedGroups.map((g) => (
           <div key={g.groupId} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "16px", borderBottom: "1px solid var(--color-border-dim)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
