@@ -41,7 +41,6 @@ export function GroupsPage() {
       await groupsApi.create({
         name: formData.name,
         color: formData.color,
-        members: 0, // Default to creator
       });
       setStatus("success");
       setTimeout(resetForm, 1500);
@@ -86,12 +85,12 @@ export function GroupsPage() {
         {groupsLoading && groups.length === 0 ? (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--color-text-dim)" }}>Loading groups…</div>
         ) : groups.map((g) => (
-          <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div key={g.groupId} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}30`, borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "16px", borderBottom: "1px solid var(--color-border-dim)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "18px" }}>{g.name}</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>{g.members} members · active</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>{g.memberCount} members · active</div>
                 </div>
                 <div style={{ background: g.color + "18", border: `1px solid ${g.color}33`, borderRadius: "6px", padding: "4px 8px", fontSize: "12px", fontWeight: 700, color: g.color }}>
                   {fmt(g.total)}
@@ -109,7 +108,7 @@ export function GroupsPage() {
                 </div>
               </div>
               <div className="recent-expenses-desktop">
-                {(expensesByGroup[g.id] ?? []).slice(0, 2).map((e) => (
+                {(expensesByGroup[g.groupId] ?? []).slice(0, 2).map((e) => (
                   <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--color-surface-2)" }}>
                     <div>
                       <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{e.merchant}</div>
@@ -120,7 +119,7 @@ export function GroupsPage() {
                 ))}
               </div>
               <button 
-                onClick={() => setSelectedGroupId(g.id)}
+                onClick={() => setSelectedGroupId(g.groupId)}
                 style={{ width: "100%", marginTop: "12px", background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
               >
                 View Group →

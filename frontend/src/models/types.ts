@@ -68,13 +68,33 @@ export interface Expense {
   notes?: string | null;
 }
 
-export interface Group {
-  id: string;
+export interface GroupMember {
+  userId: string;
   name: string;
-  members: number;
-  total: number;
+  email: string;
+  role: string;
+  joinedAt: string;
+  totalSpend: number;
+  balance: number;
+}
+
+export interface Group {
+  groupId: string;
+  name: string;
+  description?: string;
+  type: string;
+  ownerId: string;
+  color: string;
+  members: GroupMember[];
+  memberCount: number;
+  totalSpend: number;
+  monthSpend: number;
+  expenseCount: number;
+  createdAt: string;
+  updatedAt: string;
+  // UI-specific computed fields if handled by store/mapper
+  total: number; 
   myShare: number;
-  color: string;                 // hex color for UI
 }
 
 export interface ScanResult {

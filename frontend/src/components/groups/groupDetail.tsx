@@ -78,11 +78,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   if (loading) return <LoadingSpinner size="40px" />;
   if (!group) return <div>Group not found.</div>;
 
-  const mockMembers = [
-    { id: "1", name: "Alex Rivera", role: "Owner", avatar: "AR" },
-    { id: "2", name: "Jordan Smith", role: "Member", avatar: "JS" },
-    { id: "3", name: "Casey Chen", role: "Member", avatar: "CC" },
-  ];
+  const members = group.members || [];
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
@@ -94,7 +90,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
       <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "18px", border: `1px solid ${group.color}33`, marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "28px", margin: 0 }}>{group.name}</h2>
-          <div style={{ color: "var(--color-text-dim)", marginTop: "4px" }}>{group.members} Members Total</div>
+          <div style={{ color: "var(--color-text-dim)", marginTop: "4px" }}>{group.memberCount} Members Total</div>
         </div>
         
         <button 
@@ -114,14 +110,14 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
       <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "18px", border: "1px solid var(--color-border-dim)" }}>
         <h3 style={{ fontSize: "16px", marginBottom: "16px" }}>Group Members</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {mockMembers.map(m => (
-            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", background: "var(--color-surface-2)", borderRadius: "12px" }}>
+          {members.map(m => (
+            <div key={m.userId} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", background: "var(--color-surface-2)", borderRadius: "12px" }}>
               <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-indigo)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: "white" }}>
-                {m.avatar}
+                {m.name.charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{m.name}</div>
-                <div style={{ fontSize: "11px", color: "var(--color-text-dim)" }}>{m.role}</div>
+                <div style={{ fontSize: "11px", color: "var(--color-text-dim)" }}>{m.role.charAt(0).toUpperCase() + m.role.slice(1)}</div>
               </div>
               {m.role !== "Owner" && (
                 <button 
