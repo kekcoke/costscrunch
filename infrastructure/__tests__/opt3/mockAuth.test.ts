@@ -6,13 +6,20 @@ import { withMockAuth } from "@lambdas/_local/mockAuth";
 
 describe("withMockAuth", () => {
   const originalMockAuth = process.env.MOCK_AUTH;
+  const originalEnvironment = process.env.ENVIRONMENT;
 
   beforeEach(() => {
     process.env.MOCK_AUTH = "true";
+    process.env.ENVIRONMENT = "dev";
   });
 
   afterAll(() => {
     process.env.MOCK_AUTH = originalMockAuth;
+    if (originalEnvironment === undefined) {
+      delete process.env.ENVIRONMENT;
+    } else {
+      process.env.ENVIRONMENT = originalEnvironment;
+    }
   });
 
   it("should inject fake authorizer claims when MOCK_AUTH=true and no claims exist", async () => {
@@ -111,5 +118,99 @@ describe("withMockAuth", () => {
     const wrapped = withMockAuth(handler);
 
     await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow("DynamoDB error");
+  });
+
+  // ─── OWASP ASVS v4.0 V13.1 — runtime guard tests ───────────────────────────
+
+  describe("runtime guard: MOCK_AUTH blocked outside dev", () => {
+    it("should throw when MOCK_AUTH=true and ENVIRONMENT=prod", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "prod";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow(
+        /MOCK_AUTH is enabled in a non-dev environment/,
+      );
+      expect(handler).not.toHaveBeenCalled();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should throw when MOCK_AUTH=true and ENVIRONMENT=staging", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "staging";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow(
+        /MOCK_AUTH is enabled in a non-dev environment/,
+      );
+      expect(handler).not.toHaveBeenCalled();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should throw when MOCK_AUTH=true and ENVIRONMENT is an unexpected value", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "qa";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow(
+        /MOCK_AUTH is enabled in a non-dev environment/,
+      );
+      expect(handler).not.toHaveBeenCalled();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should allow MOCK_AUTH=true when ENVIRONMENT=dev", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "dev";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).resolves.toEqual({ statusCode: 200 });
+      expect(handler).toHaveBeenCalledOnce();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should not throw when MOCK_AUTH=false regardless of ENVIRONMENT", async () => {
+      process.env.MOCK_AUTH = "false";
+      process.env.ENVIRONMENT = "prod";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).resolves.toEqual({ statusCode: 200 });
+      expect(handler).toHaveBeenCalledOnce();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should not throw when MOCK_AUTH is unset regardless of ENVIRONMENT", async () => {
+      delete process.env.MOCK_AUTH;
+      process.env.ENVIRONMENT = "prod";
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = withMockAuth(handler);
+
+      await expect(wrapped({ requestContext: {} }, {})).resolves.toEqual({ statusCode: 200 });
+      expect(handler).toHaveBeenCalledOnce();
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should include the current ENVIRONMENT value in the error message", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "staging";
+      const wrapped = withMockAuth(vi.fn());
+
+      await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow("ENVIRONMENT=staging");
+      delete process.env.ENVIRONMENT;
+    });
+
+    it("should reference OWASP ASVS v4.0 control V13.1 in the error message", async () => {
+      process.env.MOCK_AUTH = "true";
+      process.env.ENVIRONMENT = "prod";
+      const wrapped = withMockAuth(vi.fn());
+
+      await expect(wrapped({ requestContext: {} }, {})).rejects.toThrow("V13.1");
+      delete process.env.ENVIRONMENT;
+    });
   });
 });
