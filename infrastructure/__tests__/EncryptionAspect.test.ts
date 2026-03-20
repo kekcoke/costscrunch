@@ -3,6 +3,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { CostsCrunchStack } from "../stacks/CostsCrunchStack";
+import { buildStackConfig } from "../stacks/StackConfig";
 
 describe("EncryptionEnforcementAspect", () => {
   const env = { 
@@ -17,9 +18,11 @@ describe("EncryptionEnforcementAspect", () => {
 
   it("should pass for the current stack configuration", () => {
     const app = new cdk.App({ context: { isTest: "true" } });
+    const config = buildStackConfig(app, '123456789012', 'us-east-1');
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env: { account: '123456789012', region: 'us-east-1' }
+      env: { account: '123456789012', region: 'us-east-1' },
+      config
     });
 
     const annotations = Annotations.fromStack(stack);
@@ -28,9 +31,11 @@ describe("EncryptionEnforcementAspect", () => {
 
   it("should fail synthesis if an unencrypted bucket is added", () => {
     const app = new cdk.App({ context: { isTest: "true" } });
+    const config = buildStackConfig(app, '123456789012', 'us-east-1');
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env: { account: '123456789012', region: 'us-east-1' }
+      env: { account: '123456789012', region: 'us-east-1' },
+      config
     });
 
     // Add an unencrypted bucket (explicitly)
@@ -42,9 +47,11 @@ describe("EncryptionEnforcementAspect", () => {
 
   it("should fail synthesis if an unencrypted table is added", () => {
     const app = new cdk.App({ context: { isTest: "true" } });
+    const config = buildStackConfig(app, '123456789012', 'us-east-1');
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env: { account: '123456789012', region: 'us-east-1' }
+      env: { account: '123456789012', region: 'us-east-1' },
+      config
     });
 
     // Add an unencrypted table (L1 bypasses high-level defaults)
