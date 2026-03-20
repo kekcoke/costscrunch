@@ -62,10 +62,11 @@ costscrunch
 │   │   └── models/          # Frontend-specific type definitions
 │   └── vite.config.ts
 └── infrastructure/
-    ├── __tests__/           # REST v1 validation and Data compliance checks
+    ├── __tests__/           # Encryption compliance and StackConfig validation
     ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
     ├── sam/                 # Local emulation templates (REST v1 / ARM64)
     ├── stacks/              # CDK Infrastructure-as-Code definitions
+    ├── .env.test            # Mock variables for Vitest execution
     └── docker-compose.yml   # Multi-container orchestration (LocalStack base)
 ```
 
@@ -255,7 +256,7 @@ The preprocessing layer is designed for seamless backwards compatibility:
 | Edge | CloudFront + WAF OWASP rules + Shield |
 | Auth | Cognito JWT (RS256) + PKCE + MFA optional |
 | Network | VPC private subnets + VPC Endpoints (no internet for AWS APIs) |
-| Data | DynamoDB + S3 encrypted with KMS CMK |
+| Data | DynamoDB + S3 encrypted with KMS CMK (Rotation Enforced) |
 | Secrets | Secrets Manager + 30-day auto-rotation |
 | Audit | CloudTrail + GuardDuty + Security Hub |
 | Code | Semgrep SAST + npm audit + Gitleaks in CI |
@@ -509,7 +510,8 @@ npm run dev
 ```bash
 # Infrastructure tests
 cd infrastructure
-npm test                                        # all infra tests (opt3 runs, opt2 skips without LocalStack)
+npm test                                        # all infra tests (loads .env.test via setup.ts)
+npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)
 npx vitest run __tests__/localstack             # Service-level LocalStack tests

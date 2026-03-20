@@ -238,6 +238,18 @@ rowToExpense()  →  inferCategory()  →  batchWriteExpenses() (DynamoDB BatchW
 
 Chart switching (soon) uses React.startTransition so the old chart stays visible until the new one is ready.
 
+### 3.6 Troubleshooting & Documentation Protocol
+When performing feature tests or troubleshooting patches:
+1. **Command Logging**: Record the exact commands used to reproduce the failure (e.g., `cd infrastructure && npx vitest run __tests__/Specific.test.ts`).
+2. **Investigation Depth**: Systematically apply targeted tools (`grep`, `find`, `ls -R`, `jq`, `env`, `Annotations.fromStack`, log tracing, and `git diff`) to surface and resolve environment-specific issues (e.g., token resolution failures, config drift, variable misalignment, dependency inconsistencies).
+3. **Troubleshooting Summary**: Upon resolution, create a technical summary in `notes/YYYY-MM-DD-feature-context-tb.md`.
+    - **Problem Statement**: Describe the failure and error codes.
+    - **Commands Used**: List steps taken to identify and fix the issue.
+    - **Root Cause**: Explain why the issue occurred (e.g., direct string manipulation on CDK Tokens).
+    - **Final Solution**: Provide code snippets and verification results.
+4. **Knowledge Loop**: If a new pitfall is discovered, update section 6 of this document.
+
+
 ---
 
 ## 4. AI Prompting Patterns
