@@ -22,6 +22,7 @@ export default defineConfig({
     // Integration tests need longer timeouts
     testTimeout: 15_000,
     hookTimeout: 10_000,
+    setupFiles: ["__tests__/setup.ts"],
   },
   resolve: {
     alias: {

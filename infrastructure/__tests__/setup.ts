@@ -1,7 +1,10 @@
 // ─── Infrastructure Test Setup ──────────────────────────────────────────────
-// Vitest 4.x globalSetup runs in an isolated context — no beforeAll/afterAll.
-// Each test suite handles its own LocalStack health check via describe.skipIf.
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load test environment variables for CDK synthesis assertions
+config({ path: resolve(__dirname, "../.env.test") });
 
 export default function setup() {
-  // Intentionally empty — opt2 tests self-skip when LocalStack is unreachable
+  // Global setup logic if needed
 }
