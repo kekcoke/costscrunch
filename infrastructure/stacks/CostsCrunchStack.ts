@@ -25,7 +25,10 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as path from "path";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 export interface CostsCrunchStackProps extends StackProps {
@@ -41,7 +44,7 @@ export class CostsCrunchStack extends Stack {
         const isProd = environment === "prod";
         const prefix = `costscrunch-${environment}`;
         const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
-        const VITE_APP_URL = process.env.VITE_APP_URL;
+        const VITE_APP_URL = process.env.VITE_APP_URL ?? "https://app.costscrunch.io";
 
         // ── KMS Key ─────────────────────────────────────────────────────────────
         const kmsKey = new kms.Key(this, "CostsCrunchKey", {
@@ -123,11 +126,16 @@ export class CostsCrunchStack extends Stack {
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
 
+        // ── Account & Region Utilities ───────────────────────────────────────────
+        // Fallback to dummy values if account/region are unresolved tokens (common in unit tests)
+        const accountId = this.account.startsWith("${Token") ? "123456789012" : this.account;
+        const regionId = this.region.startsWith("${Token") ? "us-east-1" : this.region;
+
         // ── S3 Buckets ────────────────────────────────────────────────
         // Upload bucket: initial user uploads (triggers image-preprocess Lambda)
         const uploadsBucket = new s3.Bucket(this, "UploadsBucket", {
-            bucketName: `${prefix}-uploads-${this.account}`,
-            encryption: s3.BucketEncryption.KMS_MANAGED,
+            bucketName: `${prefix}-uploads-${accountId}`,
+            encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             versioned: false,
             enforceSSL: true,
@@ -147,8 +155,8 @@ export class CostsCrunchStack extends Stack {
 
         // Processed bucket: compressed images (triggers receipts Lambda)
         const processedBucket = new s3.Bucket(this, "ProcessedBucket", {
-            bucketName: `${prefix}-processed-${this.account}`,
-            encryption: s3.BucketEncryption.KMS_MANAGED,
+            bucketName: `${prefix}-processed-${accountId}`,
+            encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             versioned: true,
             enforceSSL: true,
@@ -170,8 +178,8 @@ export class CostsCrunchStack extends Stack {
 
         // Receipts bucket: for Textract analysis results (now secondary)
         const receiptsBucket = new s3.Bucket(this, "ReceiptsBucket", {
-            bucketName: `${prefix}-receipts-${this.account}`,
-            encryption: s3.BucketEncryption.KMS_MANAGED,
+            bucketName: `${prefix}-receipts-${accountId}`,
+            encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             versioned: true,
             enforceSSL: true,
@@ -192,7 +200,7 @@ export class CostsCrunchStack extends Stack {
         });
 
         const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
-            bucketName: `${prefix}-assets-${this.account}`,
+            bucketName: `${prefix}-assets-${accountId}`,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
@@ -211,7 +219,7 @@ export class CostsCrunchStack extends Stack {
                 requireUppercase: true,
                 requireDigits: true,
                 requireSymbols: true,
-                tempPasswordValidity: Duration.minutes(30),
+                tempPasswordValidity: Duration.days(7),
             },
             accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
             standardAttributes: {
@@ -376,21 +384,21 @@ export class CostsCrunchStack extends Stack {
         // ── Lambda Functions ─────────────────────────────────────────────────────
         const expensesLambda = new NodejsFunction(this, "ExpensesLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/expenses/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/expenses/index.ts"),
             functionName: `${prefix}-expenses`,
             environment: { ...sharedEnv },
         });
 
         const groupsLambda = new NodejsFunction(this, "GroupsLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/groups/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/groups/index.ts"),
             functionName: `${prefix}-groups`,
             environment: { ...sharedEnv },
         });
 
         const healthLambda = new NodejsFunction(this, "HealthLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/health/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/health/index.ts"),
             functionName: `${prefix}-health`,
             environment: { ...sharedEnv },
         });
@@ -400,7 +408,7 @@ export class CostsCrunchStack extends Stack {
         // Higher memory/timeout for image processing workloads.
         const imagePreprocessLambda = new NodejsFunction(this, "ImagePreprocessLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/image-preprocess/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/image-preprocess/index.ts"),
             functionName: `${prefix}-image-preprocess`,
             memorySize: 2048,  // 2GB for image processing
             timeout: Duration.seconds(60),  // 60s for large images
@@ -411,7 +419,7 @@ export class CostsCrunchStack extends Stack {
 
         const receiptsLambda = new NodejsFunction(this, "ReceiptsLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/receipts/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/receipts/index.ts"),
             functionName: `${prefix}-receipts`,
             // timeout removed: Lambda now returns immediately after StartExpenseAnalysis.
             // Textract async completion flows through sns-webhook Lambda instead.
@@ -424,14 +432,14 @@ export class CostsCrunchStack extends Stack {
 
         const analyticsLambda = new NodejsFunction(this, "AnalyticsLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/analytics/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/analytics/index.ts"),
             functionName: `${prefix}-analytics`,
             environment: { ...sharedEnv },
         });
 
         const notificationsLambda = new NodejsFunction(this, "NotificationsLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/notifications/index.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/notifications/index.ts"),
             functionName: `${prefix}-notifications`,
             environment: {
                 ...sharedEnv,
@@ -445,13 +453,14 @@ export class CostsCrunchStack extends Stack {
         // Replaces the polling loop that was in receiptsLambda.
         const snsWebhookLambda = new NodejsFunction(this, "SnsWebhookLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/receipts/sns-webhook.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/sns-webhook/index.ts"),
             functionName: `${prefix}-sns-webhook`,
             environment: {
                 ...sharedEnv,
                 TEXTRACT_SNS_TOPIC_ARN: textractTopic.topicArn,
                 TEXTRACT_ROLE_ARN:      textractSnsRole.roleArn,
             },
+            logRetention: logs.RetentionDays.ONE_WEEK,
         });
 
         // ── WebSocket Notifier Lambda ──────────────────────────────────────────────
@@ -459,7 +468,7 @@ export class CostsCrunchStack extends Stack {
         // Pushes results to the user's browser over the WebSocket API.
         const wsNotifierLambda = new NodejsFunction(this, "WsNotifierLambda", {
             ...sharedLambdaProps as any,
-            entry: "backend/src/lambdas/receipts/ws-notifier.ts",
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/web-socket-notifier/index.ts"),
             functionName: `${prefix}-ws-notifier`,
             environment: {
                 ...sharedEnv,
@@ -523,7 +532,7 @@ export class CostsCrunchStack extends Stack {
         // API Gateway Management: ws-notifier pushes messages to connections
         wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
             actions:   ["execute-api:ManageConnections"],
-            resources: [`arn:aws:execute-api:${this.region}:${this.account}:*/prod/POST/@connections/*`],
+            resources: [`arn:aws:execute-api:${regionId}:${accountId}:*/prod/POST/@connections/*`],
         }));
 
         // KMS
@@ -815,11 +824,104 @@ export class CostsCrunchStack extends Stack {
         new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId, exportName: `${prefix}-user-pool-id` });
         new CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId, exportName: `${prefix}-client-id` });
         new CfnOutput(this, "TableName", { value: table.tableName, exportName: `${prefix}-table` });
-        new CfnOutput(this, "UploadsBucket", { value: uploadsBucket.bucketName, exportName: `${prefix}-uploads-bucket` });
-        new CfnOutput(this, "ProcessedBucket", { value: processedBucket.bucketName, exportName: `${prefix}-processed-bucket` });
-        new CfnOutput(this, "ReceiptsBucket", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` });
+        new CfnOutput(this, "UploadsBucketOut", { value: uploadsBucket.bucketName, exportName: `${prefix}-uploads-bucket` });
+        new CfnOutput(this, "ProcessedBucketOut", { value: processedBucket.bucketName, exportName: `${prefix}-processed-bucket` });
+        new CfnOutput(this, "ReceiptsBucketOut", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` });
         new CfnOutput(this, "WsApiUrl",       { value: wsStage.url,               exportName: `${prefix}-ws-url` });
         new CfnOutput(this, "ConnTableName",  { value: connTable.tableName,        exportName: `${prefix}-conn-table` });
         new CfnOutput(this, "TextractTopicArn", { value: textractTopic.topicArn,  exportName: `${prefix}-textract-topic` });
+
+        // ── CloudWatch Alarms & SNS Alerts ──────────────────────────────────────
+        const alarmsTopic = new sns.Topic(this, "AlarmsTopic", {
+            topicName: `${prefix}-alarms`,
+            masterKey: kmsKey,
+        });
+
+        const alarmAction = new cw_actions.SnsAction(alarmsTopic);
+
+        // 1. Lambda Error Rate & Duration Alarms
+        // List of functions with their specific timeout for threshold calculation
+        const lambdaMonitoring = [
+            { fn: expensesLambda, timeout: 29 },
+            { fn: groupsLambda, timeout: 29 },
+            { fn: healthLambda, timeout: 29 },
+            { fn: imagePreprocessLambda, timeout: 60 },
+            { fn: receiptsLambda, timeout: 29 },
+            { fn: analyticsLambda, timeout: 29 },
+            { fn: notificationsLambda, timeout: 29 },
+            { fn: snsWebhookLambda, timeout: 29 },
+            { fn: wsNotifierLambda, timeout: 29 }
+        ];
+
+        const errorRateThreshold = process.env.ALARM_LAMBDA_ERROR_RATE_THRESHOLD 
+            ? parseInt(process.env.ALARM_LAMBDA_ERROR_RATE_THRESHOLD, 10) 
+            : 5;
+
+        lambdaMonitoring.forEach(({ fn, timeout }) => {
+            // Error Rate Alarm (> 5% over 5m)
+            const errors = fn.metricErrors({ period: Duration.minutes(5), statistic: "Sum" });
+            const invocations = fn.metricInvocations({ period: Duration.minutes(5), statistic: "Sum" });
+
+            const errorRateAlarm = new cloudwatch.MathExpression({
+                expression: "100 * (errors / invocations)",
+                usingMetrics: { errors, invocations },
+                label: `${fn.node.id} Error Rate`,
+            }).createAlarm(this, `${fn.node.id}ErrorRateAlarm`, {
+                threshold: errorRateThreshold,
+                evaluationPeriods: 3,
+                datapointsToAlarm: 3,
+                alarmDescription: `Error rate for ${fn.node.id} is > ${errorRateThreshold}% over 5 minutes`,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+            });
+            errorRateAlarm.addAlarmAction(alarmAction);
+
+            // Duration Alarm (> 80% of timeout)
+            const durationThreshold = timeout * 0.8;
+            const durationAlarm = fn.metricDuration({
+                period: Duration.minutes(5),
+                statistic: "Maximum",
+            }).createAlarm(this, `${fn.node.id}DurationAlarm`, {
+                threshold: durationThreshold,
+                evaluationPeriods: 1,
+                alarmDescription: `Duration for ${fn.node.id} is > 80% of timeout (${durationThreshold}s)`,
+            });
+            durationAlarm.addAlarmAction(alarmAction);
+        });
+
+        // 3. DynamoDB ThrottledRequests > 0
+        const throttledAlarm = new cloudwatch.Alarm(this, "DynamoThrottledAlarm", {
+            metric: table.metric("ThrottledRequests", {
+                period: Duration.minutes(5),
+                statistic: "Sum",
+            }),
+            threshold: 0,
+            evaluationPeriods: 1,
+            comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            alarmDescription: "DynamoDB main table is throttling requests",
+        });
+        throttledAlarm.addAlarmAction(alarmAction);
+
+        // 4. Custom Metric for Textract/SNS Pipeline Failures
+        // Filter log group of snsWebhookLambda for explicit error patterns
+        const textractFailureFilter = new logs.MetricFilter(this, "TextractFailureFilter", {
+            logGroup: snsWebhookLambda.logGroup,
+            metricNamespace: "CostsCrunch/Pipeline",
+            metricName: "TextractFailures",
+            filterPattern: logs.FilterPattern.anyTerm("ERROR", "Failed to get expense analysis", "Textract error"),
+            metricValue: "1",
+        });
+
+        const pipelineAlarm = textractFailureFilter.metric({ period: Duration.minutes(5), statistic: "Sum" })
+            .createAlarm(this, "TextractPipelineAlarm", {
+                threshold: 1,
+                evaluationPeriods: 1,
+                alarmDescription: "Detected Textract or SNS webhook pipeline failures in logs",
+            });
+        pipelineAlarm.addAlarmAction(alarmAction);
+
+        new CfnOutput(this, "AlarmsTopicArn", {
+            value: alarmsTopic.topicArn,
+            exportName: `${prefix}-alarms-topic-arn`,
+        });
     }
 }

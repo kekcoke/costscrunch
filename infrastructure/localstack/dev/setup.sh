@@ -10,7 +10,7 @@
 #   S3 buckets (receipts + assets) + encryption + CORS + lifecycle,
 #   Cognito MOCK — DynamoDB-backed substitute (Cognito is paid-tier only),
 #   SQS queues (scan-dlq, notif-dlq, notifications.fifo, ws-notifier-dlq),
-#   SNS topics (textract-completion), EventBridge bus + rules + archive,
+#   SNS topics (textract-completion, alarms), EventBridge bus + rules + archive,
 #   SSM parameters (including WS endpoint + Textract topic ARN), seed test data
 #
 # ── LocalStack free tier limitations relevant to this stack ──────────────────
@@ -513,7 +513,15 @@ TEXTRACT_TOPIC_ARN=$($AWS sns create-topic \
   --query "TopicArn" \
   --output text 2>/dev/null || echo "arn:aws:sns:us-east-1:000000000000:${PREFIX}-textract-completion")
 
+# Alarms topic — receives CloudWatch Alarm notifications
+ALARMS_TOPIC_ARN=$($AWS sns create-topic \
+  --name "${PREFIX}-alarms" \
+  --no-cli-pager \
+  --query "TopicArn" \
+  --output text 2>/dev/null || echo "arn:aws:sns:us-east-1:000000000000:${PREFIX}-alarms")
+
 echo "  ↳ Textract topic ARN: $TEXTRACT_TOPIC_ARN"
+echo "  ↳ Alarms topic ARN:   $ALARMS_TOPIC_ARN"
 echo "✅ SNS ready"
 
 # ── SSM Parameters ────────────────────────────────────────────────────────────
@@ -922,6 +930,7 @@ echo "  Receipts bucket:      $BUCKET_RECEIPTS_NAME"
 echo "  Assets bucket:        $BUCKET_ASSETS"
 echo "  EventBridge bus:      $EVENT_BUS_NAME"
 echo "  Textract SNS topic:   $TEXTRACT_TOPIC_ARN"
+echo "  Alarms SNS topic:     $ALARMS_TOPIC_ARN"
 echo "  Cognito mock:"
 echo "    pool ID:            $MOCK_POOL_ID"
 echo "    client ID:          $MOCK_CLIENT_ID"
