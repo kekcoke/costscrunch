@@ -36,6 +36,7 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 export interface CostsCrunchStackProps extends StackProps {
   environment: "dev" | "staging" | "prod";
   domainName?: string;
+  config?: StackConfig;
 }
 
 export class CostsCrunchStack extends Stack {
@@ -72,16 +73,14 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ─ VPC Interface Endpoints (keep traffic off the public internet) ───────────────
-        const interfaceServices = [
-            { id: "SSM", service: ec2.InterfaceVpcEndpointAwsService.SSM },
-            { id: "SecretsManager", service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER },
-            { id: "SQS", service: ec2.InterfaceVpcEndpointAwsService.SQS },
-            { id: "SNS", service: ec2.InterfaceVpcEndpointAwsService.SNS },
-            { id: "EventBridge", service: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE },
-        ];
-
-        for (const { id, service } of interfaceServices) {
-            new ec2.InterfaceVpcEndpoint(this, `Endpoint${id}`, 
+        for (const service of [
+            ec2.InterfaceVpcEndpointAwsService.SSM,
+            ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            ec2.InterfaceVpcEndpointAwsService.SQS,
+            ec2.InterfaceVpcEndpointAwsService.SNS,
+            ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
+        ]) {
+            new ec2.InterfaceVpcEndpoint(this, `Endpoint${service.name.replace(/\./g, "")}`, 
             {
                 vpc,
                 service,
@@ -132,11 +131,11 @@ export class CostsCrunchStack extends Stack {
 
         // ── Account & Region Utilities ───────────────────────────────────────────
         // Fallback to dummy values if account/region are unresolved tokens (common in unit tests)
-        const accountId = cdk.Token.isUnresolved(this.account) ? "123456789012" : (String(this.account).includes("${Token") ? "123456789012" : this.account);
-        const regionId = cdk.Token.isUnresolved(this.region) ? "us-east-1" : (String(this.region).includes("${Token") ? "us-east-1" : this.region);
+        const accountId = (this.account && !cdk.Token.isUnresolved(this.account) && !this.account.includes("${Token")) ? this.account : "123456789012";
+        const regionId = (this.region && !cdk.Token.isUnresolved(this.region) && !this.region.includes("${Token")) ? this.region : "us-east-1";
 
         // Global flag to check if we are in a test environment (synthesis without full context)
-        const isTest = cdk.Token.isUnresolved(this.account) || String(this.account).includes("${Token") || this.node.tryGetContext("isTest") === "true";
+        const isTest = cdk.Token.isUnresolved(this.account) || this.account.includes("${Token") || this.node.tryGetContext("isTest") === "true";
 
         // ── S3 Buckets ────────────────────────────────────────────────
         // Upload bucket: initial user uploads (triggers image-preprocess Lambda)
@@ -543,13 +542,7 @@ export class CostsCrunchStack extends Stack {
         // Bedrock: only snsWebhookLambda calls Claude (moved from receiptsLambda)
         snsWebhookLambda.addToRolePolicy(new iam.PolicyStatement({
             actions:   ["bedrock:InvokeModel"],
-            resources: [cdk.Stack.of(this).formatArn({
-                service: 'bedrock',
-                region: regionId,
-                account: '',
-                resource: 'foundation-model',
-                resourceName: 'anthropic.claude-haiku-4-5-20251001-v1:0'
-            })],
+            resources: [`arn:aws:bedrock:${regionId}::foundation-model/${BEDROCK_MODEL_ID.split('/').pop()}`],
         }));
 
         // SNS: textractTopic -> scanQueue -> snsWebhookLambda
@@ -608,9 +601,7 @@ export class CostsCrunchStack extends Stack {
 
         // Inject the WSS callback URL so ws-notifier can call @connections
         wsNotifierLambda.addEnvironment(
-            "WEBSOCKET_ENDPOINT", (wsStage.callbackUrl && !cdk.Token.isUnresolved(wsStage.callbackUrl)) 
-                ? wsStage.callbackUrl 
-                : `https://dummy-ws.execute-api.${regionId}.amazonaws.com/prod`
+            "WEBSOCKET_ENDPOINT", (wsStage.callbackUrl && !cdk.Token.isUnresolved(wsStage.callbackUrl)) ? wsStage.callbackUrl : "https://dummy-ws.execute-api.us-east-1.amazonaws.com/prod"
         );
 
         // ── EventBridge → Notifications Lambda ───────────────────────────────────
@@ -749,7 +740,7 @@ export class CostsCrunchStack extends Stack {
         // Helper to add authenticated routes
         const addRoute = (method: apigwv2.HttpMethod, path: string, fn: lambda.Function) => {
             // Use a stable ID that doesn't involve potential token interpolation
-            const integrationId = `${fn.node.id}-${method}-Integration`;
+            const integrationId = `${fn.node.id}${method}Integration`;
             api.addRoutes({
                 path, methods: [method],
                 integration: new apigwv2Integrations.HttpLambdaIntegration(integrationId, fn),
@@ -812,8 +803,8 @@ export class CostsCrunchStack extends Stack {
             additionalBehaviors: {
                 "/api/*": {
                 origin: new origins.HttpOrigin(
-                    isTest 
-                        ? `dummy-api.execute-api.${regionId}.amazonaws.com` 
+                    (isTest || cdk.Token.isUnresolved(api.apiId))
+                        ? `dummy.execute-api.${regionId}.amazonaws.com` 
                         : `${api.apiId}.execute-api.${regionId}.amazonaws.com`
                 ),
                 viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
@@ -858,7 +849,7 @@ export class CostsCrunchStack extends Stack {
         Aspects.of(this).add(new EncryptionEnforcementAspect());
 
         // ── Outputs ───────────────────────────────────────────────────────────────
-        new CfnOutput(this, "ApiUrl", { value: isTest ? "https://dummy-api.com" : api.url, exportName: `${prefix}-api-url` });
+        new CfnOutput(this, "ApiUrl", { value: (api.url && !cdk.Token.isUnresolved(api.url)) ? api.url : "https://dummy-api.com", exportName: `${prefix}-api-url` });
         new CfnOutput(this, "CdnUrl", { value: `https://${distribution.distributionDomainName}`, exportName: `${prefix}-cdn-url` });
         new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId, exportName: `${prefix}-user-pool-id` });
         new CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId, exportName: `${prefix}-client-id` });
@@ -866,9 +857,9 @@ export class CostsCrunchStack extends Stack {
         new CfnOutput(this, "UploadsBucketOut", { value: uploadsBucket.bucketName, exportName: `${prefix}-uploads-bucket` });
         new CfnOutput(this, "ProcessedBucketOut", { value: processedBucket.bucketName, exportName: `${prefix}-processed-bucket` });
         new CfnOutput(this, "ReceiptsBucketOut", { value: receiptsBucket.bucketName, exportName: `${prefix}-receipts-bucket` });
-        new CfnOutput(this, "WsApiUrl",       { value: (isTest || cdk.Token.isUnresolved(wsStage.url)) ? "https://dummy-ws.com" : wsStage.url, exportName: `${prefix}-ws-url` });
+        new CfnOutput(this, "WsApiUrl",       { value: wsStage.url,               exportName: `${prefix}-ws-url` });
         new CfnOutput(this, "ConnTableName",  { value: connTable.tableName,        exportName: `${prefix}-conn-table` });
-        new CfnOutput(this, "TextractTopicArn", { value: (isTest || cdk.Token.isUnresolved(textractTopic.topicArn)) ? "arn:aws:sns:us-east-1:123456789012:dummy" : textractTopic.topicArn, exportName: `${prefix}-textract-topic` });
+        new CfnOutput(this, "TextractTopicArn", { value: textractTopic.topicArn,  exportName: `${prefix}-textract-topic` });
 
         // ── CloudWatch Alarms & SNS Alerts ──────────────────────────────────────
         const alarmsTopic = new sns.Topic(this, "AlarmsTopic", {
@@ -979,6 +970,7 @@ export class CostsCrunchStack extends Stack {
  * CDK Aspect that ensures S3 Buckets and DynamoDB Tables have encryption configured.
  */
 import { IAspect } from "aws-cdk-lib";
+import { StackConfig } from "./StackConfig";
 
 class EncryptionEnforcementAspect implements IAspect {
     public visit(node: IConstruct): void {
