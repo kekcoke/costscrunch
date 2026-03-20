@@ -183,11 +183,19 @@ deploy_function "WsNotifierFunction"  "index.handler"
 deploy_function "HealthFunction"      "index.handler"
 
 # ── SNS Subscription ────────────────────────────────────────────────────────
-echo "📦 Subscribing SnsWebhookFunction to Textract topic"
+echo "📦 Subscribing ScanQueue to Textract topic"
 $AWS sns subscribe \
   --topic-arn "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion" \
-  --protocol lambda \
-  --notification-endpoint "arn:aws:lambda:us-east-1:000000000000:function:SnsWebhookFunction" \
+  --protocol sqs \
+  --notification-endpoint "arn:aws:sqs:us-east-1:000000000000:costscrunch-dev-scan-queue" \
+  2>/dev/null || true
+
+# ── Lambda Event Source Mapping (SQS -> Lambda) ──────────────────────────────
+echo "📦 Mapping ScanQueue to SnsWebhookFunction"
+$AWS lambda create-event-source-mapping \
+  --function-name "SnsWebhookFunction" \
+  --event-source-arn "arn:aws:sqs:us-east-1:000000000000:costscrunch-dev-scan-queue" \
+  --batch-size 1 \
   2>/dev/null || true
 
 # ── REST API (v1) ──────────────────────────────────────────────────────────

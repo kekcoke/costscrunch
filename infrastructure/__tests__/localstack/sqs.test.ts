@@ -18,6 +18,7 @@ const client = new SQSClient({
 });
 
 const PREFIX = "costscrunch-dev";
+const QUEUE_SCAN_QUEUE = `${PREFIX}-scan-queue`;
 const QUEUE_SCAN_DLQ = `${PREFIX}-scan-dlq`;
 const QUEUE_NOTIF_DLQ = `${PREFIX}-notif-dlq`;
 const QUEUE_NOTIFICATIONS = `${PREFIX}-notifications.fifo`;
@@ -34,6 +35,7 @@ describe("SQS Queues", () => {
       const queueUrls = response.QueueUrls ?? [];
 
       const expectedQueues = [
+        QUEUE_SCAN_QUEUE,
         QUEUE_SCAN_DLQ,
         QUEUE_NOTIF_DLQ,
         QUEUE_NOTIFICATIONS,
@@ -44,6 +46,30 @@ describe("SQS Queues", () => {
         const found = queueUrls.some((url) => url.includes(expectedQueue));
         expect(found).toBe(true);
       }
+    });
+  });
+
+  describe("Scan Queue", () => {
+    it("should have 120-second visibility timeout", async () => {
+      const response = await client.send(
+        new GetQueueAttributesCommand({
+          QueueUrl: await getQueueUrl(QUEUE_SCAN_QUEUE),
+          AttributeNames: ["VisibilityTimeout"],
+        })
+      );
+      expect(response.Attributes?.VisibilityTimeout).toBe("120");
+    });
+
+    it("should have DLQ configured with max receive count of 3", async () => {
+      const response = await client.send(
+        new GetQueueAttributesCommand({
+          QueueUrl: await getQueueUrl(QUEUE_SCAN_QUEUE),
+          AttributeNames: ["RedrivePolicy"],
+        })
+      );
+      const policy = JSON.parse(response.Attributes?.RedrivePolicy ?? "{}");
+      expect(Number(policy.maxReceiveCount)).toBe(3);
+      expect(policy.deadLetterTargetArn).toContain(QUEUE_SCAN_DLQ);
     });
   });
 
