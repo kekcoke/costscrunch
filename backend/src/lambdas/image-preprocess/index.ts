@@ -7,6 +7,7 @@ import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from 
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { S3Event } from "aws-lambda";
 import sharp from "sharp";
 import { Readable } from "stream";
@@ -73,7 +74,7 @@ function getContentType(key: string, mimeType?: string): SupportedMimeType | nul
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (event: S3Event) => {
+export const handler = withErrorHandler(async (event: S3Event) => {
   logger.info("Processing S3 event", { recordCount: event.Records.length });
 
   for (const record of event.Records) {
@@ -222,4 +223,4 @@ export const handler = async (event: S3Event) => {
   }
 
   logger.info("Image preprocessing complete");
-};
+});

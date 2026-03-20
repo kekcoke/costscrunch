@@ -9,6 +9,7 @@ import {
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
@@ -58,7 +59,7 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
+export const rawHandler = withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
   const auth = getAuth(event);
   const expenseId = event.pathParameters?.id;
@@ -270,4 +271,4 @@ export const rawHandler = async (event: ApiEvent & { httpMethod?: string; routeK
   }
 
   return err("Route not found", 404);
-};
+});

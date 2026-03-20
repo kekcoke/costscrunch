@@ -558,21 +558,24 @@ describe("emitScanCompleted — EventBridge event", () => {
 // handler — failure handling
 // ═══════════════════════════════════════════════════════════════════════════════
 describe("handler — failure handling", () => {
-  it("marks scan failed and re-throws when Textract GetExpenseAnalysis throws", async () => {
+  it("marks scan failed and returns 500 when Textract GetExpenseAnalysis throws", async () => {
     wireTextractError("Textract throttled");
 
-    await expect(handler(makeSnsEvent())).rejects.toThrow("Textract throttled");
+    const result = await handler(makeSnsEvent()) as any;
+    expect(result.statusCode).toBe(500);
+    expect(JSON.parse(result.body).error).toBe("Internal server error");
 
     expect(findUpdateByStatus("failed")).toBeDefined();
   });
 
-  it("marks scan failed and re-throws when the first DDB UpdateCommand throws", async () => {
+  it("marks scan failed and returns 500 when the first DDB UpdateCommand throws", async () => {
     textractSend.mockResolvedValue({ ExpenseDocuments: makeTextractDocs() });
     ddbDocSend
       .mockRejectedValueOnce(new Error("DDB throttle")) // scan=completed write
       .mockResolvedValue({});                           // writeScanFailed fallback
 
-    await expect(handler(makeSnsEvent())).rejects.toThrow("DDB throttle");
+    const result = await handler(makeSnsEvent()) as any;
+    expect(result.statusCode).toBe(500);
 
     expect(findUpdateByStatus("failed")).toBeDefined();
   });
@@ -580,7 +583,8 @@ describe("handler — failure handling", () => {
   it("does not emit EventBridge when the pipeline errors before emitScanCompleted", async () => {
     wireTextractError();
 
-    await expect(handler(makeSnsEvent())).rejects.toThrow();
+    const result = await handler(makeSnsEvent()) as any;
+    expect(result.statusCode).toBe(500);
 
     expect(ebSend).not.toHaveBeenCalled();
   });
