@@ -25,7 +25,7 @@
      ├── groups/         splits + balances + settlements
      ├── receipts/       S3 → Textract async triggering
      ├── image-preprocess/ Lossless image compression (Sharp)
-     ├── sns-webhook/    Textract completion → Claude AI → DB
+     ├── sns-webhook/    Textract completion → SQS → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends
      ├── notifications/  SES + Pinpoint push/SMS
@@ -167,7 +167,9 @@ User uploads file
       ↓
 [SNS] textract-completion topic receives job completion notification
       ↓
-[sns-webhook Lambda] Triggered by SNS
+[SQS] scan-queue (DLQ attached)
+      ↓
+[sns-webhook Lambda] Triggered by SQS
       ↓
 [Lambda] GetExpenseAnalysis (instant — job already done)
       ↓
