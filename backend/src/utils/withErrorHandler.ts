@@ -25,17 +25,18 @@ export const withErrorHandler = <T extends AnyHandler>(
   handler: T
 ): (
   event: Parameters<T>[0],
-  context: Context,
+  context?: Context,
   ...rest: any[]
 ) => Promise<Awaited<ReturnType<T>> | APIGatewayProxyStructuredResultV2> => {
-  return async (event: any, context: Context, ...rest: any[]) => {
+  return async (event: Parameters<T>[0], context?: Context, ...rest: any[]) => {
     const requestId =
       context?.awsRequestId ||
       (event && typeof event === 'object' && 'headers' in event ? (event as Record<string, any>).headers?.['x-request-id'] : undefined) ||
       'unknown';
 
     try {
-      return await handler(event, context, ...rest);
+      // Pass through context and rest parameters (like callback) if provided
+      return await handler(event, context as Context, ...rest);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       const statusCode = getStatusCode(err);
