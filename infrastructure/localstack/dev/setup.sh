@@ -476,6 +476,18 @@ $AWS sqs create-queue \
   --attributes MessageRetentionPeriod=1209600 \
   --no-cli-pager 2>/dev/null || true
 
+SCAN_DLQ_ARN="arn:aws:sqs:us-east-1:000000000000:${PREFIX}-scan-dlq"
+
+# scan-queue — main processing queue (SNS -> SQS -> Lambda)
+$AWS sqs create-queue \
+  --queue-name "${PREFIX}-scan-queue" \
+  --attributes '{
+    "VisibilityTimeout": "120",
+    "MessageRetentionPeriod": "1209600",
+    "RedrivePolicy": "{\"deadLetterTargetArn\":\"'"${SCAN_DLQ_ARN}"'\",\"maxReceiveCount\":\"3\"}"
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
 # notif-dlq — standard queue used as DLQ for notifications.fifo
 $AWS sqs create-queue \
   --queue-name "${PREFIX}-notif-dlq" \

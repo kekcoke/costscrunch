@@ -177,3 +177,38 @@ Resources:
           Properties:
             Path: /health
             Method: GET
+
+  SnsWebhookFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/sns-webhook/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Events:
+        SnsWebhookSQS:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ScanQueue.Arn
+            BatchSize: 1
+
+  ScanQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: costscrunch-dev-scan-queue
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ScanDlq.Arn
+        maxReceiveCount: 3
+
+  ScanDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: costscrunch-dev-scan-dlq
+      MessageRetentionPeriod: 1209600

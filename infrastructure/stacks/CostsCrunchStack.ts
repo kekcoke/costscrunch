@@ -21,6 +21,7 @@ import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sns from "aws-cdk-lib/aws-sns";
+import * as sns_subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -285,11 +286,26 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ── SQS Queues ───────────────────────────────────────────────────────────
-        const scanDlq = new sqs.Queue(this, "ScanDlq", {
-            queueName: `${prefix}-scan-dlq`,
+        // Generic DLQ Factory for reusability
+        const createDlq = (id: string, name: string) => new sqs.Queue(this, id, {
+            queueName: `${prefix}-${name}`,
             retentionPeriod: Duration.days(14),
             encryption: sqs.QueueEncryption.KMS,
             encryptionMasterKey: kmsKey,
+        });
+
+        const scanDlq = createDlq("ScanDlq", "scan-dlq");
+
+        // Main Processing Queue (SNS -> SQS -> Lambda)
+        const scanQueue = new sqs.Queue(this, "ScanQueue", {
+            queueName: `${prefix}-scan-queue`,
+            visibilityTimeout: Duration.seconds(120),
+            encryption: sqs.QueueEncryption.KMS,
+            encryptionMasterKey: kmsKey,
+            deadLetterQueue: {
+                queue: scanDlq,
+                maxReceiveCount: 3,
+            },
         });
 
         const notificationsDlq = new sqs.Queue(this, "NotifDlq", {
@@ -521,13 +537,9 @@ export class CostsCrunchStack extends Stack {
             resources: [`arn:aws:bedrock:${this.region}::${BEDROCK_MODEL_ID}`],
         }));
 
-        // SNS: snsWebhookLambda must be able to subscribe to the Textract topic
-        textractTopic.grantSubscribe(snsWebhookLambda);
-        snsWebhookLambda.addEventSource(
-            new lambdaEventSources.SnsEventSource(textractTopic, {
-                deadLetterQueue: scanDlq,
-            })
-        );
+        // SNS: textractTopic -> scanQueue -> snsWebhookLambda
+        textractTopic.addSubscription(new sns_subscriptions.SqsSubscription(scanQueue));
+        snsWebhookLambda.addEventSource(new lambdaEventSources.SqsEventSource(scanQueue));
 
         // API Gateway Management: ws-notifier pushes messages to connections
         wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
@@ -918,6 +930,16 @@ export class CostsCrunchStack extends Stack {
                 alarmDescription: "Detected Textract or SNS webhook pipeline failures in logs",
             });
         pipelineAlarm.addAlarmAction(alarmAction);
+
+        // 5. DLQ Message Count > 0
+        const dlqAlarm = new cloudwatch.Alarm(this, "ScanDlqAlarm", {
+            metric: scanDlq.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(5), statistic: "Sum" }),
+            threshold: 1,
+            evaluationPeriods: 1,
+            comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            alarmDescription: "Messages found in receipt processing DLQ",
+        });
+        dlqAlarm.addAlarmAction(alarmAction);
 
         new CfnOutput(this, "AlarmsTopicArn", {
             value: alarmsTopic.topicArn,
