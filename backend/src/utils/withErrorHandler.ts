@@ -2,7 +2,9 @@ import { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from 'aws-la
 import { logger, setLogContext } from './logger.js';
 import { ValidationError, NotFoundError, CircuitOpenError } from './errors.js';
 
-export const withErrorHandler = (handler: (event: any, context: Context) => Promise<any>) => {
+export const withErrorHandler = (
+  handler: (...args: any[]) => Promise<any>
+) => {
   return async (event: any, context: Context): Promise<APIGatewayProxyResultV2> => {
     const requestId = context?.awsRequestId || (event as any)?.headers?.['x-request-id'] || 'unknown';
     
