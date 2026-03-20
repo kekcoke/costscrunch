@@ -313,6 +313,7 @@ DEBUG_EVENT=
 POWERTOOLS_SERVICE_NAME=
 POWERTOOLS_METRICS_NAMESPACE=
 POWERTOOLS_LOGGER_LOG_EVENT=
+ALARM_LAMBDA_ERROR_RATE_THRESHOLD=
 
 # Data & Storage (DynamoDB & S3)
 TABLE_NAME_MAIN=
@@ -617,6 +618,7 @@ npm run deploy:dev
 | `TEST_USER_EMAIL` | Test user for E2E tests | CD |
 | `TEST_USER_PASSWORD` | Test user password | CD |
 | `SLACK_WEBHOOK_URL` | Slack notifications (optional) | CD |
+
 
 ### One-Time Setup
 
