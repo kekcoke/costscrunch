@@ -250,11 +250,26 @@ describe("pushToConnection", () => {
     expect(deleteArg.Key.sk).toBe("CONN#gone-conn-001");
   });
 
-  it("re-throws non-GoneException errors from PostToConnectionCommand", async () => {
+  it("returns 500 for non-GoneException errors from PostToConnectionCommand", async () => {
+    // Asserting on structured logs:
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     wireConnections(["conn-001"]);
     apiGwSend.mockRejectedValue(new Error("Internal API Gateway error"));
 
-    await expect(handler(makeEbEvent())).rejects.toThrow("Internal API Gateway error");
+    const result = await handler(makeEbEvent()) as any;
+    
+    expect(result.statusCode).toBe(500);
+    const body = JSON.parse(result.body);
+    expect(body.error).toBe("Internal server error");
+
+    // Verify structured log content
+    const logOutput = JSON.parse(consoleSpy.mock.calls[0][0]);
+    expect(logOutput.level).toBe("ERROR");
+    expect(logOutput.message).toContain("Handler error: Internal API Gateway error");
+    expect(logOutput.error.message).toBe("Internal API Gateway error");
+    
+    consoleSpy.mockRestore();
   });
 });
 
@@ -305,11 +320,13 @@ describe("handler — multi-tab fan-out", () => {
     expect(DeleteCommand).toHaveBeenCalledTimes(2);
   });
 
-  it("re-throws when an unexpected error occurs (not GoneException)", async () => {
+  it("returns 500 when an unexpected error occurs (not GoneException)", async () => {
     wireConnections(["conn-001"]);
     apiGwSend.mockRejectedValue(new Error("Unexpected APIGW failure"));
 
-    await expect(handler(makeEbEvent())).rejects.toThrow("Unexpected APIGW failure");
+    const result = await handler(makeEbEvent()) as any;
+    expect(result.statusCode).toBe(500);
+    expect(JSON.parse(result.body).error).toBe("Internal server error");
   });
 
   it("resolves without error when user has no active connections", async () => {
