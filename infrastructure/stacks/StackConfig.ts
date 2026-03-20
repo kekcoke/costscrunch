@@ -17,7 +17,9 @@ export interface StackConfig {
 export function buildStackConfig(scope: IConstruct, account?: string, region?: string): StackConfig {
   const isTestContext = scope.node.tryGetContext("isTest") === "true";
   
-  // CDK environment attributes can be tokens in unit tests
+  // CDK environment attributes can be tokens in unit tests.
+  // We use String() conversion to safely check if the value contains a token placeholder
+  // without triggering a resolution error on the Token object itself.
   const isAccountToken = !account || cdk.Token.isUnresolved(account) || String(account).includes("${Token");
   const isRegionToken = !region || cdk.Token.isUnresolved(region) || String(region).includes("${Token");
   

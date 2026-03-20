@@ -32,6 +32,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { buildStackConfig } from "./StackConfig";
 
 export interface CostsCrunchStackProps extends StackProps {
   environment: "dev" | "staging" | "prod";
@@ -46,6 +47,10 @@ export class CostsCrunchStack extends Stack {
         const { environment } = props;
         const isProd = environment === "prod";
         const prefix = `costscrunch-${environment}`;
+
+        // Build or use provided configuration (useful for unit tests/Vitest)
+        const config = props.config ?? buildStackConfig(this, this.account, this.region);
+
         const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
         const VITE_APP_URL = process.env.VITE_APP_URL ?? "https://app.costscrunch.io";
 
@@ -73,17 +78,18 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ─ VPC Interface Endpoints (keep traffic off the public internet) ───────────────
-        for (const service of [
-            ec2.InterfaceVpcEndpointAwsService.SSM,
-            ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            ec2.InterfaceVpcEndpointAwsService.SQS,
-            ec2.InterfaceVpcEndpointAwsService.SNS,
-            ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
-        ]) {
-            new ec2.InterfaceVpcEndpoint(this, `Endpoint${service.name.replace(/\./g, "")}`, 
-            {
+        const vpcServices = [
+            { svc: ec2.InterfaceVpcEndpointAwsService.SSM, id: "SSM" },
+            { svc: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, id: "SecretsManager" },
+            { svc: ec2.InterfaceVpcEndpointAwsService.SQS, id: "SQS" },
+            { svc: ec2.InterfaceVpcEndpointAwsService.SNS, id: "SNS" },
+            { svc: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE, id: "EventBridge" },
+        ];
+
+        for (const { svc, id } of vpcServices) {
+            new ec2.InterfaceVpcEndpoint(this, `Endpoint${id}`, {
                 vpc,
-                service,
+                service: svc,
                 privateDnsEnabled: true,
                 subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             });
@@ -130,12 +136,7 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ── Account & Region Utilities ───────────────────────────────────────────
-        // Fallback to dummy values if account/region are unresolved tokens (common in unit tests)
-        const accountId = (this.account && !cdk.Token.isUnresolved(this.account) && !this.account.includes("${Token")) ? this.account : "123456789012";
-        const regionId = (this.region && !cdk.Token.isUnresolved(this.region) && !this.region.includes("${Token")) ? this.region : "us-east-1";
-
-        // Global flag to check if we are in a test environment (synthesis without full context)
-        const isTest = cdk.Token.isUnresolved(this.account) || this.account.includes("${Token") || this.node.tryGetContext("isTest") === "true";
+        const { accountId, regionId, isTest } = config;
 
         // ── S3 Buckets ────────────────────────────────────────────────
         // Upload bucket: initial user uploads (triggers image-preprocess Lambda)
@@ -540,9 +541,10 @@ export class CostsCrunchStack extends Stack {
         }));
 
         // Bedrock: only snsWebhookLambda calls Claude (moved from receiptsLambda)
+        const modelId = isTest ? "claude-haiku" : BEDROCK_MODEL_ID.split('/').pop();
         snsWebhookLambda.addToRolePolicy(new iam.PolicyStatement({
             actions:   ["bedrock:InvokeModel"],
-            resources: [`arn:aws:bedrock:${regionId}::foundation-model/${BEDROCK_MODEL_ID.split('/').pop()}`],
+            resources: [`arn:aws:bedrock:${regionId}::foundation-model/${modelId}`],
         }));
 
         // SNS: textractTopic -> scanQueue -> snsWebhookLambda
@@ -600,9 +602,7 @@ export class CostsCrunchStack extends Stack {
         });
 
         // Inject the WSS callback URL so ws-notifier can call @connections
-        wsNotifierLambda.addEnvironment(
-            "WEBSOCKET_ENDPOINT", (wsStage.callbackUrl && !cdk.Token.isUnresolved(wsStage.callbackUrl)) ? wsStage.callbackUrl : "https://dummy-ws.execute-api.us-east-1.amazonaws.com/prod"
-        );
+        wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", config.webSocketEndpoint || wsStage.callbackUrl);
 
         // ── EventBridge → Notifications Lambda ───────────────────────────────────
         // ReceiptScanCompleted fires both the WebSocket notifier AND the
@@ -659,7 +659,7 @@ export class CostsCrunchStack extends Stack {
             defaultAction: { allow: {} },
             visibilityConfig: {
                 cloudWatchMetricsEnabled: true,
-                metricName: `${prefix.replace(/[^a-zA-Z0-9]/g, '')}WafMetric`,
+                metricName: isTest ? "TestWafMetric" : `${prefix.replace(/[^a-zA-Z0-9]/g, '')}WafMetric`,
                 sampledRequestsEnabled: true,
             },
             rules: [
