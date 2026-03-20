@@ -202,6 +202,8 @@ export class CostsCrunchStack extends Stack {
 
         const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
             bucketName: `${prefix}-assets-${accountId}`,
+            encryption: s3.BucketEncryption.KMS,
+            encryptionKey: kmsKey,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
@@ -830,6 +832,10 @@ export class CostsCrunchStack extends Stack {
             });
         }
 
+        // ── Security Guard: Enforce Encryption ──────────────────────────────────
+        // Ensure all S3 Buckets and DynamoDB Tables use KMS encryption.
+        Aspects.of(this).add(new EncryptionEnforcementAspect());
+
         // ── Outputs ───────────────────────────────────────────────────────────────
         new CfnOutput(this, "ApiUrl", { value: api.url!, exportName: `${prefix}-api-url` });
         new CfnOutput(this, "CdnUrl", { value: `https://${distribution.distributionDomainName}`, exportName: `${prefix}-cdn-url` });
@@ -945,5 +951,28 @@ export class CostsCrunchStack extends Stack {
             value: alarmsTopic.topicArn,
             exportName: `${prefix}-alarms-topic-arn`,
         });
+    }
+}
+
+/**
+ * CDK Aspect that ensures S3 Buckets and DynamoDB Tables have encryption configured.
+ */
+import { IAspect } from "aws-cdk-lib";
+
+class EncryptionEnforcementAspect implements IAspect {
+    public visit(node: IConstruct): void {
+        // Only check L1 constructs (CfnBucket, CfnTable) for explicit encryption config
+        if (node instanceof s3.CfnBucket) {
+            const encryption = node.bucketEncryption;
+            if (!encryption) {
+                Annotations.of(node).addError("S3 Bucket must have encryption configured.");
+            }
+        }
+        if (node instanceof dynamodb.CfnTable) {
+            const sse = node.sseSpecification;
+            if (!sse || (sse as any).sseEnabled === false) {
+                Annotations.of(node).addError("DynamoDB Table must have SSE encryption enabled.");
+            }
+        }
     }
 }
