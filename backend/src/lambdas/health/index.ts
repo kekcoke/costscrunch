@@ -8,7 +8,7 @@ export const handler = withErrorHandler(async (event: APIGatewayProxyEventV2): P
     body: JSON.stringify({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      stage: process.env.STAGE || 'unknown',
+      stage: process.env.ENVIRONMENT || 'unknown',
     }),
   };
 });
