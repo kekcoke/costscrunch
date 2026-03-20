@@ -1,11 +1,14 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import { Annotations } from "aws-cdk-lib/assertions";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { CostsCrunchStack } from "../stacks/CostsCrunchStack";
 
 describe("EncryptionEnforcementAspect", () => {
-  const env = { account: '123456789012', region: 'us-east-1' };
+  const env = { 
+    account: process.env.CDK_DEFAULT_ACCOUNT || '123456789012', 
+    region: process.env.CDK_DEFAULT_REGION || 'us-east-1' 
+  };
 
   beforeEach(() => {
     process.env.VITE_APP_URL = "https://staging.costscrunch.io";
@@ -13,22 +16,21 @@ describe("EncryptionEnforcementAspect", () => {
   });
 
   it("should pass for the current stack configuration", () => {
-    const app = new cdk.App();
+    const app = new cdk.App({ context: { isTest: "true" } });
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env
+      env: { account: '123456789012', region: 'us-east-1' }
     });
 
     const annotations = Annotations.fromStack(stack);
-    const errors = annotations.all().filter(a => a.level === 'error');
-    expect(errors.length).toBe(0);
+    annotations.hasNoError("*", Match.anyValue());
   });
 
   it("should fail synthesis if an unencrypted bucket is added", () => {
-    const app = new cdk.App();
+    const app = new cdk.App({ context: { isTest: "true" } });
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env
+      env: { account: '123456789012', region: 'us-east-1' }
     });
 
     // Add an unencrypted bucket (explicitly)
@@ -39,10 +41,10 @@ describe("EncryptionEnforcementAspect", () => {
   });
 
   it("should fail synthesis if an unencrypted table is added", () => {
-    const app = new cdk.App();
+    const app = new cdk.App({ context: { isTest: "true" } });
     const stack = new CostsCrunchStack(app, "TestStack", {
       environment: "staging",
-      env
+      env: { account: '123456789012', region: 'us-east-1' }
     });
 
     // Add an unencrypted table (L1 bypasses high-level defaults)
