@@ -19,6 +19,7 @@ import { Logger } from "@aws-lambda-powertools/logger";
 import { logger as internalLogger } from "../../utils/logger.js";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
 import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types.js";
@@ -88,7 +89,7 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
+export const handler = withErrorHandler(async (event: S3Event | APIGatewayProxyEventV2) => {
 
   logger.info("Received event raw shape", { 
     keys: Object.keys(event),
@@ -173,4 +174,4 @@ export const handler = async (event: S3Event | APIGatewayProxyEventV2) => {
     logger.info("Textract job started", { JobId });
     metrics.addMetric("TextractJobStarted", MetricUnit.Count, 1);
   }
-};
+});

@@ -8,6 +8,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { EventBridgeEvent } from "aws-lambda";
 
 const ses = new SESClient({});
@@ -81,7 +82,7 @@ const templates = {
 };
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (event: EventBridgeEvent<string, any>) => {
+export const handler = withErrorHandler(async (event: EventBridgeEvent<string, any>) => {
   const { "detail-type": detailType, detail } = event;
   logger.info("Notification event received", { detailType, detail });
 
@@ -171,4 +172,4 @@ export const handler = async (event: EventBridgeEvent<string, any>) => {
     metrics.addMetric("EmailFailed", MetricUnit.Count, 1);
     throw error; // re-throw to trigger DLQ
   }
-};
+});

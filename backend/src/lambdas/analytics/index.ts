@@ -3,6 +3,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { ApiEvent } from "../../shared/models/types.js";
 import type { 
   AnalyticsQuery, 
@@ -39,7 +40,7 @@ const getStartDate = (period: string = "month"): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
-export const handler = async (event: ApiEvent & { routeKey?: string }) => {
+export const handler = withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
   const route = event.routeKey || "";
   const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
   const q = (event.queryStringParameters || {}) as AnalyticsQuery;
@@ -158,4 +159,4 @@ export const handler = async (event: ApiEvent & { routeKey?: string }) => {
   }
 
   return { statusCode: 404, body: JSON.stringify({ error: "Not found" }) };
-};
+});

@@ -8,6 +8,7 @@ import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCom
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import { ulid } from "ulid";
 import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
 
@@ -126,7 +127,7 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = async (event: ApiEvent) => {
+export const handler = withErrorHandler(async (event: ApiEvent) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
   const method = event.httpMethod || event.requestContext?.http?.method || "";
   const path = event.path || event.requestContext?.http?.path || "";
@@ -475,4 +476,4 @@ export const handler = async (event: ApiEvent) => {
   }
 
   return err("Route not found", 404);
-};
+});

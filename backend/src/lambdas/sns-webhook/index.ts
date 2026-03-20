@@ -33,6 +33,7 @@ import {
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { SNSEvent } from "aws-lambda";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -291,7 +292,7 @@ async function emitScanCompleted(opts: {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (event: SNSEvent): Promise<void> => {
+export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> => {
   for (const snsRecord of event.Records) {
     const startMs = Date.now();
 
@@ -369,4 +370,4 @@ export const handler = async (event: SNSEvent): Promise<void> => {
       throw error; // re-throw → Lambda DLQ / retry
     }
   }
-};
+});

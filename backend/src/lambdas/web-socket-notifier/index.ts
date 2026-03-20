@@ -23,6 +23,7 @@ import {
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
+import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { EventBridgeEvent } from "aws-lambda";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ async function pushToConnection(
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = async (
+export const handler = withErrorHandler(async (
   event: EventBridgeEvent<"ReceiptScanCompleted", ReceiptScanCompletedDetail>
 ): Promise<void> => {
   const detail = event.detail;
@@ -168,4 +169,4 @@ export const handler = async (
     const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
     throw firstRejection.reason;
   }
-};
+});
