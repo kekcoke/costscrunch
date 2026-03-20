@@ -1,28 +1,52 @@
-import { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from 'aws-lambda';
-import { logger, setLogContext } from './logger.js';
+import {
+  APIGatewayProxyStructuredResultV2,
+  Context,
+} from 'aws-lambda';
+import { logger } from './logger.js';
 import { ValidationError, NotFoundError, CircuitOpenError } from './errors.js';
 
-export const withErrorHandler = (
-  handler: (...args: any[]) => Promise<any>
-) => {
-  return async (event: any, context: Context): Promise<APIGatewayProxyResultV2> => {
-    const requestId = context?.awsRequestId || (event as any)?.headers?.['x-request-id'] || 'unknown';
-    
-    try {
-      return await handler(event, context);
-    } catch (error: any) {
-      const statusCode = getStatusCode(error);
-      const message = statusCode === 500 ? 'Internal server error' : error.message;
+/**
+ * Universal Lambda Handler type.
+ */
+type AnyHandler = (
+  event: any,
+  context: Context,
+  ...rest: any[]
+) => any;
 
-      logger.error(`Handler error: ${error.message}`, error);
+/**
+ * Higher-Order Function that wraps Lambda handlers with a global try/catch block.
+ * Maps known error types to HTTP status codes and ensures structured logging.
+ * 
+ * Uses Awaited and ReturnType to preserve the original handler's return type 
+ * while adding the API Gateway error response shape.
+ */
+export const withErrorHandler = <T extends AnyHandler>(
+  handler: T
+): (
+  event: Parameters<T>[0],
+  context: Context,
+  ...rest: any[]
+) => Promise<Awaited<ReturnType<T>> | APIGatewayProxyStructuredResultV2> => {
+  return async (event: any, context: Context, ...rest: any[]) => {
+    const requestId =
+      context?.awsRequestId ||
+      (event && typeof event === 'object' && 'headers' in event ? (event as Record<string, any>).headers?.['x-request-id'] : undefined) ||
+      'unknown';
+
+    try {
+      return await handler(event, context, ...rest);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const statusCode = getStatusCode(err);
+      const message = statusCode === 500 ? 'Internal server error' : err.message;
+
+      logger.error(`Handler error: ${err.message}`, err);
 
       return {
         statusCode,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          error: message,
-          requestId,
-        }),
+        body: JSON.stringify({ error: message, requestId }),
       };
     }
   };
