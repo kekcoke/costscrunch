@@ -47,7 +47,7 @@ costscrunch
 │   ├── __tests__/           # Unit (mocked) and Integration (LocalStack) suites
 │   ├── src/
 │   │   ├── lambdas/         # Service handlers (Groups, Expenses, Analytics, etc.)
-│   │   ├── utils/           # Shared utilities (Structured Logger, etc.)
+│   │   ├── utils/           # Shared utilities (Structured Logger, Error Handler, etc.)
 │   │   ├── _local/          # Local dev auth wrappers (mock authorizer)
 │   │   ├── shared/          # Domain models and common types
 │   │   └── server.ts        # Express-to-Lambda adapter for fast dev cycles
