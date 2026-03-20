@@ -9,7 +9,7 @@ describe('DLQ Retry Integration', () => {
   
   const QUEUE_URL = process.env.SCAN_QUEUE_URL!;
   const DLQ_URL = process.env.SCAN_DLQ_URL!;
-  const TOPIC_ARN = process.env.TEXTRACT_TOPIC_ARN!;
+  const TOPIC_ARN = process.env.TEXTRACT_SNS_TOPIC_ARN!;
 
   beforeEach(async () => {
     try {
@@ -47,7 +47,8 @@ describe('DLQ Retry Integration', () => {
     }));
 
     const policy = JSON.parse(Attributes?.RedrivePolicy || '{}');
-    expect(policy.maxReceiveCount).toBe(3);
+    // LocalStack might return maxReceiveCount as a string
+    expect(Number(policy.maxReceiveCount)).toBe(3);
     expect(policy.deadLetterTargetArn).toContain('scan-dlq');
   });
 });
