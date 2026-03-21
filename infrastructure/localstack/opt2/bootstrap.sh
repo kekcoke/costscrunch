@@ -341,6 +341,10 @@ for RES in $($AWS apigateway get-resources --rest-api-id "$API_ID" --query 'item
     2>/dev/null || true
 done
 
+# ── Enforce CORS ───────────────────────────────────────────────────────────
+# Use the robust enforcer script to ensure all resources (including proxies) are covered
+bash "$(dirname "$0")/enable-cors.sh" "$API_ID"
+
 # ── Deploy ──────────────────────────────────────────────────────────────────
 echo "📦 Deploying API"
 $AWS apigateway create-deployment --rest-api-id "$API_ID" --stage-name local 2>/dev/null || true
