@@ -328,3 +328,27 @@ cd frontend && npx vitest
 6. **Vitest vs Jest**: Use vi.* everywhere. Module-level mocks go at top of test file.
 7. **BatchWrite limits**: DynamoDB BatchWriteItem max 25 items per call — batchWriteExpenses() already chunks.
 8. **PDF parsing is heuristic**: parsePDFText() works for most bank PDFs but may miss rows in complex multi-column layouts.
+9. **Infrastructure Synchronization**: When modifying S3 bucket patterns (e.g., S3 Quarantine Pattern) or environment variables in `CostsCrunchStack.ts`, apply the changes symmetrically to:
+    - `infrastructure/localstack/dev/setup.sh` (resource creation)
+    - `infrastructure/localstack/opt2/bootstrap.sh` (Lambda env injection)
+    - `infrastructure/sam/template-*.yaml` (Local API emulation)
+    - `infrastructure/.env.test` (Unit test mocks)
+
+## 7. System Review & Risk Identification Protocol
+When tasked with reviewing system behavior or investigating cross-environment inconsistencies (e.g., "Why does CORS fail locally but might pass/fail in Prod?"):
+
+### 7.1 Analysis Framework
+1. **Trace the Entry Point**: Identify where the request first hits the system (e.g., LocalStack Edge vs. CloudFront).
+2. **Audit Configuration vs. Usage**: Compare defined variables (e.g., `CORS_ALLOW_HEADERS`) against where they are actually applied (e.g., `accessControlAllowHeaders`).
+3. **Check Error Passthroughs**: Ensure 4xx/5xx responses from the infrastructure (API Gateway, WAF) include the same security headers as successful Lambda responses.
+
+### 7.2 Notetaking & Reporting
+Findings must be recorded in `notes/YYYY-MM-DD-context-review.md` with the following sections:
+- **Environment Delta**: Highlight differences between Local, Staging, and Prod.
+- **Identified Risks**: Specific configuration gaps (e.g., "CloudFront policy overrides API Gateway but lacks required headers").
+- **Optimization Strategies**: Redundancy removal or streamlining (e.g., "Consolidate CORS to a single source of truth at the CDN layer").
+
+### 7.3 Example: The "Edge-First" CORS Lesson
+**Scenario**: Local API works, but Prod returns `No 'Access-Control-Allow-Origin' header`.
+**Root Cause**: CloudFront `ResponseHeadersPolicy` is active but `accessControlAllowHeaders` is an empty list `[]`, blocking the `Authorization` header required by the frontend.
+**Fix**: Synchronize the `CORS_ALLOW_HEADERS` array into both the API Gateway and the CloudFront policy.
