@@ -139,6 +139,10 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
   try {
     auth = getAuth(event);
   } catch (e) {
+    logger.warn("Auth extraction failed", { 
+      authorizer: event.requestContext?.authorizer,
+      env: process.env.MOCK_AUTH 
+    });
     return err("Unauthorized", 401);
   }
 
