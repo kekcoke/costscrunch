@@ -37,27 +37,43 @@ for i in {1..3}; do
 done
 
 # 2. Generate env.json for SAM
-# Note: To ensure ALL functions get these, we map them to individual function names 
-# and the "Parameters" block (for templates that use Ref).
+# CRITICAL: For SAM Local, the container needs 'host.docker.internal' to see LocalStack on the host.
+# We also ensure every function gets ALL necessary variables.
 cat <<EOF > "$PROJECT_ROOT/infrastructure/sam/env.json"
 {
   "Parameters": {
-    "AWS_ENDPOINT_URL": "${AWS_ENDPOINT_URL}",
-    "AWS_ACCESS_KEY_ID": "${AWS_ACCESS_KEY_ID}",
-    "AWS_SECRET_ACCESS_KEY": "${AWS_SECRET_ACCESS_KEY}",
-    "AWS_REGION": "${AWS_REGION}",
-    "MOCK_AUTH": "${MOCK_AUTH}",
     "ENVIRONMENT": "${ENVIRONMENT}",
     "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
     "TABLE_NAME_CONNECTIONS": "${TABLE_NAME_CONNECTIONS}",
     "EVENT_BUS_NAME": "${EVENT_BUS_NAME}",
     "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
   },
-  "GroupsFunction": { "ENVIRONMENT": "${ENVIRONMENT}", "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}" },
-  "ExpensesFunction": { "ENVIRONMENT": "${ENVIRONMENT}", "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}" },
-  "ReceiptsFunction": { "ENVIRONMENT": "${ENVIRONMENT}", "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}" },
-  "AnalyticsFunction": { "ENVIRONMENT": "${ENVIRONMENT}", "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}" },
-  "HealthFunction": { "ENVIRONMENT": "${ENVIRONMENT}", "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}" }
+  "GroupsFunction": { 
+    "ENVIRONMENT": "${ENVIRONMENT}", 
+    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566",
+    "MOCK_AUTH": "true"
+  },
+  "ExpensesFunction": { 
+    "ENVIRONMENT": "${ENVIRONMENT}", 
+    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  },
+  "ReceiptsFunction": { 
+    "ENVIRONMENT": "${ENVIRONMENT}", 
+    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  },
+  "AnalyticsFunction": { 
+    "ENVIRONMENT": "${ENVIRONMENT}", 
+    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  },
+  "HealthFunction": { 
+    "ENVIRONMENT": "${ENVIRONMENT}", 
+    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  }
 }
 EOF
 
@@ -83,8 +99,10 @@ sam build --template-file "$TEMPLATE"
 export VITE_API_URL="http://localhost:3001"
 cd "$PROJECT_ROOT/frontend" && npm run dev &
 
+# Use host.docker.internal for networking
 sam local start-api \
   --template-file ".aws-sam/build/template.yaml" \
   --env-vars env.json \
   --port 3001 \
-  --container-host host.docker.internal
+  --container-host host.docker.internal \
+  --container-host-interface 0.0.0.0
