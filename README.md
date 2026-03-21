@@ -378,8 +378,10 @@ sequenceDiagram
     LS_Edge->>APIGW: Route to /{proxy+}
     APIGW->>Lambda: Invoke (AWS_PROXY)
     Lambda->>Lambda: normalizeRoute(/groups/123) -> {id: "123"}
-    Lambda->>Lambda: Inject MOCK_AUTH claims
-    Lambda-->>Browser: 200 OK + Data + CORS Headers
+    Lambda->>Lambda: withLocalAuth() middleware
+    Lambda->>Lambda: getAuth(event) -> Unified claims
+    Lambda->>Lambda: response helpers inject CORS headers (Access-Control-Allow-Origin)
+    Lambda-->>Browser: 200 OK + Data + CORS Headers (Required for REST v1 Proxy)
 ```
 
 #### Option 3 Flow (SAM CLI + Express)
