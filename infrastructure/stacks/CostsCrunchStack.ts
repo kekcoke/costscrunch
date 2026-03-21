@@ -782,7 +782,8 @@ export class CostsCrunchStack extends Stack {
             comment: 'Add CORS headers at CDN layer',
             corsBehavior: {
                 accessControlAllowOrigins: CORS_ALLOW_ORIGINS,
-                accessControlAllowHeaders: [],
+                // Critical fix: Allow custom headers (Authorization, etc.) at the edge
+                accessControlAllowHeaders: CORS_ALLOW_HEADERS,
                 accessControlAllowMethods: CORS_ALLOW_METHODS,
                 accessControlExposeHeaders: CORS_ALLOW_HEADERS,
                 accessControlAllowCredentials: false,
