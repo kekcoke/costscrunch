@@ -46,7 +46,11 @@ export const withErrorHandler = <T extends AnyHandler>(
 
       return {
         statusCode,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
         body: JSON.stringify({ error: message, requestId }),
       };
     }
