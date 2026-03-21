@@ -29,16 +29,21 @@ export function withLocalAuth(
       );
     }
 
-    if (
-      process.env.MOCK_AUTH === "true" &&
-      !event.requestContext?.authorizer?.jwt?.claims?.sub
-    ) {
-      event.requestContext = {
-        ...event.requestContext,
-        authorizer: {
-          jwt: { claims: { ...getMockClaims() } },
-        },
-      };
+    if (process.env.MOCK_AUTH === "true") {
+      const authorizer = event.requestContext?.authorizer || {};
+      const claims = authorizer.jwt?.claims || authorizer.claims;
+
+      if (!claims?.sub) {
+        event.requestContext = {
+          ...event.requestContext,
+          authorizer: {
+            ...authorizer,
+            jwt: { claims: { ...getMockClaims() } },
+            // Also inject into root for v1 compatibility
+            claims: { ...getMockClaims() },
+          },
+        };
+      }
     }
     return handler(event, context);
   };
