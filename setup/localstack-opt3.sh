@@ -35,9 +35,13 @@ sam build --template-file "$TEMPLATE"
 # 4. Start local API (Lambda on host, proxying data to LocalStack)
 # Frontend connects to http://localhost:3001
 export VITE_API_URL="http://localhost:3001"
-echo "🌐 VITE_API_URL=$VITE_API_URL (run 'cd frontend && npm run dev' in a second terminal)"
+echo "🌐 VITE_API_URL=$VITE_API_URL"
+echo "Starting frontend..."
 
+cd "$PROJECT_ROOT/frontend" && npm run dev &
+
+# Use the built template so SAM finds the transpiled index.js in .aws-sam/build/
 sam local start-api \
-  --template-file "$TEMPLATE" \
+  --template-file ".aws-sam/build/template.yaml" \
   --env-vars env.json \
   --port 3001
