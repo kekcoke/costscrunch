@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+# CONFIG
+ENV_NAME="${1:-dev}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
@@ -15,9 +17,51 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # Export variables to the current shell for the heredoc expansion below
-set -a
-source <(grep -v '^#' "$ENV_FILE" | sed -E 's/^([^=]+)=(.*)$/\1="\2"/')
-set +a
+# echo "---- GENERATED SCRIPT ----"
+# grep -v '^#' "$ENV_FILE" | sed -E 's/^([^=]+)=(.*)$/\1="\2"/'
+# echo "--------------------------"
+
+# set -a
+# source <(grep -v '^#' "$ENV_FILE" | sed -E 's/^([^=]+)=(.*)$/\1="\2"/')
+# set +a
+
+echo "🔧 Loading environment: $ENV_NAME"
+
+# Load raw vars (no expansion yet)
+while IFS='=' read -r key value || [[ -n "$key" ]]; do
+  # Skip comments and empty lines
+  [[ "$key" =~ ^\s*# ]] && continue
+  [[ -z "$key" ]] && continue
+
+  # Trim whitespace
+  key="$(echo "$key" | xargs)"
+  value="$(echo "$value" | xargs)"
+
+  export "$key=$value"
+done < "$ENV_FILE"
+
+# Expand vars
+for key in $(grep -v '^#' "$ENV_FILE" | cut -d= -f1); do
+  # Skip empty keys
+  [[ -z "$key" ]] && continue
+
+  # Expand thru indirect expansion
+  eval "export $key=\"${!key}\""
+done
+
+# Allow run-time overrides (optional)
+# Example ./sh env API_URL=...
+shift || true
+for arg in "$@"; do
+  if [[ "$arg" == *=* ]]; then
+    export "$arg"
+  fi
+done
+
+# Debug
+echo "✅ Loaded variables:"
+env | grep -E '^(API_URL|BASE_URL|AWS_)' || true
+
 
 # 2. Generate env.json for SAM using the expanded variables
 # Note: "Parameters" applies these to all functions in the template
