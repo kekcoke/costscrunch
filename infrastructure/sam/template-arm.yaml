@@ -29,10 +29,14 @@ Globals:
         ResponseParameters:
           Headers:
             Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+            Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
       DEFAULT_5XX:
         ResponseParameters:
           Headers:
             Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+            Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
 
 Resources:
   GroupsFunction:
