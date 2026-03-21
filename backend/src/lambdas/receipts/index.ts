@@ -52,8 +52,24 @@ function isS3Event(event: unknown): event is S3Event {
 }
 
 // ─── Sub-handler: Generate Pre-signed POST ────────────────────────────────────
-const ok = (body: unknown) => ({ statusCode: 200, body: JSON.stringify(body) });
-const err = (msg: string, code = 400) => ({ statusCode: code, body: JSON.stringify({ error: msg }) });
+const ok = (body: unknown) => ({ 
+  statusCode: 200, 
+  headers: {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
+  body: JSON.stringify(body) 
+});
+const err = (msg: string, code = 400) => ({ 
+  statusCode: code, 
+  headers: {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
+  body: JSON.stringify({ error: msg }) 
+});
 
 async function handleUploadUrl(event: APIGatewayProxyEventV2) {
   const body = JSON.parse(event.body || "{}");

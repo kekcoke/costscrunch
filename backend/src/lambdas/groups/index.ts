@@ -24,11 +24,19 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" })
 
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
 });
 const err = (msg: string, statusCode = 400) => ({
   statusCode, body: JSON.stringify({ error: msg }),
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
 });
 
 // ─── Balance Calculator ───────────────────────────────────────────────────────

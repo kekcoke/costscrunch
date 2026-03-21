@@ -21,7 +21,11 @@ const metrics = new Metrics({ namespace: "CostsCrunch" });
 
 const ok = (body: unknown) => ({ 
   statusCode: 200, 
-  headers: { "Content-Type": "application/json" }, 
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  }, 
   body: JSON.stringify(body) 
 });
 

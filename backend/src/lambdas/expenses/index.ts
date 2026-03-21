@@ -31,11 +31,22 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ok = (body: unknown, statusCode = 200) => ({
-  statusCode, headers: { "Content-Type": "application/json", "X-Request-Id": ulid() },
+  statusCode, 
+  headers: { 
+    "Content-Type": "application/json", 
+    "X-Request-Id": ulid(),
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
   body: JSON.stringify(body),
 });
 const err = (msg: string, statusCode = 400) => ({
-  statusCode, headers: { "Content-Type": "application/json" },
+  statusCode, 
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
   body: JSON.stringify({ error: msg }),
 });
 
