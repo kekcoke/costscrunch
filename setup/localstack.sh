@@ -56,6 +56,7 @@ echo "   ✅ Lambda bundles built"
 echo "📦 [5/8] Copying artifacts..."
 docker exec costscrunch-localstack mkdir -p /opt/bootstrap /opt/lambda-build
 docker cp "$PROJECT_ROOT/infrastructure/localstack/opt2/bootstrap.sh" costscrunch-localstack:/opt/bootstrap/bootstrap.sh
+docker cp "$PROJECT_ROOT/infrastructure/localstack/opt2/enable-cors.sh" costscrunch-localstack:/opt/bootstrap/enable-cors.sh
 docker cp "$PROJECT_ROOT/backend/dist/lambda/." costscrunch-localstack:/opt/lambda-build
 echo "   ✅ Artifacts copied"
 
