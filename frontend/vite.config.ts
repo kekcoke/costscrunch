@@ -4,14 +4,14 @@ import { resolve } from "path";
 
 // https://vite.dev/config/
 export default defineConfig(() => {
-  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env.test
+  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env.dev
   const envFromFile = loadEnv("test", resolve(__dirname, ".."));
   const VITE_API_URL = process.env.VITE_API_URL ?? envFromFile.VITE_API_URL;
 
   return {
-  // Load .env files from monorepo root (e.g. .env.test)
+  // Load .env files from monorepo root (e.g. .env.dev)
   envDir: resolve(__dirname, ".."),
-  // Inject VITE_API_URL from .env.test into import.meta.env for all modes
+  // Inject VITE_API_URL from .env.dev into import.meta.env for all modes
   define: {
     "import.meta.env.VITE_API_URL": JSON.stringify(VITE_API_URL),
   },

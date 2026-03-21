@@ -25,6 +25,8 @@ services:
   localstack:
     image: localstack/localstack:3.5
     container_name: costscrunch-localstack
+    env_file:
+      - ../.env.${ENVIRONMENT:-dev}
     ports:
       - "4566:4566"  # Main LocalStack edge port/gateway
     environment:
@@ -38,6 +40,8 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - MOCK_AUTH=${MOCK_AUTH:-true}
       - HOSTNAME_EXTERNAL=localhost
       - EAGER_SERVICE_LOADING=1
       - DATA_DIR=/var/lib/localstack
@@ -51,6 +55,12 @@ services:
       - localstack-data:/var/lib/localstack
       - localstack-tmp:/tmp  # Lambda zip files survive container restarts
       - /var/run/docker.sock:/var/run/docker.sock
+      # # Map all potential env files for runtime sourcing
+      # - ../.env:/etc/localstack/.env
+      # - ../.env.dev:/etc/localstack/.env.dev
+      # - ../.env.staging:/etc/localstack/.env.staging
+      # - ../.env.production:/etc/localstack/.env.production
+      # - ../.env.local:/etc/localstack/.env.local
       # - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
       # - ./localstack/scripts:/etc/localstack/scripts  # Custom scripts for service setup
       # - ./localstack/config:/etc/localstack/config  # Custom config files for services
@@ -65,6 +75,8 @@ services:
   localstack-seed:
     image: amazon/aws-cli:2.7.32
     container_name: costscrunch-localstack-seed
+    env_file:
+      - ../.env.${ENVIRONMENT:-dev}
     depends_on:
       localstack:
         condition: service_healthy

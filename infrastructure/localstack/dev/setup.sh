@@ -30,6 +30,15 @@
 
 set -euo pipefail
 
+# Load environment variables: .env -> .env.<ENVIRONMENT> -> .env.local
+# ENV_FILES=("../../../.env" "../../../.env.${ENVIRONMENT:-dev}" "../../../.env.local")
+# for f in "${ENV_FILES[@]}"; do
+#   if [ -f "$f" ]; then
+#     echo "  ↳ Sourcing $f"
+#     export $(grep -v '^#' "$f" | xargs)
+#   fi
+# done
+
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
 TABLE_NAME_MAIN="costscrunch-dev-main"
 TABLE_NAME_DYNAMO_CONNECTIONS="costscrunch-dev-connections"

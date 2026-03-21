@@ -66,7 +66,7 @@ costscrunch
     ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
     ├── sam/                 # Local emulation templates (REST v1 / ARM64)
     ├── stacks/              # CDK Infrastructure-as-Code definitions
-    ├── .env.test            # Mock variables for Vitest execution
+    ├── .env.dev             # Mock variables for Vitest execution
     └── docker-compose.yml   # Multi-container orchestration (LocalStack base)
 ```
 
@@ -510,7 +510,7 @@ npm run dev
 ```bash
 # Infrastructure tests
 cd infrastructure
-npm test                                        # all infra tests (loads .env.test via setup.ts)
+npm test                                        # all infra tests (loads .env.dev via setup.ts)
 npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)

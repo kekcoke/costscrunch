@@ -12,6 +12,15 @@
 
 set -euo pipefail
 
+# Load environment variables: .env -> .env.<ENVIRONMENT> -> .env.local
+# (These must be mapped in docker-compose as volumes or existing in /etc/localstack/)
+# ENV_FILES=("/etc/localstack/.env" "/etc/localstack/.env.${ENVIRONMENT:-dev}" "/etc/localstack/.env.local")
+# for f in "${ENV_FILES[@]}"; do
+#   if [ -f "$f" ]; then
+#     export $(grep -v '^#' "$f" | xargs)
+#   fi
+# done
+
 # Use absolute path to avoid "command not found" in some container environments
 AWS="/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1"
 API_NAME="costscrunch-dev-api"
@@ -107,8 +116,9 @@ deploy_function() {
     "AWS_ENDPOINT_URL": "http://localstack:4566",
     "AWS_ACCESS_KEY_ID": "test",
     "AWS_SECRET_ACCESS_KEY": "test",
-    "AWS_REGION": "us-east-1",
-    "MOCK_AUTH": "true",
+    "AWS_REGION": "${AWS_REGION:-us-east-1}",
+    "MOCK_AUTH": "${MOCK_AUTH:-true}",
+    "ENVIRONMENT": "${ENVIRONMENT:-dev}",
     "TABLE_NAME_MAIN": "costscrunch-dev-main",
     "TABLE_NAME_CONNECTIONS": "costscrunch-dev-connections",
     "FROM_EMAIL": "noreply@costscrunch.dev",
@@ -169,6 +179,15 @@ ENVEOF
 
   # rm -f "$ZIP_PATH"  # Keep zip for debugging if needed
 }
+
+# # ── Cleanup Stale Containers ────────────────────────────────────────────────
+# # In opt2 (docker-reuse), stale sibling containers cause port/naming conflicts.
+# # Fix: Standard xargs for macOS compatibility.
+# echo "🧹 Cleaning up stale Lambda containers..."
+# STALE_CONTAINERS=$(docker ps -a -q --filter "name=costscrunch-localstack-lambda")
+# if [ -n "$STALE_CONTAINERS" ]; then
+#   docker rm -f $STALE_CONTAINERS
+# fi
 
 # ── Lambda Functions ────────────────────────────────────────────────────────
 echo "📦 Deploying Lambda functions"

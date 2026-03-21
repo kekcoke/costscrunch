@@ -334,21 +334,34 @@ cd frontend && npx vitest
     - `infrastructure/sam/template-*.yaml` (Local API emulation)
     - `infrastructure/.env.test` (Unit test mocks)
 
-## 7. System Review & Risk Identification Protocol
+## 7. Environment Variable Management (Monorepo)
+To ensure consistency across Docker, Vitest, and frontend/backend projects, follow the **Centralized Source** pattern.
+
+### 7.1 Single Source of Truth
+- **Root `.env`**: Maintain a master `.env` (or `.env.local`) at the monorepo root for shared configuration (e.g., `APP_URL`, `AWS_REGION`).
+- **Docker Compose**: Use the `env_file` property to point to the root file.
+    - Path in `infrastructure/docker-compose.localstack.yml`: `../.env`
+    - Path in `infrastructure/localstack/opt2/docker-compose.opt2.yml`: `../../../.env`
+
+### 7.2 Usage in Subprojects
+- **Vite/Frontend**: Vite automatically looks for `.env` in the project root. Use a symlink if shared variables are required: `ln -s ../../.env .env.local`.
+- **Vitest**: Use `dotenv` in the `vitest.setup.ts` to load the root file: `dotenv.config({ path: '../../.env' })`.
+
+## 8. System Review & Risk Identification Protocol
 When tasked with reviewing system behavior or investigating cross-environment inconsistencies (e.g., "Why does CORS fail locally but might pass/fail in Prod?"):
 
-### 7.1 Analysis Framework
+### 8.1 Analysis Framework
 1. **Trace the Entry Point**: Identify where the request first hits the system (e.g., LocalStack Edge vs. CloudFront).
 2. **Audit Configuration vs. Usage**: Compare defined variables (e.g., `CORS_ALLOW_HEADERS`) against where they are actually applied (e.g., `accessControlAllowHeaders`).
 3. **Check Error Passthroughs**: Ensure 4xx/5xx responses from the infrastructure (API Gateway, WAF) include the same security headers as successful Lambda responses.
 
-### 7.2 Notetaking & Reporting
+### 8.2 Notetaking & Reporting
 Findings must be recorded in `notes/YYYY-MM-DD-context-review.md` with the following sections:
 - **Environment Delta**: Highlight differences between Local, Staging, and Prod.
 - **Identified Risks**: Specific configuration gaps (e.g., "CloudFront policy overrides API Gateway but lacks required headers").
 - **Optimization Strategies**: Redundancy removal or streamlining (e.g., "Consolidate CORS to a single source of truth at the CDN layer").
 
-### 7.3 Example: The "Edge-First" CORS Lesson
+### 8.3 Example: The "Edge-First" CORS Lesson
 **Scenario**: Local API works, but Prod returns `No 'Access-Control-Allow-Origin' header`.
 **Root Cause**: CloudFront `ResponseHeadersPolicy` is active but `accessControlAllowHeaders` is an empty list `[]`, blocking the `Authorization` header required by the frontend.
 **Fix**: Synchronize the `CORS_ALLOW_HEADERS` array into both the API Gateway and the CloudFront policy.
