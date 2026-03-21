@@ -14,7 +14,7 @@ function getMockClaims(): Record<string, string> {
   };
 }
 
-export function withMockAuth(
+export function withLocalAuth(
   handler: (event: any, context: any) => Promise<any>,
 ): (event: any, context: any) => Promise<any> {
   return async (event: any, context: any) => {

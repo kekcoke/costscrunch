@@ -10,6 +10,8 @@ import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { getAuth } from "../../utils/auth.js";
+import { withLocalAuth } from "../_local/mockAuth.js";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
@@ -37,16 +39,6 @@ const err = (msg: string, statusCode = 400) => ({
   body: JSON.stringify({ error: msg }),
 });
 
-function getAuth(event: ApiEvent): AuthContext {
-  const claims = event.requestContext.authorizer.jwt.claims;
-  return {
-    userId: claims.sub,
-    email: claims.email,
-    groups: (claims["cognito:groups"] || "").split(",").filter(Boolean),
-    plan: "pro", // in prod: fetch from DynamoDB or JWT custom claim
-  };
-}
-
 function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense>) {
   return {
     pk: `USER#${userId}`,
@@ -59,9 +51,16 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const rawHandler = withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
+export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
-  const auth = getAuth(event);
+  
+  let auth;
+  try {
+    auth = getAuth(event);
+  } catch (e) {
+    return err("Unauthorized", 401);
+  }
+
   const expenseId = event.pathParameters?.id;
 
   logger.appendKeys({ userId: auth.userId, route });
@@ -271,4 +270,4 @@ export const rawHandler = withErrorHandler(async (event: ApiEvent & { httpMethod
   }
 
   return err("Route not found", 404);
-});
+}));

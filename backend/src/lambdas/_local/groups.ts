@@ -1,5 +1,5 @@
-import { withMockAuth } from "./mockAuth.js";
+import { withLocalAuth } from "./mockAuth.js";
 import { handler as raw } from "../groups/index.js";
 
-export { withMockAuth } from "./mockAuth.js";
-export const handler = withMockAuth(raw);
+export { withLocalAuth as withMockAuth } from "./mockAuth.js";
+export const handler = withLocalAuth(raw);
