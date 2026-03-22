@@ -14,7 +14,7 @@ function getMockClaims(): Record<string, string> {
   };
 }
 
-export function withLocalAuth(
+export function withMockAuth(
   handler: (event: any, context?: any) => Promise<any>,
 ): (event: any, context?: any) => Promise<any> {
   return async (event: any, context?: any) => {
@@ -34,13 +34,14 @@ export function withLocalAuth(
       const claims = authorizer.jwt?.claims || authorizer.claims;
 
       if (!claims?.sub) {
+        const mockClaims = getMockClaims();
         event.requestContext = {
           ...event.requestContext,
           authorizer: {
             ...authorizer,
-            jwt: { claims: { ...getMockClaims() } },
+            jwt: { claims: { ...mockClaims } },
             // Also inject into root for v1 compatibility
-            claims: { ...getMockClaims() },
+            claims: { ...mockClaims },
           },
         };
       }

@@ -52,6 +52,7 @@ FROM_EMAIL="noreply@costscrunch.dev"
 # Accept connections from both opt2 (port 4566 proxy) and opt3 (port 3001)
 APP_URL="${APP_URL:-http://localhost:3000}"
 APP_URL_OPT3="http://localhost:3001"
+APP_URL_VITE="http://localhost:5173"
 
 echo "🔧 costscrunch LocalStack seed starting..."
 
@@ -173,7 +174,7 @@ $AWS s3api put-bucket-cors \
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'"],
+      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "'"$APP_URL_VITE"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
@@ -276,7 +277,7 @@ $AWS s3api put-bucket-cors \
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'"],
+      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "'"$APP_URL_VITE"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
