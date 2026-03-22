@@ -1,4 +1,19 @@
-# React + TypeScript + Vite
+# 💸 CostsCrunch Frontend
+
+## Development
+
+- **Build**: `npm run build`
+- **Dev**: `npm run dev` (Connects to port 3000)
+- **Test**: `npx vitest` (Requires JSDOM)
+
+## Testing Strategy
+
+Component and page tests are built with **Vitest** + **React Testing Library**. 
+
+### Key Patterns:
+- **JSDOM Environment**: Enabled via `@vitest-environment jsdom` per-file directive.
+- **Scoped Queries**: Destructure queries (`getByText`, `findByRole`) from `render()` to avoid DOM bleeding between tests.
+- **Async Wait**: Use `findBy*` or `vi.waitFor` for elements appearing after state updates or `setTimeout` delays.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
