@@ -15,9 +15,9 @@ function getMockClaims(): Record<string, string> {
 }
 
 export function withLocalAuth(
-  handler: (event: any, context: any) => Promise<any>,
-): (event: any, context: any) => Promise<any> {
-  return async (event: any, context: any) => {
+  handler: (event: any, context?: any) => Promise<any>,
+): (event: any, context?: any) => Promise<any> {
+  return async (event: any, context?: any) => {
     // OWASP ASVS v4.0 V13.1 — mock auth must never be active outside dev
     if (
       process.env.MOCK_AUTH === "true" &&
