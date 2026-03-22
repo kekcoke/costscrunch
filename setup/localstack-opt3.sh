@@ -37,8 +37,11 @@ for i in {1..3}; do
 done
 
 # 2. Generate env.json for SAM
-# CRITICAL: For SAM Local, the container needs 'host.docker.internal' to see LocalStack on the host.
-# We also ensure every function gets ALL necessary variables.
+# CRITICAL: AWS SDK v3 handles endpoints differently. 
+# We set AWS_ENDPOINT_URL and also specific ones just in case.
+# Docker network mode: Lambda containers resolve LocalStack by container name.
+# NOTE: --docker-network bypasses SAM's broken socket connection in v1.155+.
+# SAM CLI requires env vars nested under "EnvironmentVariables" per function.
 cat <<EOF > "$PROJECT_ROOT/infrastructure/sam/env.json"
 {
   "Parameters": {
@@ -46,33 +49,48 @@ cat <<EOF > "$PROJECT_ROOT/infrastructure/sam/env.json"
     "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
     "TABLE_NAME_CONNECTIONS": "${TABLE_NAME_CONNECTIONS}",
     "EVENT_BUS_NAME": "${EVENT_BUS_NAME}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+    "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566"
   },
-  "GroupsFunction": { 
-    "ENVIRONMENT": "${ENVIRONMENT}", 
-    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566",
-    "MOCK_AUTH": "true"
+  "GroupsFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566",
+      "DYNAMODB_ENDPOINT": "http://costscrunch-localstack:4566",
+      "MOCK_AUTH": "true"
+    }
   },
-  "ExpensesFunction": { 
-    "ENVIRONMENT": "${ENVIRONMENT}", 
-    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  "ExpensesFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566",
+      "DYNAMODB_ENDPOINT": "http://costscrunch-localstack:4566"
+    }
   },
-  "ReceiptsFunction": { 
-    "ENVIRONMENT": "${ENVIRONMENT}", 
-    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  "ReceiptsFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566",
+      "DYNAMODB_ENDPOINT": "http://costscrunch-localstack:4566",
+      "S3_ENDPOINT": "http://costscrunch-localstack:4566"
+    }
   },
-  "AnalyticsFunction": { 
-    "ENVIRONMENT": "${ENVIRONMENT}", 
-    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  "AnalyticsFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566",
+      "DYNAMODB_ENDPOINT": "http://costscrunch-localstack:4566"
+    }
   },
-  "HealthFunction": { 
-    "ENVIRONMENT": "${ENVIRONMENT}", 
-    "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
-    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566"
+  "HealthFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "http://costscrunch-localstack:4566"
+    }
   }
 }
 EOF
@@ -99,10 +117,10 @@ sam build --template-file "$TEMPLATE"
 export VITE_API_URL="http://localhost:3001"
 cd "$PROJECT_ROOT/frontend" && npm run dev &
 
-# Use host.docker.internal for networking
+# Docker network mode — Lambda containers join the same network as LocalStack,
+# resolving it by container name. Bypasses SAM v1.155+ socket.gaierror bug.
 sam local start-api \
   --template-file ".aws-sam/build/template.yaml" \
   --env-vars env.json \
   --port 3001 \
-  --container-host host.docker.internal \
-  --container-host-interface 0.0.0.0
+  --docker-network costscrunch-local
