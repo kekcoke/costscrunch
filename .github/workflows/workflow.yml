@@ -162,6 +162,7 @@ jobs:
           # Run Bootstrap (Compute Layer)
           docker exec costscrunch-localstack mkdir -p /opt/bootstrap /opt/lambda-build
           docker cp infrastructure/localstack/opt2/bootstrap.sh costscrunch-localstack:/opt/bootstrap/bootstrap.sh
+          docker cp infrastructure/localstack/opt2/enable-cors.sh costscrunch-localstack:/opt/bootstrap/enable-cors.sh
           docker cp backend/dist/lambda/. costscrunch-localstack:/opt/lambda-build/
           docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
       - name: Run Integration Suite
