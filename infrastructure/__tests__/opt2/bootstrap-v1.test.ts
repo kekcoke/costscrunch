@@ -5,7 +5,7 @@
  * 
  * Scope:
  * - API Gateway v1 (REST API) hierarchical resource tree
- * - All 16 registered routes (no {proxy+} — explicit resources)
+ * - All 18 registered resources (no {proxy+} — explicit resources)
  * - CORS OPTIONS mock integration on every resource
  * - HTTP-level routing: every path must reach Lambda (not 404 at Gateway)
  * - Lambda build artifact integration

@@ -20,9 +20,11 @@ const endpoints = [
   // Nested — expenses
   '/expenses/test-expense-id',
   // Nested — receipts
+  '/receipts',
   '/receipts/upload-url',
   '/receipts/test-expense-id/scan',
   // Nested — analytics
+  '/analytics',
   '/analytics/summary',
   '/analytics/trends',
   '/analytics/chart-data',
