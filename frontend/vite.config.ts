@@ -3,10 +3,14 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 // https://vite.dev/config/
-export default defineConfig(() => {
-  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env.dev
-  const envFromFile = loadEnv("test", resolve(__dirname, ".."));
-  const VITE_API_URL = process.env.VITE_API_URL ?? envFromFile.VITE_API_URL;
+export default defineConfig(({ mode }) => {
+  // Shell env (set by dev:opt2 / dev:opt3 scripts) takes priority over .env files
+  const rootEnv = resolve(__dirname, "..");
+  const envFromFile = loadEnv(mode, rootEnv);
+  // .env.dev is the project convention (not Vite's .env.development).
+  // loadEnv(mode) won't find .env.dev when mode="development", so fall back.
+  const devEnv = envFromFile.VITE_API_URL ? envFromFile : loadEnv("dev", rootEnv);
+  const VITE_API_URL = process.env.VITE_API_URL ?? devEnv.VITE_API_URL;
 
   return {
   // Load .env files from monorepo root (e.g. .env.dev)
