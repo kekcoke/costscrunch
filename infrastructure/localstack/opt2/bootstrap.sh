@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Use absolute path to avoid "command not found" in some container environments
-AWS="/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1"
+AWS_CMD=(/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1)
 API_NAME="costscrunch-dev-api"
 ROLE_NAME="costscrunch-dev-lambda-role"
 LAMBDA_BUILD="/opt/lambda-build"
@@ -17,7 +17,7 @@ echo "🔧 Lambda + API GW bootstrap starting..."
 echo "⏳ Waiting for data layer to be ready (seed verification)..."
 MAX_SYNC_RETRIES=30
 for i in $(seq 1 $MAX_SYNC_RETRIES); do
-  if $AWS dynamodb describe-table --table-name "costscrunch-dev-main" >/dev/null 2>&1; then
+  if "${AWS_CMD[@]}" dynamodb describe-table --table-name "costscrunch-dev-main" >/dev/null 2>&1; then
     echo "   ✅ Data layer verified."
     break
   fi
@@ -26,7 +26,7 @@ done
 
 # ── IAM Role ────────────────────────────────────────────────────────────────
 echo "📦 Creating IAM execution role"
-$AWS iam create-role \
+"${AWS_CMD[@]}" iam create-role \
   --role-name "$ROLE_NAME" \
   --assume-role-policy-document '{
     "Version": "2012-10-17",
@@ -38,7 +38,7 @@ $AWS iam create-role \
   }' \
   2>/dev/null || echo "  ↳ Role already exists, skipping"
 
-$AWS iam put-role-policy \
+"${AWS_CMD[@]}" iam put-role-policy \
   --role-name "$ROLE_NAME" \
   --policy-name "LambdaBasicExecution" \
   --policy-document '{
@@ -98,7 +98,7 @@ deploy_function() {
 JSONEOF
 
   echo "  ↳ Creating/Updating Lambda function $NAME"
-  if ! $AWS lambda create-function \
+  if ! "${AWS_CMD[@]}" lambda create-function \
     --function-name "$NAME" \
     --runtime nodejs20.x \
     --handler "$HANDLER" \
@@ -106,8 +106,8 @@ JSONEOF
     --zip-file "fileb://${ZIP_PATH}" \
     --environment "file:///tmp/${NAME}-env.json" 2>/dev/null; then
     
-    $AWS lambda update-function-code --function-name "$NAME" --zip-file "fileb://${ZIP_PATH}" >/dev/null
-    $AWS lambda update-function-configuration --function-name "$NAME" --environment "file:///tmp/${NAME}-env.json" >/dev/null
+    "${AWS_CMD[@]}" lambda update-function-code --function-name "$NAME" --zip-file "fileb://${ZIP_PATH}" >/dev/null
+    "${AWS_CMD[@]}" lambda update-function-configuration --function-name "$NAME" --environment "file:///tmp/${NAME}-env.json" >/dev/null
   fi
 }
 
@@ -122,13 +122,16 @@ deploy_function "WsNotifierFunction"  "index.handler"
 deploy_function "HealthFunction"      "index.handler"
 
 # ── REST API (v1) ──────────────────────────────────────────────────────────
-echo "📦 Creating REST API"
-API_ID=$($AWS apigateway create-rest-api --name "$API_NAME" --query 'id' --output text 2>/dev/null || echo "")
+echo "📦 Resolving REST API (idempotent — reuses existing)"
+API_ID=$("${AWS_CMD[@]}" apigateway get-rest-apis --query "items[?name=='${API_NAME}'].id | [0]" --output text 2>/dev/null | tr -d '\r')
 if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-  API_ID=$($AWS apigateway get-rest-apis --query "items[?name=='${API_NAME}'].id | [0]" --output text)
+  API_ID=$("${AWS_CMD[@]}" apigateway create-rest-api --name "$API_NAME" --query 'id' --output text | tr -d '\r')
+  echo "  ↳ Created new API: ${API_ID}"
+else
+  echo "  ↳ Reusing existing API: ${API_ID}"
 fi
 
-ROOT_RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id | [0]" --output text)
+ROOT_RES_ID=$("${AWS_CMD[@]}" apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id | [0]" --output text)
 
 # ── Helper: ensure a resource exists in the API Gateway tree ────────────────
 # Creates nested resources (e.g., /groups/{id}/balances) by walking path segments.
@@ -138,11 +141,11 @@ ensure_resource() {
   local FULL_PATH=$3
 
   local RES_ID
-  RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" \
+  RES_ID=$("${AWS_CMD[@]}" apigateway get-resources --rest-api-id "$API_ID" \
     --query "items[?path=='${FULL_PATH}'].id | [0]" --output text 2>/dev/null | tr -d '\r')
 
   if [ -z "$RES_ID" ] || [ "$RES_ID" = "None" ]; then
-    RES_ID=$($AWS apigateway create-resource --rest-api-id "$API_ID" \
+    RES_ID=$("${AWS_CMD[@]}" apigateway create-resource --rest-api-id "$API_ID" \
       --parent-id "$PARENT_ID" --path-part "$PATH_PART" --query 'id' --output text | tr -d '\r')
     echo "  ↳ Created resource: ${FULL_PATH} (${RES_ID})" >&2
   fi
@@ -156,15 +159,15 @@ add_integration() {
   local FUNCTION=$2
 
   for METHOD in GET POST PUT PATCH DELETE; do
-    $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES_ID" \
+    "${AWS_CMD[@]}" apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES_ID" \
       --http-method "$METHOD" --authorization-type "NONE" 2>/dev/null || true
-    $AWS apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES_ID" \
+    "${AWS_CMD[@]}" apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES_ID" \
       --http-method "$METHOD" --type AWS_PROXY --integration-http-method POST \
       --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}/invocations" 2>/dev/null || true
   done
 
   # Single broad permission covers all methods on this resource
-  $AWS lambda add-permission --function-name "$FUNCTION" \
+  "${AWS_CMD[@]}" lambda add-permission --function-name "$FUNCTION" \
     --statement-id "apigw-${FUNCTION}-${RES_ID}" \
     --action lambda:InvokeFunction --principal apigateway.amazonaws.com \
     --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/*" \
@@ -226,7 +229,7 @@ bash "$(dirname "$0")/enable-cors.sh" "$API_ID"
 
 # ── Deploy ──────────────────────────────────────────────────────────────────
 echo "📦 Deploying API"
-$AWS apigateway create-deployment --rest-api-id "$API_ID" --stage-name local >/dev/null 2>&1 || true
+"${AWS_CMD[@]}" apigateway create-deployment --rest-api-id "$API_ID" --stage-name local >/dev/null 2>&1 || true
 
 echo "✅✅✅ Bootstrap complete!"
 echo "  VITE_API_URL=http://localhost:4566/restapis/${API_ID}/local/_user_request_"
