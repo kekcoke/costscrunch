@@ -14,7 +14,7 @@ import { DynamoDBDocumentClient, TranslateConfig } from "@aws-sdk/lib-dynamodb";
 import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 
 /** Base config shared by all AWS clients when running against LocalStack. */
-function baseConfig(): Record<string, unknown> {
+export function baseConfig(): Record<string, unknown> {
   const endpoint = process.env.AWS_ENDPOINT_URL;
   if (!endpoint) return {};
 
