@@ -20,7 +20,8 @@
     "db:seed": "node scripts/seed-dev.js",
     "load-test": "k6 run tests/load/main.js",
     "dev:opt2": "bash setup/localstack.sh",
-    "dev:opt3": "bash setup/localstack-opt3.sh"
+    "dev:opt3": "bash setup/localstack-opt3.sh",
+    "dev:opt3:clean": "cd infrastructure && docker compose -f docker-compose.localstack.yml down -v && docker system prune -f && cd .. && npm run dev:opt3"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
