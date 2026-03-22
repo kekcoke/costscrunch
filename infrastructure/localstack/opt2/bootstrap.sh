@@ -130,29 +130,94 @@ fi
 
 ROOT_RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id | [0]" --output text)
 
+# ── Helper: ensure a resource exists in the API Gateway tree ────────────────
+# Creates nested resources (e.g., /groups/{id}/balances) by walking path segments.
+ensure_resource() {
+  local PARENT_ID=$1
+  local PATH_PART=$2
+  local FULL_PATH=$3
+
+  local RES_ID
+  RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" \
+    --query "items[?path=='${FULL_PATH}'].id | [0]" --output text 2>/dev/null | tr -d '\r')
+
+  if [ -z "$RES_ID" ] || [ "$RES_ID" = "None" ]; then
+    RES_ID=$($AWS apigateway create-resource --rest-api-id "$API_ID" \
+      --parent-id "$PARENT_ID" --path-part "$PATH_PART" --query 'id' --output text | tr -d '\r')
+    echo "  ↳ Created resource: ${FULL_PATH} (${RES_ID})" >&2
+  fi
+
+  printf '%s' "$RES_ID"
+}
+
+# ── Helper: attach Lambda proxy integration to a resource ───────────────────
+add_integration() {
+  local RES_ID=$1
+  local FUNCTION=$2
+
+  for METHOD in GET POST PUT PATCH DELETE; do
+    $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES_ID" \
+      --http-method "$METHOD" --authorization-type "NONE" 2>/dev/null || true
+    $AWS apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES_ID" \
+      --http-method "$METHOD" --type AWS_PROXY --integration-http-method POST \
+      --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}/invocations" 2>/dev/null || true
+  done
+
+  # Single broad permission covers all methods on this resource
+  $AWS lambda add-permission --function-name "$FUNCTION" \
+    --statement-id "apigw-${FUNCTION}-${RES_ID}" \
+    --action lambda:InvokeFunction --principal apigateway.amazonaws.com \
+    --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/*" \
+    2>/dev/null || true
+}
+
+# ── Register a full path with a Lambda (creates resource tree automatically) ─
 add_route() {
   local ROUTE_PATH=$1
   local FUNCTION=$2
-  local PATH_PART=${ROUTE_PATH#/}
-  
-  local RES_ID=$($AWS apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/$PATH_PART'].id | [-1]" --output text 2>/dev/null | tr -d '\r')
-  if [ -z "$RES_ID" ] || [ "$RES_ID" = "None" ]; then
-    RES_ID=$($AWS apigateway create-resource --rest-api-id "$API_ID" --parent-id "$ROOT_RES_ID" --path-part "$PATH_PART" --query 'id' --output text | tr -d '\r')
-  fi
 
-  for METHOD in GET POST PUT PATCH DELETE; do
-    $AWS apigateway put-method --rest-api-id "$API_ID" --resource-id "$RES_ID" --http-method "$METHOD" --authorization-type "NONE" 2>/dev/null || true
-    $AWS apigateway put-integration --rest-api-id "$API_ID" --resource-id "$RES_ID" --http-method "$METHOD" --type AWS_PROXY --integration-http-method POST \
-      --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}/invocations" 2>/dev/null || true
-    $AWS lambda add-permission --function-name "$FUNCTION" --statement-id "api-$(date +%s)" --action lambda:InvokeFunction --principal apigateway.amazonaws.com \
-      --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*" 2>/dev/null || true
+  # Split path into segments and walk the resource tree
+  local PARENT_ID="$ROOT_RES_ID"
+  local CURRENT_PATH=""
+  local OLDIFS="$IFS"
+  IFS='/'
+  for SEG in $ROUTE_PATH; do
+    [ -z "$SEG" ] && continue
+    CURRENT_PATH="${CURRENT_PATH}/${SEG}"
+    PARENT_ID=$(ensure_resource "$PARENT_ID" "$SEG" "$CURRENT_PATH")
   done
+  IFS="$OLDIFS"
+
+  add_integration "$PARENT_ID" "$FUNCTION"
+  echo "  ↳ Route ${ROUTE_PATH} → ${FUNCTION}"
 }
 
+# ── Register all routes (must match server.ts + README API definitions) ─────
+echo "📦 Registering API routes"
+# Groups (6 routes)
 add_route /groups GroupsFunction
+add_route /groups/{id} GroupsFunction
+add_route /groups/{id}/balances GroupsFunction
+add_route /groups/{id}/members GroupsFunction
+add_route /groups/{id}/members/{userId} GroupsFunction
+add_route /groups/{id}/settle GroupsFunction
+
+# Expenses (2 routes — {id} sub-paths share one resource)
 add_route /expenses ExpensesFunction
+add_route /expenses/{id} ExpensesFunction
+
+# Receipts (3 routes)
 add_route /receipts ReceiptsFunction
+add_route /receipts/upload-url ReceiptsFunction
+add_route /receipts/{expenseId}/scan ReceiptsFunction
+
+# Analytics (4 routes)
 add_route /analytics AnalyticsFunction
+add_route /analytics/summary AnalyticsFunction
+add_route /analytics/trends AnalyticsFunction
+add_route /analytics/chart-data AnalyticsFunction
+
+# Health (1 route)
 add_route /health HealthFunction
 
 # ── CORS ────────────────────────────────────────────────────────────────────
