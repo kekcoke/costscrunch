@@ -11,6 +11,8 @@ import {
 } from "@aws-sdk/client-textract";
 import {
   PutCommand,
+  GetCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient, createS3Client } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
@@ -18,6 +20,8 @@ import { logger as internalLogger } from "../../utils/logger.js";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { getAuth } from "../../utils/auth.js";
+import { withLocalAuth } from "../_local/mockAuth.js";
 import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
 import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types.js";
@@ -40,13 +44,23 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "receipts" 
 
 
 // ─── Event-shape type guards ──────────────────────────────────────────────────
-function isApiGatewayEvent(event: unknown): event is APIGatewayProxyEventV2 {
-  return typeof (event as APIGatewayProxyEventV2).routeKey === "string";
+// REST API v1 events have httpMethod+path but no routeKey; HTTP API v2 has routeKey.
+function isApiGatewayEvent(event: unknown): boolean {
+  const e = event as any;
+  return typeof e.routeKey === "string" || typeof e.httpMethod === "string";
 }
 
 function isS3Event(event: unknown): event is S3Event {
   const e = event as S3Event;
   return Array.isArray(e.Records) && e.Records[0]?.eventSource === "aws:s3";
+}
+
+// Build a normalised route string that works for both REST v1 and HTTP v2
+function resolveRoute(event: any): string {
+  if (event.routeKey) return event.routeKey;
+  const method = event.httpMethod || "";
+  const path = event.path || event.requestContext?.http?.path || "";
+  return `${method} ${path}`;
 }
 
 // ─── Sub-handler: Generate Pre-signed POST ────────────────────────────────────
@@ -103,12 +117,12 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = withErrorHandler(async (event: S3Event | APIGatewayProxyEventV2) => {
+export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | APIGatewayProxyEventV2) => {
 
   logger.info("Received event raw shape", { 
     keys: Object.keys(event),
     isS3: "Records" in event,
-    isApi: "routeKey" in (event as any)
+    isApi: isApiGatewayEvent(event)
   });
   
   if (process.env.DEBUG_EVENT === "true") {
@@ -117,13 +131,35 @@ export const handler = withErrorHandler(async (event: S3Event | APIGatewayProxyE
 
   // ─── Route by event shape ──────────────────────────────────────────────────
   if (isApiGatewayEvent(event)) {
-    if (event.routeKey === "POST /receipts/upload-url") {
+    const route = resolveRoute(event);
+
+    if (route.includes("/upload-url")) {
       try {
         return await handleUploadUrl(event);
       } catch {
         return err("Failed to generate upload URL", 500);
       }
     }
+
+    // GET /receipts/{expenseId}/scan — poll scan result
+    if (route.includes("/scan")) {
+      const expenseId = (event.pathParameters as any)?.expenseId
+        || route.match(/\/receipts\/([^/]+)\/scan/)?.[1];
+      if (!expenseId) return err("expenseId is required", 400);
+
+      const result = await ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: {
+          ":pk": `RECEIPT#${expenseId}`,
+          ":prefix": "SCAN#",
+        },
+      }));
+
+      const scans = result.Items || [];
+      return ok({ items: scans, count: scans.length });
+    }
+
     return err("Not found", 404);
   }
 
@@ -188,4 +224,4 @@ export const handler = withErrorHandler(async (event: S3Event | APIGatewayProxyE
     logger.info("Textract job started", { JobId });
     metrics.addMetric("TextractJobStarted", MetricUnit.Count, 1);
   }
-});
+}));
