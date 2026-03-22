@@ -16,18 +16,17 @@ import {
   GoneException,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 import {
-  DynamoDBDocumentClient,
   QueryCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import type { EventBridgeEvent } from "aws-lambda";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 
 // The WebSocket endpoint is known at deploy time via an env var.
 // Format: https://{api-id}.execute-api.{region}.amazonaws.com/{stage}

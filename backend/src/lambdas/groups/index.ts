@@ -3,8 +3,8 @@
 //         POST /groups/:id/members, DELETE /groups/:id/members/:userId
 //         POST /groups/:id/settle, GET /groups/:id/balances
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
@@ -14,7 +14,7 @@ import { withLocalAuth } from "../_local/mockAuth.js";
 import { ulid } from "ulid";
 import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 const ses = new SESClient({});
 const TABLE = process.env.TABLE_NAME_MAIN!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;

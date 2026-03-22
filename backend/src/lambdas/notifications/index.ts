@@ -4,8 +4,8 @@
 
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
@@ -13,7 +13,7 @@ import type { EventBridgeEvent } from "aws-lambda";
 
 const ses = new SESClient({});
 const sns = new SNSClient({});
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;
 

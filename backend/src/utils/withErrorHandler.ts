@@ -34,9 +34,21 @@ export const withErrorHandler = <T extends AnyHandler>(
       (event && typeof event === 'object' && 'headers' in event ? (event as Record<string, any>).headers?.['x-request-id'] : undefined) ||
       'unknown';
 
+    const CORS_HEADERS = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Credentials': 'true',
+    };
+
     try {
       // Pass through context and rest parameters (like callback) if provided
-      return await handler(event, context as Context, ...rest);
+      const result = await handler(event, context as Context, ...rest);
+
+      // Inject CORS headers into successful responses
+      if (result && typeof result === 'object' && 'statusCode' in result) {
+        result.headers = { ...CORS_HEADERS, ...result.headers };
+      }
+
+      return result;
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       const statusCode = getStatusCode(err);
@@ -48,8 +60,7 @@ export const withErrorHandler = <T extends AnyHandler>(
         statusCode,
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Credentials': 'true',
+          ...CORS_HEADERS,
         },
         body: JSON.stringify({ error: message, requestId }),
       };

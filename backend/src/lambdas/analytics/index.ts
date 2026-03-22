@@ -1,6 +1,6 @@
 // ─── CostsCrunch — Analytics Lambda ────────────────────────────────────────────
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
@@ -14,7 +14,7 @@ import type {
   AnalyticsChartData, BubbleChartDatum 
 } from "./../../shared/models/charts.js";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
 const logger = new Logger({ serviceName: "analytics" });
 const metrics = new Metrics({ namespace: "CostsCrunch" });
@@ -47,13 +47,22 @@ const getStartDate = (period: string = "month"): string => {
 };
 
 export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
-  const route = event.routeKey || "";
+  // Support both HTTP API v2 (routeKey) and REST API v1 (path)
+  const route = event.routeKey || event.path || "";
   
   let auth;
   try {
     auth = getAuth(event);
   } catch (e) {
-    return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
+    return { 
+      statusCode: 401, 
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: JSON.stringify({ error: "Unauthorized" }) 
+    };
   }
 
   const q = (event.queryStringParameters || {}) as AnalyticsQuery;
@@ -171,5 +180,13 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
     return ok(chartData);
   }
 
-  return { statusCode: 404, body: JSON.stringify({ error: "Not found" }) };
+  return { 
+    statusCode: 404, 
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Credentials": "true",
+    },
+    body: JSON.stringify({ error: "Not found" }) 
+  };
 }));

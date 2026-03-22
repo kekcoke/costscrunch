@@ -4,17 +4,15 @@
 // Textract publishes to SNS on completion → sns-webhook.ts picks up from there.
 // Pipeline: UploadsBucket → image-preprocess → ProcessedBucket → [this file] → Textract
 
-import { S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import {
   TextractClient,
   StartExpenseAnalysisCommand,
 } from "@aws-sdk/client-textract";
 import {
-  DynamoDBDocumentClient,
   PutCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { createDynamoDBDocClient, createS3Client } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { logger as internalLogger } from "../../utils/logger.js";
 import { Tracer } from "@aws-lambda-powertools/tracer";
@@ -25,9 +23,9 @@ import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types.js";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
-const s3 = new S3Client({});
+const s3 = createS3Client();
 const textract = new TextractClient({});
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 
 const TABLE         = process.env.TABLE_NAME_MAIN!;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;

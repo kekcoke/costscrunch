@@ -1,11 +1,11 @@
 // ─── CostsCrunch — Expenses Lambda Handler ─────────────────────────────────────
 // Routes: GET /expenses, POST /expenses, GET /expenses/:id, PATCH /expenses/:id, DELETE /expenses/:id
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand,
+  GetCommand, PutCommand,
   QueryCommand, UpdateCommand, DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
@@ -19,7 +19,7 @@ import type {
 } from "../../shared/models/types.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
+const ddb = createDynamoDBDocClient({
   marshallOptions: { removeUndefinedValues: true },
 });
 const TABLE = process.env.TABLE_NAME_MAIN!;
