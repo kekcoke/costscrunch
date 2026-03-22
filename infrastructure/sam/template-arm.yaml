@@ -10,7 +10,8 @@ Globals:
     Timeout: 30
     Environment:
       Variables:
-        AWS_ENDPOINT_URL: http://host.docker.internal:4566
+        ENVIRONMENT: dev
+        AWS_ENDPOINT_URL: http://costscrunch-localstack:4566
         AWS_ACCESS_KEY_ID: test
         AWS_SECRET_ACCESS_KEY: test
         AWS_REGION: us-east-1
@@ -29,10 +30,14 @@ Globals:
         ResponseParameters:
           Headers:
             Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+            Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
       DEFAULT_5XX:
         ResponseParameters:
           Headers:
             Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+            Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
 
 Resources:
   GroupsFunction:

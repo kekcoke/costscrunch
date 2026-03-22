@@ -24,6 +24,7 @@ const {
   mockDynamoDbSend,
   mockS3Send,
   mockCreatePresignedPost,
+  mockAuthUser,
 } = vi.hoisted(() => ({
   mockTextractSend:       vi.fn().mockResolvedValue({ JobId: "textract-job-123" }),
   mockDynamoDbSend:       vi.fn().mockResolvedValue({}),
@@ -32,6 +33,7 @@ const {
     url:    "https://s3.amazonaws.com/bucket",
     fields: {},
   }),
+  mockAuthUser: { value: { sub: "test-user-001", email: "test@costscrunch.dev" } }
 }));
 
 // ─── AWS SDK mocks ────────────────────────────────────────────────────────────
@@ -82,7 +84,8 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
     })),
   },
   PutCommand:    vi.fn().mockImplementation(function (args) { return args; }),
-  UpdateCommand: vi.fn().mockImplementation(function (args) { return args; })
+  UpdateCommand: vi.fn().mockImplementation(function (args) { return args; }),
+  QueryCommand:  vi.fn().mockImplementation(function (args) { return args; })
 }));
 
 // ulid — first two calls return deterministic IDs; subsequent calls fall back.
@@ -94,17 +97,22 @@ vi.mock("ulid", () => ({
     .mockImplementation(() => "ULID-FALLBACK"),
 }));
 
+vi.mock("../../src/utils/auth.js", () => ({
+  getAuth: vi.fn(() => mockAuthUser.value),
+}));
+
 // ─── Vitest + type imports ────────────────────────────────────────────────────
 // These must appear after vi.mock() blocks (or at the very least, Vitest's
 // transform will hoist the vi.mock calls above them automatically).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { S3Event } from "aws-lambda";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { TextractClient, StartExpenseAnalysisCommand } from "@aws-sdk/client-textract";
 
 // ─── Subject under test ───────────────────────────────────────────────────────
 import { handler } from "../../src/lambdas/receipts/index.js";
+import * as authUtils from "../../src/utils/auth.js";
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 import {
@@ -157,6 +165,27 @@ function makeUploadUrlEvent(
   });
 }
 
+/**
+ * Creates a REST v1 style event (no routeKey, has path + httpMethod)
+ */
+function makeRestV1Event(method: string, path: string, overrides: any = {}) {
+  const event = makeApiEvent({ method, path, ...overrides });
+  delete (event as any).routeKey;
+  (event as any).httpMethod = method;
+  (event as any).path = path;
+  return event;
+}
+
+/**
+ * Reusable assertion for CORS headers
+ */
+function expectCorsHeaders(result: any) {
+  expect(result.headers).toMatchObject({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  });
+}
+
 function makeS3Event(keyOverride?: string): S3Event {
   const key = keyOverride ?? `receipts/${TEST_USER_ID}/expense-001/scan-001/receipt.jpg`;
   return {
@@ -196,6 +225,15 @@ describe("Router — event-shape dispatch", () => {
     // mockCreatePresignedPost already has a default resolved value from vi.hoisted.
     const result = await handler(makeUploadUrlEvent());
     expect(result).toMatchObject({ statusCode: 200 });
+    expectCorsHeaders(result);
+  });
+
+  it("routes REST v1 style events (no routeKey) correctly", async () => {
+    const result = await handler(makeRestV1Event("POST", "/receipts/upload-url", {
+      body: { contentType: "image/jpeg", filename: "test.jpg" }
+    }));
+    expect(result).toMatchObject({ statusCode: 200 });
+    expectCorsHeaders(result);
   });
 
   it("returns 404 for an unmatched API Gateway routeKey", async () => {
@@ -204,24 +242,35 @@ describe("Router — event-shape dispatch", () => {
     );
     expect(result).toMatchObject({ statusCode: 404 });
     expect(JSON.parse((result as any).body).error).toBe("Not found");
+    expectCorsHeaders(result);
   });
 
   it("returns 400 for a completely unknown event shape", async () => {
     const result = await handler({ completely: "unknown" } as any);
     expect(result).toMatchObject({ statusCode: 400 });
     expect(JSON.parse((result as any).body).error).toBe("Unknown event type");
+    // Unknown events returning 400 also use the err() helper which adds CORS
+    expectCorsHeaders(result);
   });
 });
 
 // ─── UNIT: handleUploadUrl ────────────────────────────────────────────────────
 describe("handleUploadUrl", () => {
   it("returns 401 when JWT authorizer claims are absent", async () => {
-    const event = makeUploadUrlEvent();
-    (event.requestContext as any).authorizer = undefined;
+    // Forcefully disable mock auth for this specific test
+    vi.stubEnv("MOCK_AUTH", "false");
 
-    const result = await handler(event);
-    expect(result).toMatchObject({ statusCode: 401 });
-    expect(JSON.parse((result as any).body).error).toBe("Unauthorized");
+    try {
+      const event = makeUploadUrlEvent();
+      // Ensure the authorizer is stripped so the handler sees no userId
+      (event.requestContext as any).authorizer = undefined;
+      
+      const result = await handler(event);
+      expect(result?.statusCode).toBe(401);
+      expect(JSON.parse((result as any).body).error).toBe("Unauthorized");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("returns 400 for a disallowed MIME type", async () => {
@@ -384,5 +433,74 @@ describe("S3 handler — key validation", () => {
 
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.JobTag).toBe("expense-001/scan-001");
+  });
+});
+
+// ─── UNIT: handleGetScan ──────────────────────────────────────────────────────
+describe("handleGetScan", () => {
+  const expenseId = "exp-123";
+  const scanEvent = makeApiEvent({
+    routeKey: "GET /receipts/{expenseId}/scan",
+    method:   "GET",
+    path:     `/receipts/${expenseId}/scan`,
+    pathParameters: { expenseId }
+  });
+
+  it("returns items from DynamoDB for a valid expenseId", async () => {
+    const mockItems = [
+      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#1", status: "completed" },
+      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#2", status: "processing" }
+    ];
+    mockDynamoDbSend.mockResolvedValueOnce({ Items: mockItems });
+
+    const result = await handler(scanEvent);
+    const body = JSON.parse((result as any).body);
+
+    expect(result?.statusCode).toBe(200);
+    expect(body.items).toEqual(mockItems);
+    expect(body.count).toBe(2);
+    expectCorsHeaders(result);
+
+    const queryArg = vi.mocked(QueryCommand).mock.calls[0]?.[0] as any;
+    expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`RECEIPT#${expenseId}`);
+  });
+
+  it("extracts expenseId via regex fallback if pathParameters are missing (REST v1 style)", async () => {
+    const event = makeRestV1Event("GET", `/receipts/${expenseId}/scan`);
+    mockDynamoDbSend.mockResolvedValueOnce({ Items: [] });
+
+    const result = await handler(event);
+    expect(result?.statusCode).toBe(200);
+    
+    const queryArg = vi.mocked(QueryCommand).mock.calls[0]?.[0] as any;
+    expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`RECEIPT#${expenseId}`);
+  });
+
+  it("returns 404 if expenseId is missing and regex fails (route fallthrough)", async () => {
+    const event = makeRestV1Event("GET", "/receipts/invalid-path");
+    
+    const result = await handler(event);
+    // Router falls through to Not Found because /scan regex doesn't match
+    expect(result?.statusCode).toBe(404);
+  });
+
+  it("returns 500 when DynamoDB query fails", async () => {
+    mockDynamoDbSend.mockRejectedValueOnce(new Error("DDB Down"));
+
+    const result = await handler(scanEvent);
+    expect(result?.statusCode).toBe(500);
+    // withErrorHandler converts uncaught errors to "Internal server error"
+    expect(JSON.parse((result as any).body).error).toBe("Internal server error");
+    expectCorsHeaders(result);
+  });
+
+  it("returns empty items when no items found", async () => {
+    mockDynamoDbSend.mockResolvedValueOnce({ Items: [] });
+
+    const result = await handler(scanEvent);
+    expect(result?.statusCode).toBe(200);
+    const body = JSON.parse((result as any).body);
+    expect(body.items).toEqual([]);
+    expect(body.count).toBe(0);
   });
 });

@@ -99,7 +99,7 @@ const lambdaAdapter = (handler: any, routeKeyPattern: string) =>
 // Routers - Analytics
 app.get('/analytics/summary', lambdaAdapter(analyticsHandler, 'GET /analytics/summary'));
 app.get('/analytics/trends', lambdaAdapter(analyticsHandler, 'GET /analytics/trends'));
-app.get('/analytics/chartData', lambdaAdapter(analyticsHandler,'GET /analytics/chartData' ));
+app.get('/analytics/chart-data', lambdaAdapter(analyticsHandler, 'GET /analytics/chart-data'));
 
 // Routes - Expenses
 app.get('/expenses', lambdaAdapter(expensesHandler, '/expenses'));

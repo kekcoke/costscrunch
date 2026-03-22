@@ -1,8 +1,14 @@
 {
   // ─── Vitest Extension Configuration ─────────────────────────────────────────
   "vitest.enable": true,
-  "vitest.commandLine": "npx vitest",
-  "vitest.workspaceConfig": "${workspaceFolder}/.vscode/vitest.workspace.ts",
+  "vitest.commandLine": "node_modules/.bin/vitest",
+  "vitest.workspaceConfig": ".vscode/vitest.workspace.ts",
+  "vitest.root": "${workspaceFolder}",
+  "vitest.projects": [
+    "backend",
+    "frontend",
+    "infrastructure"
+  ],
 
   // Auto-detect test files
   "vitest.include": [
@@ -12,7 +18,11 @@
     "**/*.test.tsx"
   ],
 
-  // Environment variables for all test projects
+  "vitest.nodeRuntime": "/opt/homebrew/bin/node",
+  "jest.enable": false,
+  "vitest.env": {
+    "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
   "vitest.nodeEnv": {
     "NODE_ENV": "test"
   },

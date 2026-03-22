@@ -3,17 +3,18 @@
 //         POST /groups/:id/members, DELETE /groups/:id/members/:userId
 //         POST /groups/:id/settle, GET /groups/:id/balances
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient, baseConfig } from "../../utils/awsClients.js";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { getAuth } from "../../utils/auth.js";
+import { withLocalAuth } from "../_local/mockAuth.js";
 import { ulid } from "ulid";
 import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
-
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const ses = new SESClient({});
+const ddb = createDynamoDBDocClient();
+const ses = new SESClient(baseConfig());
 const TABLE = process.env.TABLE_NAME_MAIN!;
 const FROM_EMAIL = process.env.FROM_EMAIL!;
 
@@ -22,11 +23,19 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "groups" })
 
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, body: JSON.stringify(body),
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
 });
 const err = (msg: string, statusCode = 400) => ({
   statusCode, body: JSON.stringify({ error: msg }),
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
 });
 
 // ─── Balance Calculator ───────────────────────────────────────────────────────
@@ -127,13 +136,23 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = withErrorHandler(async (event: ApiEvent) => {
+export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
   const method = event.httpMethod || event.requestContext?.http?.method || "";
   const path = event.path || event.requestContext?.http?.path || "";
   const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey);
 
-  const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
+  let auth;
+  try {
+    auth = getAuth(event);
+  } catch (e) {
+    logger.warn("Auth extraction failed", { 
+      authorizer: event.requestContext?.authorizer,
+      env: process.env.MOCK_AUTH 
+    });
+    return err("Unauthorized", 401);
+  }
+
   // Prefer explicit pathParameters (from HTTP API v2 / Express adapter), fall back to parsed params
   const mergedParams = { ...pathParams, ...event.pathParameters };
   const groupId = mergedParams.id;
@@ -476,4 +495,4 @@ export const handler = withErrorHandler(async (event: ApiEvent) => {
   }
 
   return err("Route not found", 404);
-});
+}));

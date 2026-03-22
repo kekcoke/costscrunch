@@ -173,7 +173,8 @@ jobs:
       - name: Smoke test production
         run: |
           # Verify health endpoint with 30s timeout and fail on non-200
-          curl -f --max-time 30 ${{env.VITE_APP_URL}}/health || exit 1
+          APP_URL="https://api.costscrunch.io"
+          curl -f --max-time 30 "${APP_URL}/health" || exit 1
           echo "Production health check passed ✅"
       - name: Notify Slack
         uses: 8398a7/action-slack@v3

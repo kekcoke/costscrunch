@@ -1,9 +1,11 @@
 // ─── CostsCrunch — Analytics Lambda ────────────────────────────────────────────
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { getAuth } from "../../utils/auth.js";
+import { withLocalAuth } from "../_local/mockAuth.js";
 import type { ApiEvent } from "../../shared/models/types.js";
 import type { 
   AnalyticsQuery, 
@@ -12,14 +14,18 @@ import type {
   AnalyticsChartData, BubbleChartDatum 
 } from "./../../shared/models/charts.js";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
 const logger = new Logger({ serviceName: "analytics" });
 const metrics = new Metrics({ namespace: "CostsCrunch" });
 
 const ok = (body: unknown) => ({ 
   statusCode: 200, 
-  headers: { "Content-Type": "application/json" }, 
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  }, 
   body: JSON.stringify(body) 
 });
 
@@ -40,9 +46,25 @@ const getStartDate = (period: string = "month"): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
-export const handler = withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
-  const route = event.routeKey || "";
-  const auth = { userId: event.requestContext.authorizer.jwt.claims.sub };
+export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
+  // Support both HTTP API v2 (routeKey) and REST API v1 (path)
+  const route = event.routeKey || event.path || "";
+  
+  let auth;
+  try {
+    auth = getAuth(event);
+  } catch (e) {
+    return { 
+      statusCode: 401, 
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: JSON.stringify({ error: "Unauthorized" }) 
+    };
+  }
+
   const q = (event.queryStringParameters || {}) as AnalyticsQuery;
 
   const startDate = q.from || getStartDate(q.period);
@@ -128,7 +150,7 @@ export const handler = withErrorHandler(async (event: ApiEvent & { routeKey?: st
     return ok(trends);
   }
 
-  if (route.includes("/chartData")) {
+  if (route.includes("/chart-data")) {
     const categoryTotals: Record<string, number> = {};
     const bubbleMap: Record<string, BubbleChartDatum> = {};
 
@@ -158,5 +180,13 @@ export const handler = withErrorHandler(async (event: ApiEvent & { routeKey?: st
     return ok(chartData);
   }
 
-  return { statusCode: 404, body: JSON.stringify({ error: "Not found" }) };
-});
+  return { 
+    statusCode: 404, 
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Credentials": "true",
+    },
+    body: JSON.stringify({ error: "Not found" }) 
+  };
+}));

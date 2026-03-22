@@ -1,15 +1,17 @@
 // ─── CostsCrunch — Expenses Lambda Handler ─────────────────────────────────────
 // Routes: GET /expenses, POST /expenses, GET /expenses/:id, PATCH /expenses/:id, DELETE /expenses/:id
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand,
+  GetCommand, PutCommand,
   QueryCommand, UpdateCommand, DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { getAuth } from "../../utils/auth.js";
+import { withLocalAuth } from "../_local/mockAuth.js";
 import { ulid } from "ulid";
 import type {
   ApiEvent, AuthContext, CreateExpenseRequest,
@@ -17,7 +19,7 @@ import type {
 } from "../../shared/models/types.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
+const ddb = createDynamoDBDocClient({
   marshallOptions: { removeUndefinedValues: true },
 });
 const TABLE = process.env.TABLE_NAME_MAIN!;
@@ -29,23 +31,24 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ok = (body: unknown, statusCode = 200) => ({
-  statusCode, headers: { "Content-Type": "application/json", "X-Request-Id": ulid() },
+  statusCode, 
+  headers: { 
+    "Content-Type": "application/json", 
+    "X-Request-Id": ulid(),
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
   body: JSON.stringify(body),
 });
 const err = (msg: string, statusCode = 400) => ({
-  statusCode, headers: { "Content-Type": "application/json" },
+  statusCode, 
+  headers: { 
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+  },
   body: JSON.stringify({ error: msg }),
 });
-
-function getAuth(event: ApiEvent): AuthContext {
-  const claims = event.requestContext.authorizer.jwt.claims;
-  return {
-    userId: claims.sub,
-    email: claims.email,
-    groups: (claims["cognito:groups"] || "").split(",").filter(Boolean),
-    plan: "pro", // in prod: fetch from DynamoDB or JWT custom claim
-  };
-}
 
 function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense>) {
   return {
@@ -59,9 +62,16 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const rawHandler = withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
+export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
-  const auth = getAuth(event);
+  
+  let auth;
+  try {
+    auth = getAuth(event);
+  } catch (e) {
+    return err("Unauthorized", 401);
+  }
+
   const expenseId = event.pathParameters?.id;
 
   logger.appendKeys({ userId: auth.userId, route });
@@ -271,4 +281,4 @@ export const rawHandler = withErrorHandler(async (event: ApiEvent & { httpMethod
   }
 
   return err("Route not found", 404);
-});
+}));

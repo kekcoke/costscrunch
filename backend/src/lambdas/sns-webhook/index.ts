@@ -22,10 +22,9 @@ import {
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 import {
-  DynamoDBDocumentClient,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import {
   EventBridgeClient,
   PutEventsCommand,
@@ -39,7 +38,7 @@ import type { SNSEvent } from "aws-lambda";
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const textract = new TextractClient({});
 const bedrock  = new BedrockRuntimeClient({ region: "us-east-1" });
-const ddb      = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb      = createDynamoDBDocClient();
 const eb       = new EventBridgeClient({});
 
 const TABLE         = process.env.TABLE_NAME_MAIN!;

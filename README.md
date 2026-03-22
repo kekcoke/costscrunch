@@ -66,7 +66,7 @@ costscrunch
     ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
     ├── sam/                 # Local emulation templates (REST v1 / ARM64)
     ├── stacks/              # CDK Infrastructure-as-Code definitions
-    ├── .env.test            # Mock variables for Vitest execution
+    ├── .env.dev             # Mock variables for Vitest execution
     └── docker-compose.yml   # Multi-container orchestration (LocalStack base)
 ```
 
@@ -292,6 +292,7 @@ Receipts
 Analytics
   GET    /analytics/summary?period=month|quarter|year
   GET    /analytics/trends
+  GET    /analytics/chart-data
 
 Monitoring
   GET    /health                      isolated health check
@@ -369,17 +370,19 @@ sequenceDiagram
 
     Note over Browser, Lambda: Preflight Flow
     Browser->>LS_Edge: OPTIONS /groups/123
-    LS_Edge->>APIGW: Match {proxy+}
-    APIGW->>APIGW: Execute MOCK Integration
+    LS_Edge->>APIGW: Match /groups/{id} resource
+    APIGW->>APIGW: Execute MOCK Integration (CORS enforcer)
     APIGW-->>Browser: 200 OK (CORS Headers)
 
     Note over Browser, Lambda: Actual Request Flow
     Browser->>LS_Edge: GET /groups/123
-    LS_Edge->>APIGW: Route to /{proxy+}
-    APIGW->>Lambda: Invoke (AWS_PROXY)
-    Lambda->>Lambda: normalizeRoute(/groups/123) -> {id: "123"}
-    Lambda->>Lambda: Inject MOCK_AUTH claims
-    Lambda-->>Browser: 200 OK + Data + CORS Headers
+    LS_Edge->>APIGW: Match /groups/{id} resource
+    APIGW->>Lambda: Invoke via AWS_PROXY
+    Lambda->>Lambda: resolveRoute() -> "GET /groups/123"
+    Lambda->>Lambda: withLocalAuth() middleware
+    Lambda->>Lambda: getAuth(event) -> Unified claims
+    Lambda->>Lambda: response helpers inject CORS headers (Access-Control-Allow-Origin)
+    Lambda-->>Browser: 200 OK + Data + CORS Headers (Required for REST v1 Proxy)
 ```
 
 #### Option 3 Flow (SAM CLI + Express)
@@ -410,6 +413,7 @@ sequenceDiagram
 | **Authorizer** | **Synthetic**: `MOCK_AUTH` wrapper in Lambda or Adapter. | **Managed**: Real Cognito JWT validation, MFA, and Token revocation. |
 | **Routing** | **Manual Bridge**: Requires `normalizeRoute()` to map path segments to templates. | **Native**: AWS handles parameter mapping from URL patterns automatically. |
 | **IAM/WAF** | **CRUD-Only**: Policies exist but are not enforced in LocalStack Free. | **Active**: Strict enforcement of Least Privilege and OWASP Rate Limiting. |
+| **Test Env** | **JSDOM**: Browser emulation for React component and DOM testing. | **Node**: Lambda integration testing via LocalStack. |
 | **Persistence** | **Ephemeral**: State is lost on container restart unless using volume mounts. | **Durable**: Point-in-Time Recovery and Multi-Region Replication active. |
 
 ---
@@ -440,43 +444,34 @@ cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
 
 #### Option 2 — Full LocalStack (Lambda + API GW Inside Container)
 
-Provisions IAM role, 6 Lambda functions, REST API (v1) with hierarchical resource mapping, and automated CORS enforcement. `setup.sh` seeds data; `bootstrap.sh` provisions compute.
+Provisions IAM role, 7 Lambda functions, REST API (v1) with 18-resource hierarchical tree, and automated CORS enforcement. `setup.sh` seeds data; `bootstrap.sh` provisions compute (idempotent — reuses existing API).
 
 ```bash
-# 1. Start base LocalStack (data seeding)
-cd infrastructure
-docker compose -f docker-compose.localstack.yml up -d
+# One command handles everything:
+npm run dev:opt2
 
-# 2. Start supplemental compute container (Lambda + API GW)
-docker compose -f localstack/opt2/docker-compose.opt2.yml up -d
-
-until docker exec costscrunch-localstack-seed echo "✅✅✅ LocalStack seed complete!" >/dev/null 2>&1; do
-  sleep 20
-done
-
-# 3. Build Lambda code and mount into container
-cd ../backend
-npm run build   # produces esbuild bundles
-
-# 4. Copy build artifacts into LocalStack's expected SAM build path
-#    bootstrap.sh expects /opt/sam-build/{FunctionName}/ inside the container
-docker exec costscrunch-localstack mkdir -p /opt/bootstrap
-docker exec costscrunch-localstack mkdir -p /opt/sam-build-src
-docker cp "$PROJECT_ROOT/infrastructure/localstack/opt2/bootstrap.sh" costscrunch-localstack:/opt/bootstrap/bootstrap.sh
-docker cp "$PROJECT_ROOT/backend/src" costscrunch-localstack:/opt/sam-build-src
-# (See opt2/README.md for full sam build instructions)
-
-# 5. Run bootstrap inside the Lambda container
-docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
-
-# 6. Set frontend API URL
-export VITE_API_URL="http://localhost:4566/restapis/{API_ID}/local/_user_request_"
-# API_ID is printed by bootstrap.sh. If CORS blocks persist, run the enforcer:
-docker exec costscrunch-localstack bash /localstack/opt2/enable-cors.sh {API_ID}
-
-# 7. Start frontend
-cd ../frontend && npm run dev
+# What it does internally:
+# 1. Starts LocalStack + seed container (docker compose up)
+# 2. Waits for data seed to complete
+# 3. Builds Lambda bundles (npm run build:local)
+# 4. Copies bootstrap.sh + enable-cors.sh + build artifacts into container
+# 5. Runs bootstrap.sh (creates/reuses API, registers all routes, deploys stage)
+# 6. Fetches API_ID and sets VITE_API_URL as shell env
+# 7. Starts Vite dev server with correct API URL
 ```
+
+**Manual re-bootstrap after `docker compose down`:**
+```bash
+cd backend && npm run build:local
+docker exec costscrunch-localstack mkdir -p /opt/bootstrap /opt/lambda-build
+docker cp infrastructure/localstack/opt2/bootstrap.sh costscrunch-localstack:/opt/bootstrap/
+docker cp infrastructure/localstack/opt2/enable-cors.sh costscrunch-localstack:/opt/bootstrap/
+docker cp backend/dist/lambda/. costscrunch-localstack:/opt/lambda-build/
+docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
+# Update .env.dev with the API_ID from output, then restart Vite
+```
+
+> **Note:** `docker compose down` destroys LocalStack state (no persistent volume by default). The API ID changes on every fresh start. To persist the ID, add a named volume `localstack-data:/var/lib/localstack` to `docker-compose.localstack.yml` — see `notes/2026-03-21-fix-localstack-404s.md`.
 
 #### Option 3 — SAM CLI Local (Recommended for Development)
 
@@ -510,7 +505,7 @@ npm run dev
 ```bash
 # Infrastructure tests
 cd infrastructure
-npm test                                        # all infra tests (loads .env.test via setup.ts)
+npm test                                        # all infra tests (loads .env.dev via setup.ts)
 npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)

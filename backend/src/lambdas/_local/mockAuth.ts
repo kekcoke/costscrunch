@@ -15,9 +15,9 @@ function getMockClaims(): Record<string, string> {
 }
 
 export function withMockAuth(
-  handler: (event: any, context: any) => Promise<any>,
-): (event: any, context: any) => Promise<any> {
-  return async (event: any, context: any) => {
+  handler: (event: any, context?: any) => Promise<any>,
+): (event: any, context?: any) => Promise<any> {
+  return async (event: any, context?: any) => {
     // OWASP ASVS v4.0 V13.1 — mock auth must never be active outside dev
     if (
       process.env.MOCK_AUTH === "true" &&
@@ -29,16 +29,22 @@ export function withMockAuth(
       );
     }
 
-    if (
-      process.env.MOCK_AUTH === "true" &&
-      !event.requestContext?.authorizer?.jwt?.claims?.sub
-    ) {
-      event.requestContext = {
-        ...event.requestContext,
-        authorizer: {
-          jwt: { claims: { ...getMockClaims() } },
-        },
-      };
+    if (process.env.MOCK_AUTH === "true") {
+      const authorizer = event.requestContext?.authorizer || {};
+      const claims = authorizer.jwt?.claims || authorizer.claims;
+
+      if (!claims?.sub) {
+        const mockClaims = getMockClaims();
+        event.requestContext = {
+          ...event.requestContext,
+          authorizer: {
+            ...authorizer,
+            jwt: { claims: { ...mockClaims } },
+            // Also inject into root for v1 compatibility
+            claims: { ...mockClaims },
+          },
+        };
+      }
     }
     return handler(event, context);
   };

@@ -30,6 +30,15 @@
 
 set -euo pipefail
 
+# Load environment variables: .env -> .env.<ENVIRONMENT> -> .env.local
+# ENV_FILES=("../../../.env" "../../../.env.${ENVIRONMENT:-dev}" "../../../.env.local")
+# for f in "${ENV_FILES[@]}"; do
+#   if [ -f "$f" ]; then
+#     echo "  ↳ Sourcing $f"
+#     export $(grep -v '^#' "$f" | xargs)
+#   fi
+# done
+
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
 TABLE_NAME_MAIN="costscrunch-dev-main"
 TABLE_NAME_DYNAMO_CONNECTIONS="costscrunch-dev-connections"
@@ -43,6 +52,7 @@ FROM_EMAIL="noreply@costscrunch.dev"
 # Accept connections from both opt2 (port 4566 proxy) and opt3 (port 3001)
 APP_URL="${APP_URL:-http://localhost:3000}"
 APP_URL_OPT3="http://localhost:3001"
+APP_URL_VITE="http://localhost:5173"
 
 echo "🔧 costscrunch LocalStack seed starting..."
 
@@ -164,7 +174,7 @@ $AWS s3api put-bucket-cors \
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'"],
+      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "'"$APP_URL_VITE"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]
@@ -267,7 +277,7 @@ $AWS s3api put-bucket-cors \
     "CORSRules": [{
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["PUT","GET"],
-      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'"],
+      "AllowedOrigins": ["'"$APP_URL"'", "'"$APP_URL_OPT3"'", "'"$APP_URL_VITE"'"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
     }]

@@ -222,7 +222,7 @@ describe("GET /analytics/trends", () => {
 });
 
 // ── Chart Data ───────────────────────────────────────────────────────────────
-describe("GET /analytics/chartData", () => {
+describe("GET /analytics/chart-data", () => {
   it("returns donut and bubble chart data", async () => {
     const expenses = [
       makeExpense({ amount: 100, category: "Food" }),
@@ -231,7 +231,7 @@ describe("GET /analytics/chartData", () => {
     ddbMock.on(QueryCommand).resolves({ Items: expenses });
 
     const res = await handler(
-      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+      makeEvent({ routeKey: "GET /analytics/chart-data" }) as any
     );
 
     expect(res.statusCode).toBe(200);
@@ -248,7 +248,7 @@ describe("GET /analytics/chartData", () => {
     ddbMock.on(QueryCommand).resolves({ Items: expenses });
 
     const res = await handler(
-      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+      makeEvent({ routeKey: "GET /analytics/chart-data" }) as any
     );
     const { donut } = JSON.parse(res.body);
 
@@ -260,7 +260,7 @@ describe("GET /analytics/chartData", () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
 
     const res = await handler(
-      makeEvent({ routeKey: "GET /analytics/chartData" }) as any
+      makeEvent({ routeKey: "GET /analytics/chart-data" }) as any
     );
     const body = JSON.parse(res.body);
 

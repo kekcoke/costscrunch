@@ -12,6 +12,9 @@
 
 services:
   localstack:
+    # Load environment variables from the monorepo root
+    env_file:
+      - ../../../.env.${ENVIRONMENT:-dev}
     environment:
       # Enable Lambda execution inside the LocalStack container (docker-reuse =
       # run Lambda in a sibling container on the same Docker host)
