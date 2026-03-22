@@ -150,7 +150,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
     return ok(trends);
   }
 
-  if (route.includes("/chartData")) {
+  if (route.includes("/chart-data")) {
     const categoryTotals: Record<string, number> = {};
     const bubbleMap: Record<string, BubbleChartDatum> = {};
 

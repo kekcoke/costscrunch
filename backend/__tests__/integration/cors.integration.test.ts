@@ -42,7 +42,7 @@ const CORS_ROUTES: ReadonlyArray<[string, string]> = [
   ["OPTIONS", "/groups/test-id/settle"],
   ["OPTIONS", "/analytics/summary"],
   ["OPTIONS", "/analytics/trends"],
-  ["OPTIONS", "/analytics/chartData"],
+  ["OPTIONS", "/analytics/chart-data"],
   ["OPTIONS", "/receipts/upload-url"],
   ["OPTIONS", "/receipts/test-id/scan"],
 ];
