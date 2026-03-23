@@ -2,24 +2,9 @@
   // ─── Vitest Extension Configuration ─────────────────────────────────────────
   "vitest.enable": true,
   "vitest.commandLine": "node_modules/.bin/vitest",
-  "vitest.workspaceConfig": ".vscode/vitest.workspace.ts",
   "vitest.root": "${workspaceFolder}",
-  "vitest.projects": [
-    "backend",
-    "frontend",
-    "infrastructure"
-  ],
-
-  // Auto-detect test files
-  "vitest.include": [
-    "**/__tests__/**/*.test.ts",
-    "**/__tests__/**/*.test.tsx",
-    "**/*.test.ts",
-    "**/*.test.tsx"
-  ],
-
+  "vitest.workspaceConfig": "vitest.workspace.ts",
   "vitest.nodeRuntime": "/opt/homebrew/bin/node",
-  "jest.enable": false,
   "vitest.env": {
     "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   },
@@ -28,7 +13,7 @@
   },
 
   // ─── Test Explorer Configuration ─────────────────────────────────────────────
-  "testExplorer.useNativeTesting": false,
+  "testExplorer.useNativeTesting": true,
 
   // ─── File Associations ───────────────────────────────────────────────────────
   "files.associations": {
