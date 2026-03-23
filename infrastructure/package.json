@@ -35,7 +35,7 @@
     "@aws-sdk/client-sns": "^3.1007.0",
     "@aws-sdk/client-sqs": "^3.1007.0",
     "@aws-sdk/client-ssm": "^3.1007.0",
-    "vitest": "^2.1.0",
+    "vitest": "^4.0.18",
     "@types/node": "^20.16.1",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
