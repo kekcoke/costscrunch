@@ -135,6 +135,20 @@ export class CostsCrunchStack extends Stack {
             removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
         });
 
+        // ── DynamoDB Cost Estimates & Outputs ─────────────────────────────────────
+        // 10K writes/day @ $1.25/million = $0.0125/day
+        // 50K reads/day  @ $0.25/million = $0.0125/day
+        // Storage: ~10GB @ $0.25/GB/mo = $0.08/day
+        // Total Estimated Launch Cost: ~$0.10/day per table (excl. GSI replication)
+        new CfnOutput(this, "MainTableCostNote", { 
+            value: "Estimated $3-5/mo for 10K writes/50K reads daily (On-Demand)",
+            description: "Cost note for MainTable launch capacity"
+        });
+        new CfnOutput(this, "ConnTableCostNote", {
+            value: "Estimated <$1/mo for connection management (On-Demand)",
+            description: "Cost note for ConnTable launch capacity"
+        });
+
         // ── Account & Region Utilities ───────────────────────────────────────────
         const { accountId, regionId, isTest } = config;
 
