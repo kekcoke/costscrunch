@@ -259,10 +259,24 @@ The preprocessing layer is designed for seamless backwards compatibility:
 | Auth | Cognito JWT (RS256) + PKCE + MFA optional |
 | Network | VPC private subnets + VPC Endpoints (no internet for AWS APIs) |
 | Data | DynamoDB + S3 encrypted with KMS CMK (Rotation Enforced) |
-| Secrets | Secrets Manager + 30-day auto-rotation |
+| Secrets | SSM Parameter Store + Secrets Manager (no plain-text secrets in env vars or outputs) |
 | Audit | CloudTrail + GuardDuty + Security Hub |
 | Code | Semgrep SAST + npm audit + Gitleaks in CI |
 | IAM | Least-privilege per-Lambda roles, no wildcards |
+
+### Secrets Management
+
+Sensitive values are stored in AWS SSM Parameter Store and Secrets Manager. Lambda functions retrieve them at runtime via IAM-granted access — no secrets appear in CloudFormation templates or environment variables.
+
+| Secret Type | Storage | Parameter Path / Secret Name |
+|-------------|---------|----------------------------|
+| Bedrock Model ID | SSM Parameter Store | `/costscrunch-{env}/bedrock-model-id` |
+| Frontend URL (CORS) | SSM Parameter Store | `/costscrunch-{env}/vite-app-url` |
+| Sender Email | SSM Parameter Store | `/costscrunch-{env}/from-email` |
+| Pinpoint App ID | SSM Parameter Store | `/costscrunch-{env}/pinpoint-app-id` |
+| Notification Config | Secrets Manager | `costscrunch-{env}/notification-config` |
+
+**CDK Synthesis Guard:** An `IAspect` scans all Lambda functions during `cdk synth`. If a sensitive environment variable (API key, password, token, email address) is detected, synthesis fails with an error pointing to the offending construct. This prevents secrets from being accidentally committed to Infrastructure-as-Code.
 
 ---
 
