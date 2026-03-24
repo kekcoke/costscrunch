@@ -104,7 +104,7 @@ vi.mock("../../src/utils/auth.js", () => ({
 // ─── Vitest + type imports ────────────────────────────────────────────────────
 // These must appear after vi.mock() blocks (or at the very least, Vitest's
 // transform will hoist the vi.mock calls above them automatically).
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import type { S3Event } from "aws-lambda";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
@@ -127,6 +127,10 @@ const TABLE_NAME_MAIN         = process.env.TABLE_NAME_MAIN;
 const EVENT_BUS_NAME          = process.env.EVENT_BUS_NAME;
 const BUCKET_UPLOADS_NAME     = process.env.BUCKET_UPLOADS_NAME ?? "costscrunch-dev-uploads-000000000000";
 const BUCKET_RECEIPTS_NAME    = process.env.BUCKET_RECEIPTS_NAME ?? "costscrunch-dev-receipts-000000000000";
+
+// Ensure env vars are set so handler code reading process.env.* at call-time gets values
+if (!process.env.BUCKET_UPLOADS_NAME) process.env.BUCKET_UPLOADS_NAME = BUCKET_UPLOADS_NAME;
+if (!process.env.BUCKET_RECEIPTS_NAME) process.env.BUCKET_RECEIPTS_NAME = BUCKET_RECEIPTS_NAME;
 
 let snsTopic: string;
 let snsRole: string;
