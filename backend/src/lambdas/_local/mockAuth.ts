@@ -49,3 +49,6 @@ export function withMockAuth(
     return handler(event, context);
   };
 }
+
+// Alias — handlers import as withLocalAuth for clarity
+export { withMockAuth as withLocalAuth };

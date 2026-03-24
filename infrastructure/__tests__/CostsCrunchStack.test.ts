@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { CostsCrunchStack } from "../stacks/CostsCrunchStack";
@@ -24,7 +25,7 @@ describe("CostsCrunchStack Alarms", () => {
 
   it("creates Lambda Error Rate Alarms for all functions", () => {
     // We have 9 functions defined in the stack
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 20); // (9 functions * 2 alarms) + DynamoDB + Pipeline
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 21); // (9 functions * 2 alarms) + DynamoDB + Pipeline + DLQ
     
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       ComparisonOperator: "GreaterThanOrEqualToThreshold",
@@ -35,10 +36,10 @@ describe("CostsCrunchStack Alarms", () => {
   });
 
   it("creates Lambda Duration Alarms with 80% threshold", () => {
-    // For a 29s timeout, threshold should be 23.2
+    // For a 29s timeout, threshold = 29 * 0.8 = 23.2 (IEEE 754: 23.200000000000003)
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "Duration",
-      Threshold: 23.2,
+      Threshold: 29 * 0.8,
     });
     // For 60s timeout (image-preprocess), threshold should be 48
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
@@ -58,9 +59,14 @@ describe("CostsCrunchStack Alarms", () => {
 
   it("creates Textract Pipeline Failure Alarm and Metric Filter", () => {
     template.hasResourceProperties("AWS::Logs::MetricFilter", {
-      MetricName: "TextractFailures",
-      MetricNamespace: "CostsCrunch/Pipeline",
-      FilterPattern: "?ERROR ?\"Failed to get expense analysis\" ?\"Textract error\"",
+      FilterPattern: "?\"ERROR\" ?\"Failed to get expense analysis\" ?\"Textract error\"",
+      MetricTransformations: [
+        {
+          MetricName: "TextractFailures",
+          MetricNamespace: "CostsCrunch/Pipeline",
+          MetricValue: "1",
+        },
+      ],
     });
 
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
