@@ -203,6 +203,7 @@ Every Lambda:
     - Block-on-Balance: Prevent member/group removal if balances are not settled ($0.00).
 6. Never logs PII in production.
 7. **Daily Changelogs**: Every session involving feature branch changes must conclude with a new entry in `changelog/YYYY-MM-DD.md` summarizing infra, backend, frontend, and test advancements.
+8. **Scalability Plan Updates**: The `notes/scalability-plan.md` must be updated alongside any substantial infrastructure changes in `CostsCrunchStack.ts` that affect resource capacity, billing modes, or scaling policies.
 
 ### 3.3 Auth flow
 ```
