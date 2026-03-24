@@ -62,7 +62,9 @@ costscrunch
 │   │   └── models/          # Frontend-specific type definitions
 │   └── vite.config.ts
 └── infrastructure/
-    ├── __tests__/           # Encryption compliance and StackConfig validation
+    ├── __tests__/
+    │   ├── unit/            # CDK assertion tests (billing, encryption)
+    │   └── localstack/      # Service-level integration tests
     ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
     ├── sam/                 # Local emulation templates (REST v1 / ARM64)
     ├── stacks/              # CDK Infrastructure-as-Code definitions

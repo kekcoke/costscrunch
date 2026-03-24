@@ -23,6 +23,12 @@ export default defineConfig({
     testTimeout: 15_000,
     hookTimeout: 10_000,
     setupFiles: ["__tests__/setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["**/*.ts"],
+      exclude: ["__tests__/**", "**/*.d.ts"],
+    },
   },
   resolve: {
     alias: {
