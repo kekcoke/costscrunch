@@ -12,7 +12,7 @@
         ↓
 🌍 CloudFront (CDN + TLS 1.3 + HTTP/3)
         ↓
-🛡️ WAF v2 (OWASP rules + rate limiting)
+🛡️ WAF v2 (OWASP + SQLi rules + global & path-specific rate limiting + access logging)
         ↓
 🔑 Cognito (JWT auth + MFA + PKCE)
         ↓
@@ -255,7 +255,7 @@ The preprocessing layer is designed for seamless backwards compatibility:
 
 | Layer | Control |
 |---|---|
-| Edge | CloudFront + WAF OWASP rules + Shield |
+| Edge | CloudFront + WAF OWASP/SQLi rules + global & path rate limiting + access logging + Shield |
 | Auth | Cognito JWT (RS256) + PKCE + MFA optional |
 | Network | VPC private subnets + VPC Endpoints (no internet for AWS APIs) |
 | Data | DynamoDB + S3 encrypted with KMS CMK (Rotation Enforced) |
