@@ -35,18 +35,17 @@
     "@aws-sdk/client-sns": "^3.1007.0",
     "@aws-sdk/client-sqs": "^3.1007.0",
     "@aws-sdk/client-ssm": "^3.1007.0",
-    "vitest": "^4.0.18",
     "@types/node": "^20.16.1",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
     "aws-cdk": "^2.154.1",
     "aws-cdk-lib": "^2.154.1",
+    "esbuild": "^0.20.2",
     "eslint": "^9.9.1",
-
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^4.0.18"
   },
-
   "cdk": {
     "app": "npx ts-node --prefer-ts-exts bin/app.ts",
     "watch": {
