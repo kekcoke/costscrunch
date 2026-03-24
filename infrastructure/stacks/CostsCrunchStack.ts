@@ -666,11 +666,22 @@ export class CostsCrunchStack extends Stack {
             targets: [new targets.LambdaFunction(notificationsLambda)],
         });
 
-        // ── WAF ─────────────────────────────────────────────────
+        // ── WAF Access Logs ──────────────────────────────────────────────
+        // CloudFront-scoped WebACLs require logs in us-east-1.
+        // If this stack is deployed outside us-east-1, move this LogGroup to a
+        // separate us-east-1 stack and reference its ARN cross-stack.
+        const wafLogGroup = new logs.LogGroup(this, "WafLogGroup", {
+            logGroupName: `/aws/wafv2/${prefix}-waf-logs`,
+            retention: logs.RetentionDays.THREE_MONTHS,
+            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+        });
+
+        // ── WAF v2 WebACL ─────────────────────────────────────────────────
         const wafAcl = new wafv2.CfnWebACL(this, "WafAcl", {
             name: `${prefix}-waf`,
             scope: "CLOUDFRONT",
             defaultAction: { allow: {} },
+            description: "CloudFront WAF: managed rules + rate limiting",
             visibilityConfig: {
                 cloudWatchMetricsEnabled: true,
                 metricName: isTest ? "TestWafMetric" : `${prefix.replace(/[^a-zA-Z0-9]/g, '')}WafMetric`,
@@ -694,8 +705,24 @@ export class CostsCrunchStack extends Stack {
                     },
                 },
                 {
-                    name: "AWSManagedRulesKnownBadInputsRuleSet",
+                    name: "AWSManagedRulesSQLiRuleSet",
                     priority: 2,
+                    overrideAction: { none: {} },
+                    visibilityConfig: { 
+                        cloudWatchMetricsEnabled: true, 
+                        metricName: "SQLiRuleSet", 
+                        sampledRequestsEnabled: false 
+                    },
+                    statement: { 
+                        managedRuleGroupStatement: { 
+                            vendorName: "AWS", 
+                            name: "AWSManagedRulesSQLiRuleSet" 
+                        } 
+                    },
+                },
+                {
+                    name: "AWSManagedRulesKnownBadInputsRuleSet",
+                    priority: 3,
                     overrideAction: { none: {} },
                     visibilityConfig: { 
                         cloudWatchMetricsEnabled: true, 
@@ -710,23 +737,70 @@ export class CostsCrunchStack extends Stack {
                     },
                 },
                 {
-                    name: "RateLimitPerIP",
-                    priority: 3,
+                    name: "GlobalRateLimitPerIP",
+                    priority: 4,
                     action: { block: {} },
                     visibilityConfig: { 
                         cloudWatchMetricsEnabled: true, 
-                        metricName: "RateLimit", 
+                        metricName: "GlobalRateLimit", 
                         sampledRequestsEnabled: true 
                     },
                     statement: { 
                         rateBasedStatement: { 
-                            limit: 2000, 
+                            limit: 5000, 
                             aggregateKeyType: "IP" 
                         } 
                     },
                 },
+                {
+                    name: "ReceiptUploadRateLimit",
+                    priority: 5,
+                    action: { block: {} },
+                    visibilityConfig: {
+                        cloudWatchMetricsEnabled: true,
+                        metricName: "ReceiptUploadRateLimit",
+                        sampledRequestsEnabled: true,
+                    },
+                    statement: {
+                        rateBasedStatement: {
+                            limit: 200,
+                            aggregateKeyType: "IP",
+                            scopeDownStatement: {
+                                andStatement: {
+                                    statements: [
+                                        {
+                                            byteMatchStatement: {
+                                                fieldToMatch: { method: {} },
+                                                positionalConstraint: "EXACTLY",
+                                                searchString: "POST",
+                                                textTransformations: [{ priority: 0, type: "NONE" }],
+                                            },
+                                        },
+                                        {
+                                            byteMatchStatement: {
+                                                fieldToMatch: { uriPath: {} },
+                                                positionalConstraint: "EXACTLY",
+                                                searchString: "/receipts/upload",
+                                                textTransformations: [{ priority: 0, type: "NONE" }],
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
             ]
         });
+
+        new wafv2.CfnLoggingConfiguration(this, "WafLoggingConfig", {
+            logDestinationConfigs: [wafLogGroup.logGroupArn],
+            redactedFields: [
+                { singleHeader: { name: "Authorization" } },
+            ],
+            resourceArn: wafAcl.attrArn
+        });
+
 
         // ── API Gateway HTTP API ─────────────────────────────────────────────────
         const authorizer = new apigwv2Authorizers.HttpUserPoolAuthorizer("CognitoAuthorizer", userPool, {
