@@ -29,6 +29,7 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as path from "path";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -51,8 +52,46 @@ export class CostsCrunchStack extends Stack {
         // Build or use provided configuration (useful for unit tests/Vitest)
         const config = props.config ?? buildStackConfig(this, this.account, this.region);
 
-        const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0";
-        const VITE_APP_URL = process.env.VITE_APP_URL ?? "https://app.costscrunch.io";
+        // ── SSM Parameter Store ───────────────────────────────────────────────
+        // Store configuration values securely; Lambdas retrieve at runtime
+        const bedrockModelIdParam = new ssm.StringParameter(this, "BedrockModelId", {
+            parameterName: `/${prefix}/bedrock-model-id`,
+            stringValue: process.env.BEDROCK_MODEL_ID ?? "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+            tier: ssm.ParameterTier.STANDARD,
+        });
+
+        const viteAppUrlParam = new ssm.StringParameter(this, "ViteAppUrl", {
+            parameterName: `/${prefix}/vite-app-url`,
+            stringValue: process.env.VITE_APP_URL ?? "https://app.costscrunch.io",
+            tier: ssm.ParameterTier.STANDARD,
+        });
+
+        // ── Secrets Manager ───────────────────────────────────────────────────
+        // Store sensitive notification config as JSON; Lambdas retrieve at runtime via GetSecretValue.
+        const notificationSecret = new secretsmanager.Secret(this, "NotificationSecret", {
+            secretName: `${prefix}/notification-config`,
+            description: "Notification service configuration (email, Pinpoint)",
+            generateSecretString: {
+                secretStringTemplate: JSON.stringify({
+                    fromEmail: "noreply@costscrunch.com",
+                    pinpointAppId: isProd ? "REPLACE_WITH_ACTUAL_ID" : "dummy-pinpoint-id",
+                }),
+                generateStringKey: "unused"
+            }
+        });
+
+        // SSM parameters for non-sensitive but environment-specific config
+        new ssm.StringParameter(this, "FromEmail", {
+            parameterName: `/${prefix}/from-email`,
+            stringValue: "noreply@costscrunch.com",
+            description: "Default sender email for SES notifications",
+        });
+
+        new ssm.StringParameter(this, "PinpointAppId", {
+            parameterName: `/${prefix}/pinpoint-app-id`,
+            stringValue: isProd ? "REPLACE_WITH_ACTUAL_ID" : "dummy-pinpoint-id",
+            description: "AWS Pinpoint application ID for push notifications",
+        });
 
         // ── KMS Key ─────────────────────────────────────────────────────────────
         const kmsKey = new kms.Key(this, "CostsCrunchKey", {
@@ -152,6 +191,9 @@ export class CostsCrunchStack extends Stack {
         // ── Account & Region Utilities ───────────────────────────────────────────
         const { accountId, regionId, isTest } = config;
 
+        // Resolve VITE_APP_URL from SSM parameter (supports runtime updates without redeploy)
+        const viteAppUrl = viteAppUrlParam.stringValue;
+
         // ── S3 Buckets ────────────────────────────────────────────────
         // Upload bucket: initial user uploads (triggers image-preprocess Lambda)
         const uploadsBucket = new s3.Bucket(this, "UploadsBucket", {
@@ -164,7 +206,7 @@ export class CostsCrunchStack extends Stack {
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
-                    allowedOrigins: isProd ? [`${VITE_APP_URL}`] : ["*"],
+                    allowedOrigins: isProd ? [viteAppUrl] : ["*"],
                     allowedHeaders: ["*"],
                     maxAge: 3600,
                 },
@@ -208,7 +250,7 @@ export class CostsCrunchStack extends Stack {
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
-                    allowedOrigins: isProd ? [`${VITE_APP_URL}`] : ["*"],
+                    allowedOrigins: isProd ? [viteAppUrl] : ["*"],
                     allowedHeaders: ["*"],
                     maxAge: 3600,
                 },
@@ -266,8 +308,8 @@ export class CostsCrunchStack extends Stack {
             oAuth: {
                 flows: { authorizationCodeGrant: true },
                 scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],
-                callbackUrls: isProd ? [`${VITE_APP_URL}/callback`] : ["http://localhost:3000/callback"],
-                logoutUrls: isProd ? [`${VITE_APP_URL}/logout`] : ["http://localhost:3000/logout"],
+                callbackUrls: isProd ? [`${viteAppUrl}/callback`] : ["http://localhost:3000/callback"],
+                logoutUrls: isProd ? [`${viteAppUrl}/logout`] : ["http://localhost:3000/logout"],
             },
             accessTokenValidity: Duration.minutes(15),
             refreshTokenValidity: Duration.days(30),
@@ -390,6 +432,8 @@ export class CostsCrunchStack extends Stack {
         );
 
         // ── Lambda Shared Environment ────────────────────────────────────────────
+        // NOTE: Sensitive values (BEDROCK_MODEL_ID, FROM_EMAIL, PINPOINT_APP_ID) are NOT
+        // stored in environment variables. Lambdas retrieve them at runtime via SSM/Secrets Manager.
         const sharedEnv = {
             TABLE_NAME_MAIN:      table.tableName,
             TABLE_NAME_CONNECTIONS: connTable.tableName,   // ws-notifier reads connection records
@@ -405,6 +449,10 @@ export class CostsCrunchStack extends Stack {
             LOG_LEVEL: isProd ? "INFO" : "DEBUG",
             ENVIRONMENT: environment,
             AWS_REGION_ID: regionId, // Explicitly pass concrete region
+            // SSM/Secrets Manager parameter paths for runtime retrieval
+            SSM_BEDROCK_MODEL_ID: bedrockModelIdParam.parameterName,
+            SSM_VITE_APP_URL: viteAppUrlParam.parameterName,
+            SECRET_NOTIFICATION_ARN: notificationSecret.secretArn,
         };
 
         const sharedLambdaProps: Partial<lambda.FunctionProps> = {
@@ -482,8 +530,7 @@ export class CostsCrunchStack extends Stack {
             functionName: `${prefix}-notifications`,
             environment: {
                 ...sharedEnv,
-                FROM_EMAIL: "noreply@costscrunch.com",
-                PINPOINT_APP_ID: "dummy-pinpoint-id", // Use static value for tests/synthesis to avoid token resolution errors
+                // FROM_EMAIL and PINPOINT_APP_ID retrieved from Secrets Manager at runtime
             },
         });
 
@@ -555,10 +602,12 @@ export class CostsCrunchStack extends Stack {
         }));
 
         // Bedrock: only snsWebhookLambda calls Claude (moved from receiptsLambda)
-        const modelId = isTest ? "claude-haiku" : BEDROCK_MODEL_ID.split('/').pop();
+        // Model ID is stored in SSM Parameter Store; IAM policy grants access based on parameter value
+        const bedrockModelId = bedrockModelIdParam.stringValue;
+        const bedrockModelName = bedrockModelId.split('/').pop() ?? "claude-haiku";
         snsWebhookLambda.addToRolePolicy(new iam.PolicyStatement({
             actions:   ["bedrock:InvokeModel"],
-            resources: [`arn:aws:bedrock:${regionId}::foundation-model/${modelId}`],
+            resources: [`arn:aws:bedrock:${regionId}::foundation-model/${bedrockModelName}`],
         }));
 
         // SNS: textractTopic -> scanQueue -> snsWebhookLambda
@@ -578,6 +627,12 @@ export class CostsCrunchStack extends Stack {
         kmsKey.grantEncryptDecrypt(snsWebhookLambda);
         kmsKey.grantEncryptDecrypt(groupsLambda);
         kmsKey.grantEncryptDecrypt(wsNotifierLambda);
+
+        // SSM Parameter Store: Bedrock model ID
+        bedrockModelIdParam.grantRead(snsWebhookLambda);
+
+        // Secrets Manager: Notification config (fromEmail, pinpointAppId)
+        notificationSecret.grantRead(notificationsLambda);
 
         // Notifications Lambda: SES + Pinpoint
         notificationsLambda.addToRolePolicy(new iam.PolicyStatement({
@@ -809,7 +864,7 @@ export class CostsCrunchStack extends Stack {
         });
 
         // ── CORS — single source of truth (mirrored in server.ts for local dev) ─────
-        const CORS_ALLOW_ORIGINS = isProd ? [`${VITE_APP_URL}`] : ["*"];
+        const CORS_ALLOW_ORIGINS = isProd ? [viteAppUrl] : ["*"];
         const CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
         const CORS_ALLOW_HEADERS = ["Authorization", "Content-Type", "X-Idempotency-Key"];
 
@@ -936,6 +991,50 @@ export class CostsCrunchStack extends Stack {
         // ── Security Guard: Enforce Encryption ──────────────────────────────────
         // Ensure all S3 Buckets and DynamoDB Tables use KMS encryption.
         Aspects.of(this).add(new EncryptionEnforcementAspect());
+
+        // ── Security Guard: No Secrets in Environment Variables ──────────────────
+        // OWASP ASVS v4.0 V13.1 — fail synthesis if sensitive values appear as
+        // plain text env vars. Use SSM Parameter Store or Secrets Manager instead.
+        Aspects.of(this).add({
+            visit(node: IConstruct) {
+                if (node instanceof lambda.Function) {
+                    const fnEnv = (node as any).environment as Record<string, string> | undefined;
+                    if (!fnEnv) return;
+
+                    // Patterns that indicate hardcoded secrets (case-insensitive)
+                    const SENSITIVE_PATTERNS = [
+                        /^(api[_-]?key|secret|password|token|credential)/i,
+                        /^(aws[_-]??(access[_-]?key|secret))/i,
+                        /^(bearer|auth[_-]?token)/i,
+                        /@costscrunch\.(com|io|dev)$/,  // Email patterns
+                    ];
+
+                    for (const [key, value] of Object.entries(fnEnv)) {
+                        // Skip SSM parameter path references (these are safe)
+                        if (key.startsWith("SSM_") || key.startsWith("SECRET_")) continue;
+
+                        // Check for sensitive key names
+                        if (SENSITIVE_PATTERNS.some(p => p.test(key))) {
+                            Annotations.of(node).addError(
+                                `Sensitive env var '${key}' found on ${node.node.path}. ` +
+                                "Store secrets in SSM Parameter Store or Secrets Manager. " +
+                                "See OWASP ASVS v4.0 control V13.1."
+                            );
+                        }
+
+                        // Check for email patterns in values (but not SSM paths)
+                        if (!key.startsWith("SSM_") && !key.startsWith("SECRET_")) {
+                            if (/@costscrunch\.(com|io|dev)$/.test(value)) {
+                                Annotations.of(node).addError(
+                                    `Email-like value detected in env var '${key}' on ${node.node.path}. ` +
+                                    "Move to Secrets Manager."
+                                );
+                            }
+                        }
+                    }
+                }
+            },
+        });
 
         // ── Outputs ───────────────────────────────────────────────────────────────
         new CfnOutput(this, "ApiUrl", { value: (api.url && !cdk.Token.isUnresolved(api.url)) ? api.url : "https://dummy-api.com", exportName: `${prefix}-api-url` });

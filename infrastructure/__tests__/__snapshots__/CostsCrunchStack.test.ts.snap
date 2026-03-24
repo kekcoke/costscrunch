@@ -204,6 +204,15 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
                 "PrimaryEndPoint.Port",
               ],
             },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
             },
@@ -1929,6 +1938,15 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       },
       "Type": "AWS::S3::BucketPolicy",
     },
+    "BedrockModelIdFA30AE87": {
+      "Properties": {
+        "Name": "/costscrunch-staging/bedrock-model-id",
+        "Tier": "Standard",
+        "Type": "String",
+        "Value": "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
     "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691": {
       "DependsOn": [
         "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
@@ -3401,6 +3419,15 @@ def sort_filter_rules(json_obj):
                 "PrimaryEndPoint.Port",
               ],
             },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
             },
@@ -3791,6 +3818,15 @@ def sort_filter_rules(json_obj):
       },
       "Type": "AWS::Cognito::UserPoolGroup",
     },
+    "FromEmailE5CFF916": {
+      "Properties": {
+        "Description": "Default sender email for SES notifications",
+        "Name": "/costscrunch-staging/from-email",
+        "Type": "String",
+        "Value": "noreply@costscrunch.com",
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
     "GroupsLambdaD7E8272B": {
       "DependsOn": [
         "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
@@ -3834,6 +3870,15 @@ def sort_filter_rules(json_obj):
                 "Redis",
                 "PrimaryEndPoint.Port",
               ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
             },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
@@ -4249,6 +4294,15 @@ def sort_filter_rules(json_obj):
                 "PrimaryEndPoint.Port",
               ],
             },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
             },
@@ -4565,6 +4619,15 @@ def sort_filter_rules(json_obj):
                 "Redis",
                 "PrimaryEndPoint.Port",
               ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
             },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
@@ -5191,6 +5254,19 @@ def sort_filter_rules(json_obj):
       "Type": "AWS::SQS::Queue",
       "UpdateReplacePolicy": "Delete",
     },
+    "NotificationSecret49F46D4D": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Description": "Notification service configuration (email, Pinpoint)",
+        "GenerateSecretString": {
+          "GenerateStringKey": "unused",
+          "SecretStringTemplate": "{"fromEmail":"noreply@costscrunch.com","pinpointAppId":"dummy-pinpoint-id"}",
+        },
+        "Name": "costscrunch-staging/notification-config",
+      },
+      "Type": "AWS::SecretsManager::Secret",
+      "UpdateReplacePolicy": "Delete",
+    },
     "NotificationsLambda6E6FB54B": {
       "DependsOn": [
         "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
@@ -5221,9 +5297,7 @@ def sort_filter_rules(json_obj):
             "EVENT_BUS_NAME": {
               "Ref": "EventBus7B8748AA",
             },
-            "FROM_EMAIL": "noreply@costscrunch.com",
             "LOG_LEVEL": "DEBUG",
-            "PINPOINT_APP_ID": "dummy-pinpoint-id",
             "POWERTOOLS_SERVICE_NAME": "costscrunch",
             "REDIS_HOST": {
               "Fn::GetAtt": [
@@ -5236,6 +5310,15 @@ def sort_filter_rules(json_obj):
                 "Redis",
                 "PrimaryEndPoint.Port",
               ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
             },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
@@ -5582,6 +5665,16 @@ def sort_filter_rules(json_obj):
             },
             {
               "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "NotificationSecret49F46D4D",
+              },
+            },
+            {
+              "Action": [
                 "ses:SendEmail",
                 "ses:SendTemplatedEmail",
                 "mobiletargeting:SendMessages",
@@ -5600,6 +5693,15 @@ def sort_filter_rules(json_obj):
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "PinpointAppId81F959E0": {
+      "Properties": {
+        "Description": "AWS Pinpoint application ID for push notifications",
+        "Name": "/costscrunch-staging/pinpoint-app-id",
+        "Type": "String",
+        "Value": "dummy-pinpoint-id",
+      },
+      "Type": "AWS::SSM::Parameter",
     },
     "ProGroup": {
       "Properties": {
@@ -5919,6 +6021,15 @@ def sort_filter_rules(json_obj):
                 "Redis",
                 "PrimaryEndPoint.Port",
               ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
             },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
@@ -6768,6 +6879,15 @@ def sort_filter_rules(json_obj):
                 "PrimaryEndPoint.Port",
               ],
             },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
             },
@@ -7091,7 +7211,20 @@ def sort_filter_rules(json_obj):
             {
               "Action": "bedrock:InvokeModel",
               "Effect": "Allow",
-              "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:bedrock:us-east-1::foundation-model/",
+                    {
+                      "Fn::GetAtt": [
+                        "BedrockModelIdFA30AE87",
+                        "Value",
+                      ],
+                    },
+                  ],
+                ],
+              },
             },
             {
               "Action": [
@@ -7131,6 +7264,30 @@ def sort_filter_rules(json_obj):
                 "Fn::GetAtt": [
                   "CostsCrunchKeyFB2571C5",
                   "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "ssm:DescribeParameters",
+                "ssm:GetParameters",
+                "ssm:GetParameter",
+                "ssm:GetParameterHistory",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":ssm:us-east-1:123456789012:parameter",
+                    {
+                      "Ref": "BedrockModelIdFA30AE87",
+                    },
+                  ],
                 ],
               },
             },
@@ -7575,6 +7732,15 @@ def sort_filter_rules(json_obj):
       },
       "Type": "AWS::Cognito::UserPoolClient",
     },
+    "ViteAppUrl8757D260": {
+      "Properties": {
+        "Name": "/costscrunch-staging/vite-app-url",
+        "Tier": "Standard",
+        "Type": "String",
+        "Value": "https://staging.costscrunch.io",
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
     "WafAcl": {
       "Properties": {
         "DefaultAction": {
@@ -7859,6 +8025,15 @@ def sort_filter_rules(json_obj):
                 "Redis",
                 "PrimaryEndPoint.Port",
               ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
             },
             "TABLE_NAME_CONNECTIONS": {
               "Ref": "ConnTable3E9543CC",
