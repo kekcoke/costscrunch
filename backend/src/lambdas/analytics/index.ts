@@ -13,6 +13,7 @@ import type {
   AnalyticsTrends, 
   AnalyticsChartData, BubbleChartDatum 
 } from "./../../shared/models/charts.js";
+import { analyticsQuerySchema } from "../../shared/validation/schemas.js";
 
 const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
@@ -65,10 +66,19 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
     };
   }
 
-  const q = (event.queryStringParameters || {}) as AnalyticsQuery;
+  const rawQ = event.queryStringParameters || {};
+  const parsedQ = analyticsQuerySchema.safeParse(rawQ);
+  if (!parsedQ.success) {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ error: parsedQ.error.errors.map(e => e.message).join('; ') }),
+    };
+  }
 
-  const startDate = q.from || getStartDate(q.period);
-  const endDate = q.to || new Date().toISOString().slice(0, 10);
+  const q = parsedQ.data;
+  const startDate = q.startDate || getStartDate(q.period);
+  const endDate = q.endDate || new Date().toISOString().slice(0, 10);
 
   const result = await ddb.send(new QueryCommand({
     TableName: TABLE,
