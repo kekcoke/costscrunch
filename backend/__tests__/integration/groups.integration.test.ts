@@ -6,19 +6,42 @@
  */
 
 import axios from "axios";
+import { execSync } from "child_process";
 import { ulid } from "ulid";
 
-const getBaseUrl = () => {
+/**
+ * Resolve the LocalStack REST API ID dynamically.
+ * Priority:
+ *   1. VITE_API_URL env var (if it contains /restapis/)
+ *   2. API_ID env var (explicit override)
+ *   3. Query LocalStack via docker exec (ephemeral — survives container restarts)
+ */
+const getBaseUrl = (): string => {
   const envUrl = process.env.VITE_API_URL;
-  // If VITE_API_URL is a full REST API path, use it.
-  if (envUrl && envUrl.includes("/restapis/")) return envUrl;
-  
-  // Otherwise, require API_ID and build the path.
-  const apiId = process.env.API_ID;
-  if (!apiId) {
-    throw new Error("API_ID must be set if VITE_API_URL is not a full REST API endpoint (currently: " + envUrl + ")");
+  if (envUrl?.includes("/restapis/")) return envUrl;
+
+  if (process.env.API_ID) {
+    return `http://localhost:4566/restapis/${process.env.API_ID}/local/_user_request_`;
   }
-  return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
+
+  // Ephemeral fallback: ask LocalStack directly
+  try {
+    const apiId = execSync(
+      `docker exec costscrunch-localstack /usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1 apigateway get-rest-apis --query "items[?name=='costscrunch-dev-api'].id | [0]" --output text 2>/dev/null`,
+      { encoding: "utf-8", timeout: 5000 }
+    ).trim().replace(/\r/g, "");
+
+    if (apiId && apiId !== "None") {
+      return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
+    }
+  } catch {
+    // Container not running — fall through to error
+  }
+
+  throw new Error(
+    "Cannot resolve LocalStack API ID. Start LocalStack first (setup/localstack.sh), " +
+    "or set API_ID=<id> / VITE_API_URL=<full-url> env vars."
+  );
 };
 
 const API_URL = getBaseUrl();
