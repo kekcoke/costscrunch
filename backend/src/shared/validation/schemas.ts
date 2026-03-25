@@ -81,6 +81,16 @@ export const getExpensesQuerySchema = z.object({
   nextToken: z.string().optional(),
 }).strict();
 
+export const exportExpensesQuerySchema = z.object({
+  format: z.enum(["csv", "json"]).optional().default("csv"),
+  groupId: ulidSchema.optional(),
+  status: expenseStatusSchema.optional(),
+  category: z.string().max(50).optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(10000).optional().default(10000),
+}).strict();
+
 // ── Group Schemas ─────────────────────────────────────────────────────────────
 
 export const budgetSchema = z.object({

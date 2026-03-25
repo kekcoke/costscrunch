@@ -913,6 +913,7 @@ export class CostsCrunchStack extends Stack {
 
         // Expense routes
         addRoute(apigwv2.HttpMethod.GET, "/expenses", expensesLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/expenses/export", expensesLambda);
         addRoute(apigwv2.HttpMethod.POST, "/expenses", expensesLambda);
         addRoute(apigwv2.HttpMethod.GET, "/expenses/{id}", expensesLambda);
         addRoute(apigwv2.HttpMethod.PATCH, "/expenses/{id}", expensesLambda);
