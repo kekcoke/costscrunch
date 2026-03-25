@@ -207,17 +207,28 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
     // ── 3. Start async Textract job with SNS notification on completion.
     //       Textract calls the SNS topic when done; sns-webhook.ts handles the rest.
     //       This Lambda returns immediately — no polling, no timeout risk.
-    const { JobId } = await textract.send(
-      new StartExpenseAnalysisCommand({
-        DocumentLocation: { S3Object: { Bucket: bucket, Name: key } },
-        NotificationChannel: {
-          SNSTopicArn: TEXTRACT_SNS_TOPIC_ARN,
-          RoleArn:     TEXTRACT_ROLE_ARN,
-        },
-        // Tag the job so sns-webhook.ts can correlate back to this scan
-        JobTag: `${expenseId}/${scanId}`,
-      })
-    );
+    tracer.putAnnotation("receiptId", expenseId);
+    
+    const textractSubsegment = tracer.getSegment()?.addNewSubsegment("TextractJobStart");
+    textractSubsegment?.addAnnotation("stage", "textract");
+    
+    let JobId;
+    try {
+      const response = await textract.send(
+        new StartExpenseAnalysisCommand({
+          DocumentLocation: { S3Object: { Bucket: bucket, Name: key } },
+          NotificationChannel: {
+            SNSTopicArn: TEXTRACT_SNS_TOPIC_ARN,
+            RoleArn:     TEXTRACT_ROLE_ARN,
+          },
+          // Tag the job so sns-webhook.ts can correlate back to this scan
+          JobTag: `${expenseId}/${scanId}`,
+        })
+      );
+      JobId = response.JobId;
+    } finally {
+      textractSubsegment?.close();
+    }
 
     if (!JobId) throw new Error("Textract did not return a JobId");
 
