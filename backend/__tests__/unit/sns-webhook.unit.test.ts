@@ -129,6 +129,12 @@ vi.mock("@aws-sdk/client-eventbridge", () => ({
   }),
 }));
 
+// Circuit breaker is fully tested in circuitBreaker.unit.test.ts — here we
+// mock it as a pass-through so module-level state doesn't accumulate across tests.
+vi.mock("../../src/utils/circuitBreaker.js", () => ({
+  createCircuitBreaker: () => ({ execute: (fn: () => any) => fn(), getState: vi.fn(), _setState: vi.fn(), _getState: vi.fn() }),
+}));
+
 // ─── Imports — always after vi.mock() registrations ──────────────────────────
 import { UpdateCommand }   from "@aws-sdk/lib-dynamodb";
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
