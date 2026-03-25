@@ -1,0 +1,131 @@
+name: Post-Deploy Rollback
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Deployment environment (staging|production)'
+        required: true
+        type: string
+      stack_name:
+        description: 'CloudFormation stack name'
+        required: true
+        type: string
+      api_url:
+        description: 'API base URL for health check'
+        required: true
+        type: string
+      deployment_sha:
+        description: 'Git commit SHA that was deployed'
+        required: true
+        type: string
+      cdk_command:
+        description: 'CDK deploy command to use for rollback'
+        required: false
+        type: string
+        default: 'staging'
+
+jobs:
+  health-check-and-rollback:
+    name: Health Check → Rollback on Failure
+    runs-on: ubuntu-latest
+    outputs:
+      health_check_passed: ${{ steps.health_check.outputs.passed }}
+    steps:
+      - name: Wait for propagation (30s)
+        run: |
+          echo "Waiting 30 seconds for deployment propagation..."
+          sleep 30
+          echo "Propagation wait complete."
+
+      - name: Health check with retries
+        id: health_check
+        run: |
+          MAX_RETRIES=3
+          RETRY_INTERVAL=10
+          APP_URL="${{ inputs.api_url }}"
+          HEALTH_ENDPOINT="${APP_URL}/health"
+          
+          echo "Starting health checks against: ${HEALTH_ENDPOINT}"
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES..."
+            
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${HEALTH_ENDPOINT}")
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Health check passed (HTTP $HTTP_CODE)"
+              echo "passed=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            echo "❌ Health check failed (HTTP $HTTP_CODE)"
+            
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Retrying in ${RETRY_INTERVAL} seconds..."
+              sleep $RETRY_INTERVAL
+            fi
+          done
+          
+          echo "passed=false" >> $GITHUB_OUTPUT
+          echo "All $MAX_RETRIES health check attempts failed. Triggering rollback..."
+          exit 1
+
+      - name: Rollback on failure
+        if: steps.health_check.outputs.passed == 'false'
+        run: |
+          echo "Initiating rollback for stack: ${{ inputs.stack_name }}"
+          echo "Deployment SHA: ${{ inputs.deployment_sha }}"
+          
+          # Get previous deployed template from S3
+          PREVIOUS_TEMPLATE=$(aws cloudformation get-template \
+            --stack-name ${{ inputs.stack_name }} \
+            --template-stage Previous \
+            --query 'TemplateBody' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TEMPLATE" ]; then
+            echo "Found previous template, rolling back..."
+            aws cloudformation rollback-stack \
+              --stack-name ${{ inputs.stack_name }}
+          else
+            echo "No previous template found. Attempting CDK redeploy with previous commit..."
+            # Fallback: redeploy with previous CDK template
+            PREV_COMMIT=$(git rev-parse HEAD~1)
+            git checkout $PREV_COMMIT
+            npm run deploy:${{ inputs.cdk_command }} -w infrastructure
+            git checkout -
+          fi
+          
+          echo "Waiting for rollback to complete..."
+          aws cloudformation wait stack-rollback-complete \
+            --stack-name ${{ inputs.stack_name }}
+          
+          echo "Rollback completed for stack: ${{ inputs.stack_name }}"
+
+      - name: Post rollback notification
+        if: steps.health_check.outputs.passed == 'false'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'failure'
+          text: |
+            🚨 CostsCrunch ${{ inputs.environment }} deployment FAILED
+            Commit: ${{ inputs.deployment_sha }}
+            Stack: ${{ inputs.stack_name }}
+            Status: ROLLED BACK
+            Details: Health checks failed after deployment. Automated rollback triggered.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Post success notification
+        if: steps.health_check.outputs.passed == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'success'
+          text: |
+            ✅ CostsCrunch ${{ inputs.environment }} deployment SUCCESS
+            Commit: ${{ inputs.deployment_sha }}
+            Stack: ${{ inputs.stack_name }}
+            Health checks passed after ${{ inputs.environment }} deploy.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

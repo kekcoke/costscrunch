@@ -130,6 +130,19 @@ jobs:
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
+  # ─── Post-Deploy Health Check & Rollback ───────────────────────────────────
+  post-deploy-staging:
+    name: Post-Deploy Health Check → Rollback
+    needs: deploy-staging
+    if: always()
+    uses: ./.github/workflows/rollback.yml
+    with:
+      environment: staging
+      stack_name: costscrunch-staging-CostsCrunchStack
+      api_url: ${{ secrets.STAGING_URL }}/api
+      deployment_sha: ${{ github.sha }}
+      cdk_command: staging
+
   # ─── Deploy to Production ────────────────────────────────────────────────────
   deploy-prod:
     name: Deploy — Production
@@ -170,12 +183,6 @@ jobs:
           aws s3 sync frontend/dist/ s3://${{ secrets.PROD_ASSETS_BUCKET }} --delete --cache-control "public,max-age=31536000,immutable"
           aws s3 cp frontend/dist/index.html s3://${{ secrets.PROD_ASSETS_BUCKET }}/index.html --cache-control "no-cache"
           aws cloudfront create-invalidation --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} --paths "/*"
-      - name: Smoke test production
-        run: |
-          # Verify health endpoint with 30s timeout and fail on non-200
-          APP_URL="https://api.costscrunch.io"
-          curl -f --max-time 30 "${APP_URL}/health" || exit 1
-          echo "Production health check passed ✅"
       - name: Notify Slack
         uses: 8398a7/action-slack@v3
         with:
@@ -184,6 +191,19 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: always()
+
+  # ─── Post-Deploy Health Check & Rollback ───────────────────────────────────
+  post-deploy-prod:
+    name: Post-Deploy Health Check → Rollback
+    needs: deploy-prod
+    if: always()
+    uses: ./.github/workflows/rollback.yml
+    with:
+      environment: production
+      stack_name: costscrunch-prod-CostsCrunchStack
+      api_url: https://api.costscrunch.io
+      deployment_sha: ${{ github.sha }}
+      cdk_command: prod
 
   # ─── Rollback (manual trigger) ───────────────────────────────────────────────
   rollback:
