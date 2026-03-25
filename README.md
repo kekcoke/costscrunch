@@ -25,7 +25,7 @@
      ├── groups/         splits + balances + settlements
      ├── receipts/       S3 → Textract async triggering
      ├── image-preprocess/ Lossless image compression (Sharp)
-     ├── sns-webhook/    Textract completion → SQS → Claude AI → DB
+     ├── sns-webhook/    Textract completion → circuit breaker → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends
      ├── notifications/  SES + Pinpoint push/SMS
@@ -175,11 +175,14 @@ User uploads file
 [sns-webhook Lambda] Triggered by SQS
       ↓
 [Lambda] GetExpenseAnalysis (instant — job already done)
+      │  ↳ Circuit breaker: 5 failures → OPEN (30s cooldown)
+      │     On OPEN → status: "pending_manual_review" (no Textract call)
       ↓
 [Lambda] Parses: merchant, amount, date, tax, tip, line items
       ↓
 [Lambda] Claude 3 Haiku (Bedrock) → category + confidence + policy flags
-             ↓ (on Bedrock failure)
+      │  ↳ Circuit breaker: 5 failures → OPEN (30s cooldown)
+             ↓ (on Bedrock failure or circuit open)
          [Fallback] guessCategory() keyword matching → confidence: 85
       ↓
 [DynamoDB] Updates scan record  →  status: "completed"
