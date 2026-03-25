@@ -435,6 +435,10 @@ export class CostsCrunchStack extends Stack {
         // NOTE: Sensitive values (BEDROCK_MODEL_ID, FROM_EMAIL, PINPOINT_APP_ID) are NOT
         // stored in environment variables. Lambdas retrieve them at runtime via SSM/Secrets Manager.
         const sharedEnv = {
+            AWS_XRAY_SDK_ENABLED: "true",
+            AWS_XRAY_TRACING_NAME: `${prefix}-receipt-pipeline`,
+            // Derived from env var, default to 1% (0.01) for production scale
+            AWS_XRAY_SAMPLING_RATE: process.env.XRAY_SAMPLING_RATE ?? "0.01",
             TABLE_NAME_MAIN:      table.tableName,
             TABLE_NAME_CONNECTIONS: connTable.tableName,   // ws-notifier reads connection records
             EVENT_BUS_NAME:  eventBus.eventBusName,
@@ -639,6 +643,15 @@ export class CostsCrunchStack extends Stack {
             actions:   ["ses:SendEmail", "ses:SendTemplatedEmail", "mobiletargeting:SendMessages"],
             resources: ["*"],
         }));
+
+        // Explicitly grant X-Ray permissions to all pipeline functions
+        const xrayPolicy = new iam.PolicyStatement({
+            actions: ["xray:PutTraceSegments", "xray:PutTelemetryRecords"],
+            resources: ["*"],
+        });
+        [imagePreprocessLambda, receiptsLambda, snsWebhookLambda, wsNotifierLambda].forEach(fn => {
+            fn.addToRolePolicy(xrayPolicy);
+        });
 
         // ── S3 → Lambda Event Sources ────────────────────────────────────────────────
         // Image preprocessing: triggered by uploads to the uploads bucket
