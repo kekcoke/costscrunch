@@ -32,7 +32,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { buildStackConfig } from "./StackConfig";
 
 export interface CostsCrunchStackProps extends StackProps {
@@ -459,12 +459,19 @@ export class CostsCrunchStack extends Stack {
             SECRET_NOTIFICATION_ARN: notificationSecret.secretArn,
         };
 
-        const sharedLambdaProps: Partial<lambda.FunctionProps> = {
+        const sharedLambdaProps: Partial<NodejsFunctionProps> = {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: Duration.seconds(29),
             tracing: lambda.Tracing.ACTIVE,
             layers: [powertoolsLayer],
+            bundling: {
+                externalModules: [
+                    "@aws-lambda-powertools/logger",
+                    "@aws-lambda-powertools/metrics",
+                    "@aws-lambda-powertools/tracer",
+                ],
+            },
             vpc,
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             logRetention: isProd ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_WEEK,
