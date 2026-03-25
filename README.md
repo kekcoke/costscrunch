@@ -294,6 +294,7 @@ Expenses
   GET    /expenses/:id                get single
   PATCH  /expenses/:id                update / approve / reject
   DELETE /expenses/:id                delete
+  GET    /expenses/export             export (csv/json, with S3 fallback)
 
 Groups
   GET    /groups                      list my groups
@@ -705,7 +706,8 @@ npm run deploy:prod
 - [ ] Mobile apps (React Native + Expo)
 - [ ] Recurring expense detection (ML)
 - [ ] Slack bot for expense submission
-- [ ] CSV/PDF export + scheduled reports
+- [x] CSV/JSON export with S3 fallback for large datasets
+- [ ] PDF export + scheduled reports
 
 ---
 
