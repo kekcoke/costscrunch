@@ -23,7 +23,9 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 import {
   UpdateCommand,
+  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { transactWriteWithRetry } from "../../utils/transactWriteWithRetry.js";
 import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import {
   EventBridgeClient,
@@ -214,51 +216,59 @@ async function writeScanCompleted(opts: {
 }): Promise<void> {
   const { expenseId, scanId, userId, jobId, extracted, lineItems, aiEnrichment, processingMs, now } = opts;
 
-  // 5a. Update the scan record → completed
-  await ddb.send(
-    new UpdateCommand({
-      TableName:        TABLE,
-      Key:              { pk: `RECEIPT#${expenseId}`, sk: `SCAN#${scanId}` },
-      UpdateExpression: `SET #status = :status,
-                             extractedData  = :data,
-                             aiEnrichment   = :ai,
-                             textractJobId  = :jobId,
-                             processingMs   = :ms,
-                             updatedAt      = :now`,
-      ExpressionAttributeNames:  { "#status": "status" },
-      ExpressionAttributeValues: {
-        ":status": "completed",
-        ":data":   { ...extracted, lineItems: lineItems.map(d => ({ description: d, total: 0 })) },
-        ":ai":     aiEnrichment,
-        ":jobId":  jobId,
-        ":ms":     processingMs,
-        ":now":    now,
+  // Atomically update scan record and back-fill parent expense in one transaction.
+  // Condition: scan must still be "processing" — prevents duplicate completion
+  // from Textract retry notifications.
+  await transactWriteWithRetry(ddb, {
+    TransactItems: [
+      // 5a. Update the scan record → completed
+      {
+        Update: {
+          TableName:           TABLE,
+          Key:                 { pk: `RECEIPT#${expenseId}`, sk: `SCAN#${scanId}` },
+          UpdateExpression:    `SET #status = :status,
+                                   extractedData  = :data,
+                                   aiEnrichment   = :ai,
+                                   textractJobId  = :jobId,
+                                   processingMs   = :ms,
+                                   updatedAt      = :now`,
+          ConditionExpression: `#status = :processing`,
+          ExpressionAttributeNames:  { "#status": "status" },
+          ExpressionAttributeValues: {
+            ":status":     "completed",
+            ":processing": "processing",
+            ":data":       { ...extracted, lineItems: lineItems.map(d => ({ description: d, total: 0 })) },
+            ":ai":         aiEnrichment,
+            ":jobId":      jobId,
+            ":ms":         processingMs,
+            ":now":        now,
+          },
+        },
       },
-    })
-  );
-
-  // 5b. Back-fill the parent expense record (only if fields not already set by user)
-  await ddb.send(
-    new UpdateCommand({
-      TableName:        TABLE,
-      Key:              { pk: `USER#${userId}`, sk: `EXPENSE#${expenseId}` },
-      UpdateExpression: `SET scanId                           = :sid,
-                             merchant    = if_not_exists(merchant,  :merchant),
-                             amount      = if_not_exists(amount,    :amount),
-                             #date       = if_not_exists(#date,     :date),
-                             category    = if_not_exists(category,  :category),
-                             updatedAt   = :now`,
-      ExpressionAttributeNames:  { "#date": "date" },
-      ExpressionAttributeValues: {
-        ":sid":      scanId,
-        ":merchant": extracted.merchant ?? "Unknown",
-        ":amount":   extracted.total    ?? 0,
-        ":date":     extracted.date     ?? now.slice(0, 10),
-        ":category": aiEnrichment.category,
-        ":now":      now,
+      // 5b. Back-fill the parent expense record (only if fields not already set by user)
+      {
+        Update: {
+          TableName:           TABLE,
+          Key:                 { pk: `USER#${userId}`, sk: `EXPENSE#${expenseId}` },
+          UpdateExpression:    `SET scanId                           = :sid,
+                                   merchant    = if_not_exists(merchant,  :merchant),
+                                   amount      = if_not_exists(amount,    :amount),
+                                   #date       = if_not_exists(#date,     :date),
+                                   category    = if_not_exists(category,  :category),
+                                   updatedAt   = :now`,
+          ExpressionAttributeNames:  { "#date": "date" },
+          ExpressionAttributeValues: {
+            ":sid":      scanId,
+            ":merchant": extracted.merchant ?? "Unknown",
+            ":amount":   extracted.total    ?? 0,
+            ":date":     extracted.date     ?? now.slice(0, 10),
+            ":category": aiEnrichment.category,
+            ":now":      now,
+          },
+        },
       },
-    })
-  );
+    ],
+  });
 }
 
 async function writeScanFailed(expenseId: string, scanId: string): Promise<void> {
@@ -393,12 +403,29 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       const processingMs = Date.now() - startMs;
 
       // ── Step 3: Persist results to DynamoDB ────────────────────────────────
-      await writeScanCompleted({
-        expenseId, scanId, userId, jobId,
-        extracted, lineItems, aiEnrichment,
-        processingMs, now,
-      });
-      logger.info("DynamoDB updated", { status: "completed", processingMs });
+      try {
+        await writeScanCompleted({
+          expenseId, scanId, userId, jobId,
+          extracted, lineItems, aiEnrichment,
+          processingMs, now,
+        });
+        logger.info("DynamoDB updated", { status: "completed", processingMs });
+      } catch (e: any) {
+        // TransactionCanceledException with ConditionalCheckFailed means the
+        // scan was already processed (duplicate Textract notification) — safe
+        // to ignore.  Any other error propagates.
+        const reasons = e.CancellationReasons as Array<{ Code?: string }> | undefined;
+        if (
+          e.name === "TransactionCanceledException" &&
+          reasons?.some(r => r.Code === "ConditionalCheckFailed")
+        ) {
+          logger.info("Scan already completed — skipping duplicate write", {
+            expenseId, scanId,
+          });
+          return; // don't re-emit EventBridge
+        }
+        throw e;
+      }
 
       // ── Step 4: Emit EventBridge event (triggers ws-notifier.ts) ──────────
       await emitScanCompleted({

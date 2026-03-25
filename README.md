@@ -185,8 +185,7 @@ User uploads file
              ↓ (on Bedrock failure or circuit open)
          [Fallback] guessCategory() keyword matching → confidence: 85
       ↓
-[DynamoDB] Updates scan record  →  status: "completed"
-[DynamoDB] Back-fills expense record  →  merchant, amount, category (if_not_exists)
+[DynamoDB] TransactWrite (atomic): scan → "completed" + expense back-fill (if_not_exists)
       ↓
 [EventBridge] Emits ReceiptScanCompleted
       ↓
