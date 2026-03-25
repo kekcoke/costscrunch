@@ -25,6 +25,7 @@ import { withLocalAuth } from "../_local/mockAuth.js";
 import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
 import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types.js";
+import { initiateUploadSchema } from "../../shared/validation/schemas.js";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const s3 = createS3Client();
@@ -45,7 +46,7 @@ const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "receipts" 
 
 // ─── Event-shape type guards ──────────────────────────────────────────────────
 // REST API v1 events have httpMethod+path but no routeKey; HTTP API v2 has routeKey.
-function isApiGatewayEvent(event: unknown): boolean {
+function isApiGatewayEvent(event: unknown): event is APIGatewayProxyEventV2 {
   const e = event as any;
   return typeof e.routeKey === "string" || typeof e.httpMethod === "string";
 }
@@ -84,29 +85,28 @@ const err = (msg: string, code = 400) => ({
 });
 
 async function handleUploadUrl(event: APIGatewayProxyEventV2) {
-  const body = JSON.parse(event.body || "{}");
   const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string | undefined;
   if (!userId) return err("Unauthorized", 401);
 
-  const allowedMimes = ["image/jpeg", "image/png", "image/heic", "application/pdf"];
-  if (!allowedMimes.includes(body.contentType)) {
-    return err("Invalid file type. Allowed: JPG, PNG, HEIC, PDF");
-  }
+  const bodyRaw = JSON.parse(event.body || "{}");
+  const parsed = initiateUploadSchema.safeParse(bodyRaw);
+  if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
-  const expenseId = ulid();
+  const { filename, contentType, fileSizeBytes, expenseId: existingExpenseId } = parsed.data;
+  const expenseId = existingExpenseId || ulid();
   const scanId = ulid();
   // Upload to uploads bucket with uploads/ prefix — preprocessing Lambda will move to processed bucket
-  const key = `uploads/${userId}/${expenseId}/${scanId}/${body.filename}`;
+  const key = `uploads/${userId}/${expenseId}/${scanId}/${filename}`;
 
   const { url, fields } = await createPresignedPost(s3, {
     Bucket: process.env.BUCKET_UPLOADS_NAME!,
     Key: key,
     Conditions: [
-      ["content-length-range", 1, MAX_FILE_SIZE],
-      ["eq", "$Content-Type", body.contentType],
+      ["content-length-range", 1, Math.min(fileSizeBytes || MAX_FILE_SIZE, MAX_FILE_SIZE)],
+      ["eq", "$Content-Type", contentType],
     ],
     Fields: {
-      "Content-Type": body.contentType,
+      "Content-Type": contentType,
       "x-amz-meta-userid": userId,
       "x-amz-meta-expenseid": expenseId,
     },

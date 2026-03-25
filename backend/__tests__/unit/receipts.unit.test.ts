@@ -280,7 +280,7 @@ describe("handleUploadUrl", () => {
   it("returns 400 for a disallowed MIME type", async () => {
     const result = await handler(makeUploadUrlEvent({ contentType: "image/gif" }));
     expect(result).toMatchObject({ statusCode: 400 });
-    expect(JSON.parse((result as any).body).error).toMatch(/Invalid file type/);
+    expect(JSON.parse((result as any).body).error).toMatch(/[Uu]nsupported|[Ff]ile.?type/);
   });
 
   it.each(["image/jpeg", "image/png", "application/pdf"])(
