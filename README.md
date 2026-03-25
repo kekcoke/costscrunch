@@ -260,6 +260,7 @@ The preprocessing layer is designed for seamless backwards compatibility:
 | Network | VPC private subnets + VPC Endpoints (no internet for AWS APIs) |
 | Data | DynamoDB + S3 encrypted with KMS CMK (Rotation Enforced) |
 | Secrets | SSM Parameter Store + Secrets Manager (no plain-text secrets in env vars or outputs) |
+| Input Validation | Zod schemas at Lambda handler layer — all API bodies and query params validated |
 | Audit | CloudTrail + GuardDuty + Security Hub |
 | Code | Semgrep SAST + npm audit + Gitleaks in CI |
 | IAM | Least-privilege per-Lambda roles, no wildcards |
