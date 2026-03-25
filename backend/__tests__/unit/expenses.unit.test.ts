@@ -225,7 +225,7 @@ describe("POST /expenses", () => {
     );
 
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/required/);
+    expect(JSON.parse(res.body).error).toMatch(/[Rr]equired/);
     expect(ddbMock).not.toHaveReceivedCommand(PutCommand);
   });
 
@@ -238,7 +238,7 @@ describe("POST /expenses", () => {
     );
 
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/amount/);
+    expect(JSON.parse(res.body).error).toMatch(/[Aa]mount/);
   });
 
   it("returns 400 for amount exceeding 1,000,000", async () => {
