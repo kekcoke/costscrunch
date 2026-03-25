@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import type { S3Event, SNSEvent } from "aws-lambda";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 const {
   mockTextractSend,
@@ -179,8 +179,19 @@ beforeAll(async () => {
         AttributeDefinitions: [
           { AttributeName: "pk", AttributeType: "S" },
           { AttributeName: "sk", AttributeType: "S" },
+          // GSI for receipt duplicate detection
+          { AttributeName: "receiptHash", AttributeType: "S" },
         ],
         BillingMode: "PAY_PER_REQUEST",
+        GlobalSecondaryIndexes: TableName === TABLE_NAME_MAIN ? [
+          {
+            IndexName: "ReceiptHashIndex",
+            KeySchema: [
+              { AttributeName: "receiptHash", KeyType: "HASH" },
+            ],
+            Projection: { ProjectionType: "ALL" },
+          },
+        ] : undefined,
       }));
     } catch (e: any) {
       if (e.name !== "ResourceInUseException") throw e;
@@ -419,6 +430,18 @@ describe("SNS Webhook (sns-webhook.ts) — integration", () => {
         mimeType:   "image/jpeg",
         createdAt:  new Date().toISOString(),
       },
+    }));
+  });
+
+  // Reset scan record to "processing" before each test so the conditional
+  // expression in writeScanCompleted (status = :processing) succeeds
+  beforeEach(async () => {
+    await ddbDoc.send(new UpdateCommand({
+      TableName: TABLE_NAME_MAIN,
+      Key: { pk: `RECEIPT#${EXPENSE_ID}`, sk: `SCAN#${SCAN_ID}` },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: { ":status": "processing" },
     }));
   });
 
