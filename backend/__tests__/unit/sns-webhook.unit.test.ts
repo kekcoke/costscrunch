@@ -87,6 +87,9 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   TransactWriteCommand: vi.fn(function(args){
     return { _tag: "TransactWriteCommand", input: args };
   }),
+  QueryCommand: vi.fn(function(args){
+    return { _tag: "QueryCommand", input: args };
+  }),
 }));
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
@@ -136,6 +139,23 @@ vi.mock("@aws-sdk/client-eventbridge", () => ({
 // mock it as a pass-through so module-level state doesn't accumulate across tests.
 vi.mock("../../src/utils/circuitBreaker.js", () => ({
   createCircuitBreaker: () => ({ execute: (fn: () => any) => fn(), getState: vi.fn(), _setState: vi.fn(), _getState: vi.fn() }),
+}));
+
+// Mock duplicate detection utilities
+vi.mock("../../src/utils/receiptHash.js", () => ({
+  computeReceiptHash: vi.fn(() => "mocked-receipt-hash"),
+  normalizeReceiptFields: vi.fn(() => ["starbucks", "2025-06-01", "12.50"]),
+  computeEntityHash: vi.fn(() => "mocked-entity-hash"),
+}));
+
+vi.mock("../../src/utils/fuzzyMatch.js", () => ({
+  fuzzyMatchReceipt: vi.fn(() => ({
+    isDuplicate: false,
+    similarity: "none",
+    merchantDistance: 0,
+    amountDifference: 0,
+  })),
+  levenshtein: vi.fn(() => 0),
 }));
 
 // ─── Imports — always after vi.mock() registrations ──────────────────────────

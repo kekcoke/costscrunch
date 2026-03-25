@@ -24,6 +24,7 @@ import {
 import {
   UpdateCommand,
   TransactWriteCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { transactWriteWithRetry } from "../../utils/transactWriteWithRetry.js";
 import { createDynamoDBDocClient } from "../../utils/awsClients.js";
@@ -37,6 +38,8 @@ import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import { createCircuitBreaker } from "../../utils/circuitBreaker.js";
 import { CircuitOpenError } from "../../utils/errors.js";
+import { computeReceiptHash } from "../../utils/receiptHash.js";
+import { fuzzyMatchReceipt } from "../../utils/fuzzyMatch.js";
 import type { SNSEvent } from "aws-lambda";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -255,6 +258,9 @@ async function writeScanCompleted(opts: {
                                    amount      = if_not_exists(amount,    :amount),
                                    #date       = if_not_exists(#date,     :date),
                                    category    = if_not_exists(category,  :category),
+                                   receiptHash = :hash,
+                                   gsi3pk      = :gsi3pk,
+                                   gsi3sk      = :gsi3sk,
                                    updatedAt   = :now`,
           ExpressionAttributeNames:  { "#date": "date" },
           ExpressionAttributeValues: {
@@ -263,6 +269,17 @@ async function writeScanCompleted(opts: {
             ":amount":   extracted.total    ?? 0,
             ":date":     extracted.date     ?? now.slice(0, 10),
             ":category": aiEnrichment.category,
+            ":hash":     computeReceiptHash(
+                           String(extracted.merchant?.toString() ?? "Unknown"),
+                           String(extracted.date ?? now.slice(0, 10)).slice(0, 10),
+                           Number(extracted.total)    ?? 0,
+                         ),
+            ":gsi3pk":   `RECEIPT_HASH#${computeReceiptHash(
+                           String(extracted.merchant?.toString() ?? "Unknown"),
+                           String(extracted.date ?? now.slice(0, 10)).slice(0, 10),
+                           Number(extracted.total)    ?? 0,
+                         )}`,
+            ":gsi3sk":   `DATE#${(extracted.date ?? now.slice(0, 10)).toString().slice(0, 10)}#${expenseId}`,
             ":now":      now,
           },
         },
@@ -295,7 +312,79 @@ async function writeScanPendingManualReview(expenseId: string, scanId: string): 
   );
 }
 
-// ─── Section 6: EventBridge notification ─────────────────────────────────────
+// ─── Section 6: Duplicate Detection ─────────────────────────────────────────────
+
+interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  similarity: "exact" | "fuzzy" | "none";
+  existingExpenseId?: string;
+  merchantDistance: number;
+  amountDifference: number;
+}
+
+async function checkForDuplicate(opts: {
+  merchant: string;
+  date: string;
+  amount: number;
+  userId: string;
+}): Promise<DuplicateCheckResult> {
+  const { merchant, date, amount, userId } = opts;
+
+  // Compute deterministic hash from normalized fields
+  const receiptHash = computeReceiptHash(merchant, date, amount);
+  logger.appendKeys({ receiptHash });
+
+  // Query GSI for existing expense with same hash
+  // Gracefully handle environments where the GSI doesn't exist yet (e.g., local dev/testing)
+  let result;
+  try {
+    result = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      IndexName: "ReceiptHashIndex",
+      KeyConditionExpression: "receiptHash = :hash",
+      ExpressionAttributeValues: {
+        ":hash": receiptHash,
+      },
+      Limit: 1,
+    }));
+  } catch (e: any) {
+    if (e.name === "ResourceNotFoundException" || e.message?.includes("Index not found")) {
+      logger.warn("ReceiptHashIndex GSI not available — skipping duplicate check", { error: e.message });
+      return { isDuplicate: false, similarity: "none", merchantDistance: 0, amountDifference: 0 };
+    }
+    throw e;
+  }
+
+  const existing = result.Items?.[0];
+  if (!existing) {
+    return { isDuplicate: false, similarity: "none", merchantDistance: 0, amountDifference: 0 };
+  }
+
+  // Fuzzy match to determine similarity level
+  const match = fuzzyMatchReceipt(
+    merchant,
+    String(existing.merchant ?? ""),
+    amount,
+    Number(existing.amount ?? 0),
+  );
+
+  logger.info("Duplicate check result", {
+    existingExpenseId: existing.expenseId,
+    similarity: match.similarity,
+    merchantDistance: match.merchantDistance,
+    amountDifference: match.amountDifference,
+  });
+
+  return {
+    isDuplicate: match.isDuplicate,
+    similarity: match.similarity,
+    existingExpenseId: existing.expenseId,
+    merchantDistance: match.merchantDistance,
+    amountDifference: match.amountDifference,
+  };
+}
+
+// ─── Section 7: EventBridge notification ─────────────────────────────────────
 
 async function emitScanCompleted(opts: {
   userId:       string;
@@ -317,6 +406,43 @@ async function emitScanCompleted(opts: {
           userId,
           expenseId,
           scanId,
+          merchant:     extracted.merchant,
+          amount:       extracted.total,
+          category:     aiEnrichment.category,
+          confidence:   aiEnrichment.confidence,
+          processingMs,
+        }),
+      }],
+    })
+  );
+}
+
+async function emitDuplicateDetected(opts: {
+  userId: string;
+  expenseId: string;
+  scanId: string;
+  extracted: Extracted;
+  aiEnrichment: AiEnrichment;
+  processingMs: number;
+  existingExpenseId: string;
+  similarity: "exact" | "fuzzy" | "none";
+  receiptHash: string;
+}): Promise<void> {
+  const { userId, expenseId, scanId, extracted, aiEnrichment, processingMs, existingExpenseId, similarity, receiptHash } = opts;
+
+  await eb.send(
+    new PutEventsCommand({
+      Entries: [{
+        EventBusName: EVENT_BUS,
+        Source:       "costscrunch.receipts",
+        DetailType:   "DuplicateReceiptDetected",
+        Detail:       JSON.stringify({
+          userId,
+          expenseId,
+          scanId,
+          existingExpenseId,
+          similarity,
+          receiptHash,
           merchant:     extracted.merchant,
           amount:       extracted.total,
           category:     aiEnrichment.category,
@@ -402,7 +528,41 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       const now          = new Date().toISOString();
       const processingMs = Date.now() - startMs;
 
-      // ── Step 3: Persist results to DynamoDB ────────────────────────────────
+      // ── Step 3: Check for duplicate receipts ─────────────────────────────
+      const duplicateCheck = await checkForDuplicate({
+        merchant: String(extracted.merchant ?? ""),
+        date:     String(extracted.date     ?? now.slice(0, 10)),
+        amount:   Number(extracted.total    ?? 0),
+        userId,
+      });
+
+      if (duplicateCheck.isDuplicate) {
+        // Emit duplicate detection event instead of completing scan
+        await emitDuplicateDetected({
+          userId,
+          expenseId,
+          scanId,
+          extracted,
+          aiEnrichment,
+          processingMs,
+          existingExpenseId: duplicateCheck.existingExpenseId!,
+          similarity: duplicateCheck.similarity,
+          receiptHash: computeReceiptHash(
+            String(extracted.merchant ?? ""),
+            String(extracted.date ?? now.slice(0, 10)),
+            Number(extracted.total ?? 0),
+          ),
+        });
+
+        metrics.addMetric("DuplicateDetected", MetricUnit.Count, 1);
+        logger.info("Duplicate receipt detected", {
+          existingExpenseId: duplicateCheck.existingExpenseId,
+          similarity: duplicateCheck.similarity,
+        });
+        continue;
+      }
+
+      // ── Step 4: Persist results to DynamoDB ────────────────────────────────
       try {
         await writeScanCompleted({
           expenseId, scanId, userId, jobId,

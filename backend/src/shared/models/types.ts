@@ -69,6 +69,8 @@ export interface Expense {
   gsi1sk: string;       // DATE#date#expenseId (sorted by date)
   gsi2pk: string;       // CATEGORY#category
   gsi2sk: string;       // DATE#date#expenseId
+  gsi3pk: string;       // RECEIPT_HASH#sha256hex (duplicate detection)
+  gsi3sk: string;       // DATE#date#expenseId
   entityType: "EXPENSE";
 
   // Core fields
@@ -97,6 +99,9 @@ export interface Expense {
   status: ExpenseStatus;
   approverId?: string;
   approverNote?: string;
+
+  // Receipt duplicate detection
+  receiptHash?: string;   // SHA-256 of normalized (merchant + date + amount)
 
   // Receipt
   receiptKey?: string;    // S3 key: receipts/{userId}/{expenseId}/{filename}

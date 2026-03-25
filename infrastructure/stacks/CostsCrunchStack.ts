@@ -158,6 +158,16 @@ export class CostsCrunchStack extends Stack {
                     partitionKey: { name: "gsi2pk", type: dynamodb.AttributeType.STRING },
                     sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
                 },
+                {
+                    indexName: "GSI3",
+                    partitionKey: { name: "gsi3pk", type: dynamodb.AttributeType.STRING },
+                    sortKey: { name: "gsi3sk", type: dynamodb.AttributeType.STRING },
+                },
+                {
+                    indexName: "ReceiptHashIndex",
+                    partitionKey: { name: "receiptHash", type: dynamodb.AttributeType.STRING },
+                    projectionType: dynamodb.ProjectionType.ALL,
+                },
             ],
         });
 
