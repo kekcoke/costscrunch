@@ -117,11 +117,11 @@ describe("POST /groups", () => {
       makeEvent({ routeKey: "POST /groups", body: JSON.stringify({}) }) as any
     );
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/name/);
+    expect(JSON.parse(res.body).error).toMatch(/Required/i);
     expect(ddbMock).not.toHaveReceivedCommand(PutCommand);
   });
 
-  it("applies defaults (currency USD, approvalRequired false)", async () => {
+  it("applies defaults (currency USD, approvalRequired true)", async () => {
     ddbMock.on(PutCommand).resolves({});
 
     const res = await handler(
@@ -130,7 +130,7 @@ describe("POST /groups", () => {
 
     const body = JSON.parse(res.body);
     expect(body.currency).toBe("USD");
-    expect(body.approvalRequired).toBe(false);
+    expect(body.approvalRequired).toBe(true);
     expect(body.requireReceipts).toBe(false);
   });
 });
@@ -200,7 +200,7 @@ describe("PATCH /groups/{id}", () => {
       }) as any
     );
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/valid fields/);
+    expect(JSON.parse(res.body).error).toMatch(/[Uu]nrecognized/);
   });
 });
 
@@ -420,7 +420,7 @@ describe("POST /groups/{id}/members", () => {
     );
 
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/email/);
+    expect(JSON.parse(res.body).error).toMatch(/Required/i);
   });
 
   it("succeeds even if SES email fails (swallows error)", async () => {

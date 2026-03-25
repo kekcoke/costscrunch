@@ -13,6 +13,7 @@ import { getAuth } from "../../utils/auth.js";
 import { withLocalAuth } from "../_local/mockAuth.js";
 import { ulid } from "ulid";
 import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
+import { createGroupSchema, updateGroupSchema, addGroupMemberSchema } from "../../shared/validation/schemas.js";
 const ddb = createDynamoDBDocClient();
 const ses = new SESClient(baseConfig());
 const TABLE = process.env.TABLE_NAME_MAIN!;
@@ -162,15 +163,17 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
 
   // ── POST /groups ──────────────────────────────────────────────────────────
   if (route === "POST /groups") {
-    const body = JSON.parse(event.body || "{}");
-    if (!body.name) return err("name is required");
+    const bodyRaw = JSON.parse(event.body || "{}");
+    const parsed = createGroupSchema.safeParse(bodyRaw);
+    if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
+    const body = parsed.data;
     const id = ulid();
     const now = new Date().toISOString();
     const initialMember: GroupMember = {
       userId: auth.userId,
-      name: body.ownerName || "Owner",
-      email: body.ownerEmail || "",
+      name: auth.email.split('@')[0] || "Owner",
+      email: auth.email,
       role: "owner",
       joinedAt: now,
       totalSpend: 0,
@@ -186,17 +189,17 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
       groupId: id,
       name: body.name,
       description: body.description,
-      type: body.type || "personal",
+      type: body.type,
       ownerId: auth.userId,
-      color: body.color || "#6366f1",
+      color: body.color,
       iconEmoji: body.iconEmoji,
       members: [initialMember],
       memberCount: 1,
-      budgets: body.budgets || [],
-      currency: body.currency || "USD",
-      approvalRequired: body.approvalRequired ?? false,
+      budgets: body.budgets ?? [],
+      currency: body.currency,
+      approvalRequired: body.approvalRequired,
       approvalThreshold: body.approvalThreshold,
-      requireReceipts: body.requireReceipts ?? false,
+      requireReceipts: body.requireReceipts,
       requireReceiptsAbove: body.requireReceiptsAbove,
       policyId: body.policyId,
       costCenters: body.costCenters,
@@ -266,13 +269,18 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
 
   // ── PATCH /groups/:id ────────────────────────────────────────────────────
   if (route === "PATCH /groups/{id}" && groupId) {
-    const body = JSON.parse(event.body || "{}");
+    const bodyRaw = JSON.parse(event.body || "{}");
+    const parsed = updateGroupSchema.safeParse(bodyRaw);
+    if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
+
+    const body = parsed.data;
     const now = new Date().toISOString();
 
     const updates: string[] = ["updatedAt = :now"];
     const values: Record<string, any> = { ":now": now };
     const names: Record<string, string> = {};
 
+    // Dynamically build update expression for Zod-validated fields
     const allowedFields = ["name", "description", "type", "color", "iconEmoji", "currency",
       "approvalRequired", "approvalThreshold", "requireReceipts", "requireReceiptsAbove",
       "policyId", "costCenters", "projectCodes", "budgets", "active"] as const;
@@ -324,9 +332,11 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
 
   // ── POST /groups/:id/members ──────────────────────────────────────────────
   if (route === "POST /groups/{id}/members" && groupId) {
-    const body = JSON.parse(event.body || "{}");
-    if (!body.email) return err("email is required");
+    const bodyRaw = JSON.parse(event.body || "{}");
+    const parsed = addGroupMemberSchema.safeParse(bodyRaw);
+    if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
+    const body = parsed.data;
     const now = new Date().toISOString();
     const newMember: GroupMember = {
       userId: body.userId || `pending:${body.email}`,
