@@ -82,7 +82,10 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
     }),
   },
   UpdateCommand: vi.fn(function(args){
-    return { _tag: "GetExpenseAnalysis", input: args };
+    return { _tag: "UpdateCommand", input: args };
+  }),
+  TransactWriteCommand: vi.fn(function(args){
+    return { _tag: "TransactWriteCommand", input: args };
   }),
 }));
 
@@ -136,7 +139,7 @@ vi.mock("../../src/utils/circuitBreaker.js", () => ({
 }));
 
 // ─── Imports — always after vi.mock() registrations ──────────────────────────
-import { UpdateCommand }   from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand, TransactWriteCommand }   from "@aws-sdk/lib-dynamodb";
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import { handler } from "../../src/lambdas/sns-webhook/index.js";
 import { TEST_USER_ID } from "../__helpers__/localstack-client.js"
@@ -263,20 +266,45 @@ function wireBedrockError(message = "Bedrock throttled") {
 // ─── Assertion helpers ────────────────────────────────────────────────────────
 
 /**
- * Find a UpdateCommand call by its :status ExpressionAttributeValue.
- * Returns the constructor's first argument (the raw input object).
+ * Find an UpdateCommand call by its :status ExpressionAttributeValue.
+ * Used for writeScanFailed (still a single UpdateCommand).
  */
-function findUpdateByStatus(status: "completed" | "failed") {
+function findUpdateByStatus(status: "failed") {
   return vi.mocked(UpdateCommand).mock.calls.find(
     ([arg]: any[]) => arg.ExpressionAttributeValues?.[":status"] === status
   );
 }
 
-/** Find a UpdateCommand call whose Key.pk starts with the given prefix. */
-function findUpdateByPkPrefix(prefix: string) {
-  return vi.mocked(UpdateCommand).mock.calls.find(
-    ([arg]: any[]) => (arg.Key?.pk as string)?.startsWith(prefix)
+/**
+ * Find a TransactWriteCommand call and return the TransactItem whose
+ * Update has a :status matching the given value.
+ * Used for writeScanCompleted (now a transaction).
+ */
+function findTransactItemByStatus(status: "completed" | "processing") {
+  const txCall = vi.mocked(TransactWriteCommand).mock.calls.find(
+    ([arg]: any[]) => arg.TransactItems?.some(
+      (item: any) => item.Update?.ExpressionAttributeValues?.[":status"] === status
+    )
   );
+  if (!txCall) return undefined;
+  const [arg] = txCall as any[];
+  return arg.TransactItems.find(
+    (item: any) => item.Update?.ExpressionAttributeValues?.[":status"] === status
+  )?.Update;
+}
+
+/** Find a TransactWriteCommand's Update item whose Key.pk starts with the given prefix. */
+function findTransactItemByPkPrefix(prefix: string) {
+  const txCall = vi.mocked(TransactWriteCommand).mock.calls.find(
+    ([arg]: any[]) => arg.TransactItems?.some(
+      (item: any) => (item.Update?.Key?.pk as string)?.startsWith(prefix)
+    )
+  );
+  if (!txCall) return undefined;
+  const [arg] = txCall as any[];
+  return arg.TransactItems.find(
+    (item: any) => (item.Update?.Key?.pk as string)?.startsWith(prefix)
+  )?.Update;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -303,11 +331,10 @@ describe("SNS message parsing", () => {
 
     await handler(makeSnsEvent({ JobTag: "custom-exp/custom-scan" }));
 
-    const call = findUpdateByStatus("completed");
-    expect(call).toBeDefined();
-    const [arg] = call as any[];
-    expect(arg.Key.pk).toBe("RECEIPT#custom-exp");
-    expect(arg.Key.sk).toBe("SCAN#custom-scan");
+    const item = findTransactItemByStatus("completed");
+    expect(item).toBeDefined();
+    expect(item.Key.pk).toBe("RECEIPT#custom-exp");
+    expect(item.Key.sk).toBe("SCAN#custom-scan");
   });
 
   it("extracts userId from S3 key segment at index [1]", async () => {
@@ -315,10 +342,9 @@ describe("SNS message parsing", () => {
 
     await handler(makeSnsEvent({ s3Key: "receipts/my-user/exp/scan/file.jpg" }));
 
-    const call = findUpdateByPkPrefix("USER#");
-    expect(call).toBeDefined();
-    const [arg] = call as any[];
-    expect(arg.Key.pk).toBe("USER#my-user");
+    const item = findTransactItemByPkPrefix("USER#");
+    expect(item).toBeDefined();
+    expect(item.Key.pk).toBe("USER#my-user");
   });
 });
 
@@ -328,7 +354,7 @@ describe("SNS message parsing", () => {
 describe("parseExpenseDocuments — summary field mapping", () => {
   /**
    * Run a full handler call with controlled Textract output and return the
-   * ExpressionAttributeValues from the "completed" UpdateCommand.
+   * ExpressionAttributeValues from the "completed" TransactWrite item.
    */
   async function runWithDocs(docs: object[]) {
     textractSend.mockResolvedValue({ ExpenseDocuments: docs });
@@ -336,8 +362,8 @@ describe("parseExpenseDocuments — summary field mapping", () => {
 
     await handler(makeSnsEvent());
 
-    const call = findUpdateByStatus("completed");
-    return (call as any[])[0].ExpressionAttributeValues;
+    const item = findTransactItemByStatus("completed");
+    return item.ExpressionAttributeValues;
   }
 
   it("maps VENDOR_NAME → extracted.merchant", async () => {
@@ -390,7 +416,7 @@ describe("parseExpenseDocuments — summary field mapping", () => {
 describe("guessCategory — keyword fallback", () => {
   /**
    * Force Bedrock to error so the handler always uses guessCategory,
-   * then return the :ai value from the completed UpdateCommand.
+   * then return the :ai value from the completed TransactWrite item.
    */
   async function runWithMerchant(vendorName: string) {
     textractSend.mockResolvedValue({
@@ -406,8 +432,8 @@ describe("guessCategory — keyword fallback", () => {
 
     await handler(makeSnsEvent());
 
-    const call = findUpdateByStatus("completed");
-    return (call as any[])[0].ExpressionAttributeValues[":ai"] as {
+    const item = findTransactItemByStatus("completed");
+    return item.ExpressionAttributeValues[":ai"] as {
       category:   string;
       confidence: number;
     };
@@ -437,8 +463,8 @@ describe("enrichWithClaude", () => {
 
     await handler(makeSnsEvent());
 
-    const call = findUpdateByStatus("completed");
-    const ai   = (call as any[])[0].ExpressionAttributeValues[":ai"];
+    const item = findTransactItemByStatus("completed");
+    const ai   = item.ExpressionAttributeValues[":ai"];
     expect(ai.category).toBe("Meals");
     expect(ai.confidence).toBe(92);
     expect(ai.suggestedTags).toContain("coffee");
@@ -454,8 +480,8 @@ describe("enrichWithClaude", () => {
 
     await expect(handler(makeSnsEvent())).resolves.toBeUndefined();
 
-    const call = findUpdateByStatus("completed");
-    const ai   = (call as any[])[0].ExpressionAttributeValues[":ai"];
+    const item = findTransactItemByStatus("completed");
+    const ai   = item.ExpressionAttributeValues[":ai"];
     // Starbucks in docs → Meals via keyword fallback, confidence 85
     expect(ai.category).toBe("Meals");
     expect(ai.confidence).toBe(85);
@@ -466,9 +492,9 @@ describe("enrichWithClaude", () => {
 
     await expect(handler(makeSnsEvent())).resolves.toBeUndefined();
 
-    const call = findUpdateByStatus("completed");
-    expect(call).toBeDefined();
-    const ai = (call as any[])[0].ExpressionAttributeValues[":ai"];
+    const item = findTransactItemByStatus("completed");
+    expect(item).toBeDefined();
+    const ai = item.ExpressionAttributeValues[":ai"];
     expect(ai.category).toBe("Meals");
   });
 });
@@ -476,36 +502,40 @@ describe("enrichWithClaude", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // writeScanCompleted — DynamoDB writes
 // ═══════════════════════════════════════════════════════════════════════════════
-describe("writeScanCompleted — DynamoDB writes", () => {
+describe("writeScanCompleted — DynamoDB writes (transactional)", () => {
   beforeEach(() => wireSuccess());
 
-  it("updates scan record: status=completed, textractJobId, processingMs, aiEnrichment", async () => {
+  it("uses TransactWriteCommand with scan + expense updates", async () => {
     await handler(makeSnsEvent());
 
-    const call = vi.mocked(UpdateCommand).mock.calls.find(
-      ([arg]: any[]) =>
-        (arg.Key?.pk as string)?.startsWith("RECEIPT#") &&
-        arg.ExpressionAttributeValues?.[":status"] === "completed"
-    );
-    expect(call).toBeDefined();
-
-    const [arg] = call as any[];
-    expect(arg.ExpressionAttributeValues[":jobId"]).toBe(TEXTRACT_JOB);
-    expect(typeof arg.ExpressionAttributeValues[":ms"]).toBe("number");
-    expect(arg.ExpressionAttributeValues[":ai"]).toMatchObject({ category: "Meals" });
+    expect(vi.mocked(TransactWriteCommand).mock.calls).toHaveLength(1);
+    const [arg] = vi.mocked(TransactWriteCommand).mock.calls[0] as any[];
+    expect(arg.TransactItems).toHaveLength(2);
   });
 
-  it("back-fills parent expense via USER# pk with if_not_exists", async () => {
+  it("scan item: status=completed, textractJobId, processingMs, aiEnrichment, condition on processing", async () => {
     await handler(makeSnsEvent());
 
-    const call = findUpdateByPkPrefix("USER#");
-    expect(call).toBeDefined();
+    const item = findTransactItemByStatus("completed");
+    expect(item).toBeDefined();
+    expect(item.Key.pk).toMatch(/^RECEIPT#/);
+    expect(item.ExpressionAttributeValues[":jobId"]).toBe(TEXTRACT_JOB);
+    expect(typeof item.ExpressionAttributeValues[":ms"]).toBe("number");
+    expect(item.ExpressionAttributeValues[":ai"]).toMatchObject({ category: "Meals" });
+    // Condition: must still be "processing" to prevent duplicate writes
+    expect(item.ConditionExpression).toBe("#status = :processing");
+    expect(item.ExpressionAttributeValues[":processing"]).toBe("processing");
+  });
 
-    const [arg] = call as any[];
-    expect(arg.UpdateExpression).toMatch(/if_not_exists/);
-    expect(arg.ExpressionAttributeValues[":merchant"]).toBe("Starbucks");
-    expect(arg.ExpressionAttributeValues[":amount"]).toBe(12.5);
-    expect(arg.ExpressionAttributeValues[":category"]).toBe("Meals");
+  it("expense item: back-fills via USER# pk with if_not_exists", async () => {
+    await handler(makeSnsEvent());
+
+    const item = findTransactItemByPkPrefix("USER#");
+    expect(item).toBeDefined();
+    expect(item.UpdateExpression).toMatch(/if_not_exists/);
+    expect(item.ExpressionAttributeValues[":merchant"]).toBe("Starbucks");
+    expect(item.ExpressionAttributeValues[":amount"]).toBe(12.5);
+    expect(item.ExpressionAttributeValues[":category"]).toBe("Meals");
   });
 
   it("defaults merchant to 'Unknown' and amount to 0 when Textract returns no fields", async () => {
@@ -516,10 +546,9 @@ describe("writeScanCompleted — DynamoDB writes", () => {
 
     await handler(makeSnsEvent());
 
-    const call = findUpdateByPkPrefix("USER#");
-    const [arg] = call as any[];
-    expect(arg.ExpressionAttributeValues[":merchant"]).toBe("Unknown");
-    expect(arg.ExpressionAttributeValues[":amount"]).toBe(0);
+    const item = findTransactItemByPkPrefix("USER#");
+    expect(item.ExpressionAttributeValues[":merchant"]).toBe("Unknown");
+    expect(item.ExpressionAttributeValues[":amount"]).toBe(0);
   });
 });
 
@@ -580,10 +609,10 @@ describe("handler — failure handling", () => {
     expect(findUpdateByStatus("failed")).toBeDefined();
   });
 
-  it("marks scan failed and returns 500 when the first DDB UpdateCommand throws", async () => {
+  it("marks scan failed and returns 500 when the DDB TransactWrite throws", async () => {
     textractSend.mockResolvedValue({ ExpenseDocuments: makeTextractDocs() });
     ddbDocSend
-      .mockRejectedValueOnce(new Error("DDB throttle")) // scan=completed write
+      .mockRejectedValueOnce(new Error("DDB throttle")) // transact write
       .mockResolvedValue({});                           // writeScanFailed fallback
 
     const result = await handler(makeSnsEvent()) as any;
@@ -613,20 +642,23 @@ describe("handler — failure handling", () => {
 
     await expect(handler(event)).resolves.toBeUndefined();
 
-    const allCalls = vi.mocked(UpdateCommand).mock.calls;
-
-    const failedCall = allCalls.find(
+    // FAILED record → still uses UpdateCommand (writeScanFailed)
+    const failedCall = vi.mocked(UpdateCommand).mock.calls.find(
       ([a]: any[]) =>
         a.Key?.pk === "RECEIPT#exp-a" &&
         a.ExpressionAttributeValues?.[":status"] === "failed"
     );
-    const completedCall = allCalls.find(
-      ([a]: any[]) =>
-        a.Key?.pk === "RECEIPT#exp-b" &&
-        a.ExpressionAttributeValues?.[":status"] === "completed"
+
+    // SUCCEEDED record → now uses TransactWriteCommand
+    const txCall = vi.mocked(TransactWriteCommand).mock.calls.find(
+      ([a]: any[]) => a.TransactItems?.some(
+        (item: any) =>
+          item.Update?.Key?.pk === "RECEIPT#exp-b" &&
+          item.Update?.ExpressionAttributeValues?.[":status"] === "completed"
+      )
     );
 
     expect(failedCall).toBeDefined();
-    expect(completedCall).toBeDefined();
+    expect(txCall).toBeDefined();
   });
 });
