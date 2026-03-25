@@ -91,8 +91,12 @@ vi.mock("@aws-lambda-powertools/tracer", () => ({
   Tracer: vi.fn(function () {
     return {
       getSegment: vi.fn(() => ({
-        addNewSubsegment: vi.fn(() => ({ close: vi.fn() })),
+        addNewSubsegment: vi.fn(() => ({ 
+          close: vi.fn(),
+          addAnnotation: vi.fn(),
+        })),
       })),
+      putAnnotation: vi.fn(),
     };
   }),
 }));
