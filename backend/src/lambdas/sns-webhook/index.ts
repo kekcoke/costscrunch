@@ -33,6 +33,8 @@ import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
+import { createCircuitBreaker } from "../../utils/circuitBreaker.js";
+import { CircuitOpenError } from "../../utils/errors.js";
 import type { SNSEvent } from "aws-lambda";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -48,6 +50,20 @@ const BEDROCK_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0";
 const logger  = new Logger({ serviceName: "receipts-sns-webhook" });
 const tracer  = new Tracer({ serviceName: "receipts-sns-webhook" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "receipts-sns-webhook" });
+
+// ─── Circuit Breakers ─────────────────────────────────────────────────────────
+// Module-level instances persist across warm invocations in the same Lambda
+// container. Cold starts reset state to CLOSED (safe default).
+const textractBreaker = createCircuitBreaker({
+  name: "textract",
+  failureThreshold: 5,
+  cooldownMs: 30_000,
+});
+const bedrockBreaker = createCircuitBreaker({
+  name: "bedrock",
+  failureThreshold: 5,
+  cooldownMs: 30_000,
+});
 
 // ─── SNS payload shape emitted by Textract ────────────────────────────────────
 interface TextractSnsMessage {
@@ -257,6 +273,18 @@ async function writeScanFailed(expenseId: string, scanId: string): Promise<void>
   );
 }
 
+async function writeScanPendingManualReview(expenseId: string, scanId: string): Promise<void> {
+  await ddb.send(
+    new UpdateCommand({
+      TableName:        TABLE,
+      Key:              { pk: `RECEIPT#${expenseId}`, sk: `SCAN#${scanId}` },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames:  { "#status": "status" },
+      ExpressionAttributeValues: { ":status": "pending_manual_review" },
+    })
+  );
+}
+
 // ─── Section 6: EventBridge notification ─────────────────────────────────────
 
 async function emitScanCompleted(opts: {
@@ -320,7 +348,20 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       // ── Step 1: Fetch completed Textract results (instant — job is done) ───
       const segment     = tracer.getSegment()!;
       const textractSub = segment.addNewSubsegment("fetchTextractResults");
-      const docs        = await fetchTextractDocs(jobId);
+
+      let docs: any[];
+      try {
+        docs = await textractBreaker.execute(() => fetchTextractDocs(jobId));
+      } catch (e) {
+        textractSub.close();
+        if (e instanceof CircuitOpenError) {
+          logger.warn("Textract circuit open — queueing for manual review", { error: e.message });
+          metrics.addMetric("TextractCircuitOpen", MetricUnit.Count, 1);
+          await writeScanPendingManualReview(expenseId, scanId);
+          continue;
+        }
+        throw e; // unexpected error → outer catch → writeScanFailed
+      }
       textractSub.close();
 
       const { extracted, lineItems } = parseExpenseDocuments(docs);
@@ -335,11 +376,16 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       let aiEnrichment: AiEnrichment = guessCategory(String(extracted.merchant ?? ""), lineItems);
 
       try {
-        aiEnrichment = await enrichWithClaude(extracted, lineItems);
+        aiEnrichment = await bedrockBreaker.execute(() => enrichWithClaude(extracted, lineItems));
         metrics.addMetric("ClaudeEnrichmentSuccess", MetricUnit.Count, 1);
       } catch (e) {
-        logger.warn("Claude enrichment failed — using keyword fallback", { error: e });
-        metrics.addMetric("ClaudeEnrichmentFallback", MetricUnit.Count, 1);
+        if (e instanceof CircuitOpenError) {
+          logger.warn("Bedrock circuit open — using keyword fallback", { error: e.message });
+          metrics.addMetric("BedrockCircuitOpen", MetricUnit.Count, 1);
+        } else {
+          logger.warn("Claude enrichment failed — using keyword fallback", { error: e });
+          metrics.addMetric("ClaudeEnrichmentFallback", MetricUnit.Count, 1);
+        }
       }
       bedrockSub.close();
 
