@@ -425,7 +425,7 @@ async function emitDuplicateDetected(opts: {
   aiEnrichment: AiEnrichment;
   processingMs: number;
   existingExpenseId: string;
-  similarity: "exact" | "fuzzy";
+  similarity: "exact" | "fuzzy" | "none";
   receiptHash: string;
 }): Promise<void> {
   const { userId, expenseId, scanId, extracted, aiEnrichment, processingMs, existingExpenseId, similarity, receiptHash } = opts;
@@ -546,7 +546,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
           aiEnrichment,
           processingMs,
           existingExpenseId: duplicateCheck.existingExpenseId!,
-          similarity: duplicateCheck.similarity as "exact" | "fuzzy",
+          similarity: duplicateCheck.similarity,
           receiptHash: computeReceiptHash(
             String(extracted.merchant ?? ""),
             String(extracted.date ?? now.slice(0, 10)),

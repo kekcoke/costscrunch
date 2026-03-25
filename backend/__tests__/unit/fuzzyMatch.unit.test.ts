@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { levenshtein, fuzzyMatchReceipt, type FuzzyMatchResult } from "../../src/utils/fuzzyMatch";
+import { levenshtein, fuzzyMatchReceipt, type FuzzyMatchResult } from "../../src/utils/fuzzyMatch.js";
 
 describe("fuzzyMatch", () => {
   describe("levenshtein", () => {
@@ -139,7 +139,7 @@ describe("fuzzyMatch", () => {
           13.25,
           { amountTolerance: 0.50 }
         );
-        expect(result.amountDifference).toBeCloseTo(0.26, 2);
+        expect(result.amountDifference).toBeCloseTo(0.26);
         expect(result.amountDifference).toBeLessThanOrEqual(0.50);
         expect(result.similarity).toBe("exact");
       });
@@ -152,7 +152,7 @@ describe("fuzzyMatch", () => {
           13.75,
           { amountTolerance: 0.50 }
         );
-        expect(result.amountDifference).toBeCloseTo(0.76, 2);
+        expect(result.amountDifference).toBeCloseTo(0.76);
         expect(result.amountDifference).toBeGreaterThan(0.50);
         expect(result.similarity).toBe("none");
       });
