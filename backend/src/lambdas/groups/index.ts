@@ -3,8 +3,9 @@
 //         POST /groups/:id/members, DELETE /groups/:id/members/:userId
 //         POST /groups/:id/settle, GET /groups/:id/balances
 
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand, TransactWriteCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient, baseConfig } from "../../utils/awsClients.js";
+import { transactWriteWithRetry } from "../../utils/transactWriteWithRetry.js";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
@@ -213,7 +214,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
     };
 
     // Transactionally create group and owner membership
-    await ddb.send(new TransactWriteCommand({
+    await transactWriteWithRetry(ddb, {
       TransactItems: [
         {
           Put: {
@@ -237,7 +238,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
           },
         },
       ],
-    }));
+    });
 
     metrics.addMetric("GroupCreated", MetricUnit.Count, 1);
     return ok(group, 201);
@@ -349,7 +350,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
     };
 
     // Transactionally add member to group and write member record
-    await ddb.send(new TransactWriteCommand({
+    await transactWriteWithRetry(ddb, {
       TransactItems: [
         {
           Update: {
@@ -370,7 +371,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
           },
         },
       ],
-    }));
+    });
 
     // Send invite email via SES
     try {
@@ -426,7 +427,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
     }
 
     // 5. Atomic removal
-    await ddb.send(new TransactWriteCommand({
+    await transactWriteWithRetry(ddb, {
       TransactItems: [
         {
           Update: {
@@ -448,7 +449,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
           },
         },
       ],
-    }));
+    });
 
     metrics.addMetric("MemberRemoved", MetricUnit.Count, 1);
     return ok({ deleted: true });
