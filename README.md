@@ -731,7 +731,42 @@ npm run deploy:staging  # Deploy to staging
 npm run deploy:prod     # Deploy to production (requires approval)
 ```
 
-### Rollback Procedure
+### Automated Post-Deploy Rollback
+
+Deployments include automated health checks and rollback on failure:
+
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────────────┐
+│  CDK Deploy     │───▶│ Wait 30s     │───▶│ Health Check (3x)   │
+└─────────────────┘    └──────────────┘    └──────────┬──────────┘
+                                                      │
+                         ┌────────────────────────────┴────────────────────────────┐
+                         ↓                                                      ↓
+                    Health OK                                              Health FAIL
+                         ↓                                                      ↓
+                   ✅ Slack: SUCCESS                                   🚨 Rollback Stack
+                                                                        ↓
+                                                               AWS CloudFormation
+                                                               rollback-stack
+                                                                        ↓
+                                                               ⏳ Wait complete
+                                                                        ↓
+                                                               ✅ Slack: ROLLED BACK
+```
+
+**Health check parameters:**
+- **Wait time:** 30 seconds for propagation
+- **Retries:** 3 attempts with 10-second intervals
+- **Timeout:** 30 seconds per attempt
+- **Success criteria:** HTTP 200 from `/health` endpoint
+
+**Rollback strategies:**
+1. **Primary:** Use CloudFormation `Previous` template from S3
+2. **Fallback:** Git checkout `HEAD~1` + CDK redeploy
+
+**Always runs:** Uses `if: always()` — executes even on partial failures.
+
+### Manual Rollback Procedure
 
 ```bash
 # Automatic rollback via CloudFormation
