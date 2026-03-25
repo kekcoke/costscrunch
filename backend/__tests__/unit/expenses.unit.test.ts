@@ -14,9 +14,17 @@ import {
   UpdateCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { vi } from "vitest";
 
 // ── Mock the DDB client BEFORE importing the handler ─────────────────────────
 const ddbMock = mockClient(DynamoDBDocumentClient);
+const s3Mock = mockClient(S3Client);
+
+// Mock getSignedUrl to return a fake URL
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+  getSignedUrl: vi.fn().mockResolvedValue("https://s3.amazonaws.com/fake-export-url"),
+}));
 
 // Import AFTER mocking so the module-level client is intercepted
 import { rawHandler as handler } from "../../src/lambdas/expenses/index.js";
@@ -67,6 +75,7 @@ const SAMPLE_EXPENSE = {
 
 beforeEach(() => {
   ddbMock.reset();
+  s3Mock.reset();
 });
 
 // ── GET /expenses ──────────────────────────────────────────────────────────────
@@ -383,6 +392,153 @@ describe("DELETE /expenses/{id}", () => {
       Key: { pk: "USER#user-abc", sk: "EXPENSE#01HZ" },
       ConditionExpression: expect.stringContaining("ownerId"),
     });
+  });
+});
+
+// ── GET /expenses/export ──────────────────────────────────────────────────────
+describe("GET /expenses/export", () => {
+  const makeExportEvent = (qs: Record<string, string> = {}) =>
+    makeEvent({ routeKey: "GET /expenses/export", queryStringParameters: qs }) as any;
+
+  const SAMPLE_EXPORT_ITEM = {
+    ...SAMPLE_EXPENSE,
+    expenseId: "01HZ",
+    merchant: "Starbucks",
+    amount: 12.5,
+    currency: "USD",
+    category: "Meals",
+    date: "2026-02-01",
+    status: "submitted",
+    approvalRequired: true,
+    approvedBy: null,
+    notes: "Team lunch",
+    tags: ["work"],
+    groupId: null,
+    splitMethod: null,
+    splitDetails: null,
+  };
+
+  it("returns empty CSV for empty result set", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    const res = await handler(makeExportEvent());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toBe("text/csv");
+    // Only header row
+    expect(res.body).toContain("expenseId,merchant,amount");
+    expect(res.body).not.toContain("Starbucks");
+  });
+
+  it("returns CSV with correct columns for matching expenses", async () => {
+    ddbMock.on(QueryCommand).resolves({
+      Items: [SAMPLE_EXPORT_ITEM],
+      Count: 1,
+    });
+
+    const res = await handler(makeExportEvent());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toBe("text/csv");
+    expect(res.headers["Content-Disposition"]).toContain("expenses-");
+    expect(res.headers["Content-Disposition"]).toContain(".csv");
+    expect(res.body).toContain("Starbucks");
+    expect(res.body).toContain("12.5");
+    expect(res.body).toContain("Meals");
+  });
+
+  it("returns JSON when format=json", async () => {
+    ddbMock.on(QueryCommand).resolves({
+      Items: [SAMPLE_EXPORT_ITEM],
+      Count: 1,
+    });
+
+    const res = await handler(makeExportEvent({ format: "json" }));
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toBe("application/json");
+    expect(res.headers["Content-Disposition"]).toContain(".json");
+    const parsed = JSON.parse(res.body);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].merchant).toBe("Starbucks");
+  });
+
+  it("validates format parameter — rejects invalid format", async () => {
+    const res = await handler(makeExportEvent({ format: "xml" }));
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("csv");
+  });
+
+  it("rejects limit over 10000", async () => {
+    const res = await handler(makeExportEvent({ limit: "10001" }));
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("10000");
+  });
+
+  it("filters by date range (from/to)", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [SAMPLE_EXPORT_ITEM], Count: 1 });
+
+    await handler(makeExportEvent({ from: "2026-01-01", to: "2026-02-28" }));
+
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    expect(call.args[0].input.FilterExpression).toContain("#date >=");
+    expect(call.args[0].input.FilterExpression).toContain("#date <=");
+  });
+
+  it("switches to GROUP# partition when groupId is provided", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    await handler(makeExportEvent({ groupId: "01GROUP" }));
+
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    expect((call.args[0] as any).input.ExpressionAttributeValues[":pk"]).toBe("GROUP#01GROUP");
+  });
+
+  it("writes to S3 and returns presigned URL when items exceed threshold", async () => {
+    // Create 1001 items to exceed S3_EXPORT_THRESHOLD (1000)
+    const manyItems = Array.from({ length: 1001 }, (_, i) => ({
+      ...SAMPLE_EXPORT_ITEM,
+      sk: `EXPENSE#item-${i}`,
+      expenseId: `item-${i}`,
+    }));
+    ddbMock.on(QueryCommand)
+      .resolvesOnce({ Items: manyItems.slice(0, 1000), Count: 1000, LastEvaluatedKey: { pk: "x", sk: "y" } })
+      .resolvesOnce({ Items: manyItems.slice(1000), Count: 1 });
+
+    const res = await handler(makeExportEvent());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toBe("application/json");
+    const body = JSON.parse(res.body);
+    expect(body.downloadUrl).toBe("https://s3.amazonaws.com/fake-export-url");
+    expect(body.format).toBe("csv");
+    expect(body.count).toBe(1001);
+    expect(body.expiresIn).toBe(1800);
+    expect(s3Mock).toHaveReceivedCommandWith(PutObjectCommand, {
+      ContentType: "text/csv",
+    });
+  });
+
+  it("strips internal fields (pk, sk, gsi1pk, etc.) from CSV output", async () => {
+    ddbMock.on(QueryCommand).resolves({
+      Items: [{ ...SAMPLE_EXPENSE, pk: "USER#x", sk: "EXPENSE#y", gsi1pk: "STATUS#draft", gsi1sk: "DATE#..." }],
+      Count: 1,
+    });
+
+    const res = await handler(makeExportEvent());
+
+    expect(res.body).not.toContain("USER#x");
+    expect(res.body).not.toContain("gsi1pk");
+    expect(res.body).toContain("Starbucks");
+  });
+
+  it("rejects strict unknown query params", async () => {
+    const res = await handler(makeExportEvent({ unknownParam: "bad" }));
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("unknownParam");
   });
 });
 
