@@ -136,19 +136,33 @@ describe("GET /expenses (list)", () => {
     expect(body.nextToken).toBeTruthy();
   });
 
-  it("caps limit at 200", async () => {
+  it("passes limit=200 (max allowed by Zod schema)", async () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
 
     await handler(
       makeEvent({
         routeKey: "GET /expenses",
-        queryStringParameters: { limit: "9999" },
+        queryStringParameters: { limit: "200" },
       }) as any
     );
 
     expect(ddbMock).toHaveReceivedCommandWith(QueryCommand, {
       Limit: 200,
     });
+  });
+
+  it("rejects limit > 200 via Zod validation", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+    const res = await handler(
+      makeEvent({
+        routeKey: "GET /expenses",
+        queryStringParameters: { limit: "9999" },
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(400);
+    expect(ddbMock).not.toHaveReceivedCommandWith(QueryCommand, expect.anything());
   });
 });
 

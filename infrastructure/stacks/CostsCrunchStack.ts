@@ -32,7 +32,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { buildStackConfig } from "./StackConfig";
 
 export interface CostsCrunchStackProps extends StackProps {
@@ -435,6 +435,10 @@ export class CostsCrunchStack extends Stack {
         // NOTE: Sensitive values (BEDROCK_MODEL_ID, FROM_EMAIL, PINPOINT_APP_ID) are NOT
         // stored in environment variables. Lambdas retrieve them at runtime via SSM/Secrets Manager.
         const sharedEnv = {
+            AWS_XRAY_SDK_ENABLED: "true",
+            AWS_XRAY_TRACING_NAME: `${prefix}-receipt-pipeline`,
+            // Derived from env var, default to 1% (0.01) for production scale
+            AWS_XRAY_SAMPLING_RATE: process.env.XRAY_SAMPLING_RATE ?? "0.01",
             TABLE_NAME_MAIN:      table.tableName,
             TABLE_NAME_CONNECTIONS: connTable.tableName,   // ws-notifier reads connection records
             EVENT_BUS_NAME:  eventBus.eventBusName,
@@ -455,12 +459,19 @@ export class CostsCrunchStack extends Stack {
             SECRET_NOTIFICATION_ARN: notificationSecret.secretArn,
         };
 
-        const sharedLambdaProps: Partial<lambda.FunctionProps> = {
+        const sharedLambdaProps: Partial<NodejsFunctionProps> = {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: Duration.seconds(29),
             tracing: lambda.Tracing.ACTIVE,
             layers: [powertoolsLayer],
+            bundling: {
+                externalModules: [
+                    "@aws-lambda-powertools/logger",
+                    "@aws-lambda-powertools/metrics",
+                    "@aws-lambda-powertools/tracer",
+                ],
+            },
             vpc,
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             logRetention: isProd ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_WEEK,
@@ -639,6 +650,15 @@ export class CostsCrunchStack extends Stack {
             actions:   ["ses:SendEmail", "ses:SendTemplatedEmail", "mobiletargeting:SendMessages"],
             resources: ["*"],
         }));
+
+        // Explicitly grant X-Ray permissions to all pipeline functions
+        const xrayPolicy = new iam.PolicyStatement({
+            actions: ["xray:PutTraceSegments", "xray:PutTelemetryRecords"],
+            resources: ["*"],
+        });
+        [imagePreprocessLambda, receiptsLambda, snsWebhookLambda, wsNotifierLambda].forEach(fn => {
+            fn.addToRolePolicy(xrayPolicy);
+        });
 
         // ── S3 → Lambda Event Sources ────────────────────────────────────────────────
         // Image preprocessing: triggered by uploads to the uploads bucket

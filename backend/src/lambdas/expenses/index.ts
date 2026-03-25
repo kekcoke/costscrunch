@@ -96,7 +96,6 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
           ":pk": `USER#${auth.userId}`,
           ":prefix": "EXPENSE#",
         },
-        Limit: Math.min(Number(q.limit) || 50, 200),
         ScanIndexForward: false,
       };
 

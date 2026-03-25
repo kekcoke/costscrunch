@@ -99,6 +99,8 @@ export const handler = withErrorHandler(async (event: S3Event) => {
 
     const [, userId, expenseId, scanId, filename] = parts;
 
+    tracer.putAnnotation("receiptId", expenseId);
+
     try {
       // ── 2. Get object metadata to check MIME type
       const headResult = await s3.send(new HeadObjectCommand({
@@ -131,6 +133,9 @@ export const handler = withErrorHandler(async (event: S3Event) => {
       let outputFormat: string;
 
       // ── 4. Process based on file type
+      const preprocessSubsegment = tracer.getSegment()?.addNewSubsegment("ImageProcessing");
+      preprocessSubsegment?.addAnnotation("stage", "preprocess");
+
       if (format === "pdf") {
         // PDF: pass through unchanged (no lossless compression needed)
         logger.info("PDF detected — passing through unchanged");
@@ -167,6 +172,8 @@ export const handler = withErrorHandler(async (event: S3Event) => {
           .toBuffer();
         outputFormat = "jpg";
       }
+
+      preprocessSubsegment?.close();
 
       const originalSize = bodyBuffer.length;
       const compressedSize = processedBuffer.length;

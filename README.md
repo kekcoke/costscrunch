@@ -20,7 +20,7 @@
         ↓
 ⚡ ElastiCache Redis (response cache + sessions)
         ↓
-⚙️ AWS Lambda (Node.js 20 + Powertools + Vitest)
+⚙️ AWS Lambda (Node.js 20 + Powertools + X-Ray 1% sampling + Vitest)
      ├── expenses/       CRUD + approval workflows
      ├── groups/         splits + balances + settlements
      ├── receipts/       S3 → Textract async triggering

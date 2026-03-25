@@ -303,6 +303,8 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
     const [expenseId, scanId] = jobTag.split("/");
     const userId = message.DocumentLocation.S3ObjectName.split("/")[1]; // receipts/{userId}/…
 
+    tracer.putAnnotation("receiptId", expenseId);
+
     logger.appendKeys({ jobId, expenseId, scanId, userId });
     logger.info("Received Textract completion notification", { status });
 
@@ -329,6 +331,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
 
       // ── Step 2: AI enrichment — Claude with keyword fallback ───────────────
       const bedrockSub  = segment.addNewSubsegment("claudeEnrichment");
+      bedrockSub.addAnnotation("stage", "categorize");
       let aiEnrichment: AiEnrichment = guessCategory(String(extracted.merchant ?? ""), lineItems);
 
       try {
