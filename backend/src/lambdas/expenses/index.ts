@@ -1,11 +1,15 @@
 // ─── CostsCrunch — Expenses Lambda Handler ─────────────────────────────────────
-// Routes: GET /expenses, POST /expenses, GET /expenses/:id, PATCH /expenses/:id, DELETE /expenses/:id
+// Routes: GET /expenses, POST /expenses, GET /expenses/:id, PATCH /expenses/:id,
+//         DELETE /expenses/:id, GET /expenses/export
 
 import {
   GetCommand, PutCommand,
   QueryCommand, UpdateCommand, DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { createDynamoDBDocClient } from "../../utils/awsClients.js";
+import { createDynamoDBDocClient, createS3Client } from "../../utils/awsClients.js";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { stringify } from "csv-stringify/sync";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
@@ -17,13 +21,16 @@ import type {
   ApiEvent, AuthContext,
   Expense,
 } from "../../shared/models/types.js";
-import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema } from "../../shared/validation/schemas.js";
+import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema, exportExpensesQuerySchema } from "../../shared/validation/schemas.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = createDynamoDBDocClient({
   marshallOptions: { removeUndefinedValues: true },
 });
+const s3 = createS3Client();
 const TABLE = process.env.TABLE_NAME_MAIN!;
+const EXPORTS_BUCKET = process.env.BUCKET_ASSETS_NAME!; // reuse assets bucket for exports
+const S3_EXPORT_THRESHOLD = 1000;                       // inline response below this, S3 above
 
 // ─── Powertools ───────────────────────────────────────────────────────────────
 const logger = new Logger({ serviceName: "expenses" });
@@ -76,6 +83,151 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
   const expenseId = event.pathParameters?.id;
 
   logger.appendKeys({ userId: auth.userId, route });
+
+  // ── GET /expenses/export ─────────────────────────────────────────────────
+  if (route === "GET /expenses/export") {
+    const qRaw = event.queryStringParameters || {};
+    const parsed = exportExpensesQuerySchema.safeParse(qRaw);
+    if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join("; "));
+
+    const q = parsed.data;
+    const seg = tracer.getSegment()!;
+    const sub = seg.addNewSubsegment("exportExpenses");
+
+    try {
+      // Build base query — switch partition by groupId filter
+      const pk = q.groupId ? `GROUP#${q.groupId}` : `USER#${auth.userId}`;
+      const baseParams: any = {
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: {
+          ":pk": pk,
+          ":prefix": "EXPENSE#",
+        },
+        ScanIndexForward: true,
+      };
+
+      // Date range filters
+      const filters: string[] = [];
+      const attrNames: Record<string, string> = {};
+      const attrVals: Record<string, string> = {};
+      if (q.status) {
+        attrNames["#status"] = "status";
+        attrVals[":status"] = q.status;
+        filters.push("#status = :status");
+      }
+      if (q.category) {
+        attrVals[":category"] = q.category;
+        filters.push("category = :category");
+      }
+      if (q.from) {
+        attrNames["#date"] = "date";
+        attrVals[":from"] = q.from;
+        filters.push("#date >= :from");
+      }
+      if (q.to) {
+        attrNames["#date"] = attrNames["#date"] || "date";
+        attrVals[":to"] = q.to;
+        filters.push("#date <= :to");
+      }
+      if (filters.length) {
+        baseParams.FilterExpression = filters.join(" AND ");
+        baseParams.ExpressionAttributeNames = attrNames;
+        Object.assign(baseParams.ExpressionAttributeValues, attrVals);
+      }
+
+      // Paginate through all matching items up to limit
+      const items: any[] = [];
+      let lastKey: any = undefined;
+      do {
+        const result = await ddb.send(new QueryCommand({
+          ...baseParams,
+          Limit: q.limit - items.length,
+          ExclusiveStartKey: lastKey,
+        }));
+        items.push(...(result.Items || []));
+        lastKey = result.LastEvaluatedKey;
+      } while (lastKey && items.length < q.limit);
+
+      metrics.addMetric("ExpensesExported", MetricUnit.Count, items.length);
+
+      // CSV columns — strip internal fields
+      const csvColumns = [
+        "expenseId", "merchant", "amount", "currency", "category",
+        "date", "status", "approvalRequired", "approvedBy",
+        "notes", "tags", "groupId", "splitMethod", "splitDetails",
+      ];
+      const stripInternal = (item: any) => {
+        const row: Record<string, unknown> = {};
+        for (const col of csvColumns) {
+          const val = item[col];
+          if (val !== undefined) {
+            row[col] = typeof val === "object" ? JSON.stringify(val) : val;
+          }
+        }
+        return row;
+      };
+
+      const useS3 = items.length > S3_EXPORT_THRESHOLD;
+
+      if (q.format === "json") {
+        const body = JSON.stringify(items.map(stripInternal), null, 2);
+        if (useS3) {
+          const key = `exports/${auth.userId}/${ulid()}.json`;
+          await s3.send(new PutObjectCommand({
+            Bucket: EXPORTS_BUCKET,
+            Key: key,
+            Body: body,
+            ContentType: "application/json",
+          }));
+          const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key }), { expiresIn: 1800 });
+          return ok({ downloadUrl: url, format: "json", count: items.length, expiresIn: 1800 });
+        }
+        return {
+          statusCode: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Disposition": `attachment; filename="expenses-${q.from || "all"}-${q.to || "all"}.json"`,
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+          },
+          body,
+        };
+      }
+
+      // Default: CSV
+      const rows = items.map(stripInternal);
+      const csvBody = stringify(rows, {
+        header: true,
+        columns: csvColumns,
+      });
+
+      if (useS3) {
+        const key = `exports/${auth.userId}/${ulid()}.csv`;
+        await s3.send(new PutObjectCommand({
+          Bucket: EXPORTS_BUCKET,
+          Key: key,
+          Body: csvBody,
+          ContentType: "text/csv",
+        }));
+        const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key }), { expiresIn: 1800 });
+        return ok({ downloadUrl: url, format: "csv", count: items.length, expiresIn: 1800 });
+      }
+
+      return {
+        statusCode: 200,
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="expenses-${q.from || "all"}-${q.to || "all"}.csv"`,
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": "true",
+        },
+        body: csvBody,
+      };
+    } finally {
+      sub.close();
+    }
+  }
 
   // ── GET /expenses ─────────────────────────────────────────────────────────
   if (route.startsWith("GET") && !expenseId) {
