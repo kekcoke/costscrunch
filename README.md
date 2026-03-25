@@ -669,18 +669,20 @@ npm run deploy:dev
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Required GitHub Variables (OIDC)
+
+| Variable | Description | Environment |
+|---------|-------------|-------------|
+| `DEV_GITHUB_ROLE_ARN` | IAM role ARN for CDK synth | CI |
+| `STAGING_GITHUB_ROLE_ARN` | IAM role ARN for staging deploy | CD |
+| `PROD_GITHUB_ROLE_ARN` | IAM role ARN for production deploy | CD |
+
 ### Required GitHub Secrets
 
 | Secret | Description | Environment |
 |--------|-------------|-------------|
-| `AWS_ACCESS_KEY_ID_DEV` | AWS access key for CDK synth | CI |
-| `AWS_SECRET_ACCESS_KEY_DEV` | AWS secret key for CDK synth | CI |
-| `AWS_ACCESS_KEY_ID_STAGING` | AWS access key for staging deploy | CD |
-| `AWS_SECRET_ACCESS_KEY_STAGING` | AWS secret key for staging deploy | CD |
-| `AWS_ACCOUNT_ID_STAGING` | AWS account ID for staging | CD |
-| `AWS_ACCESS_KEY_ID_PROD` | AWS access key for production | CD |
-| `AWS_SECRET_ACCESS_KEY_PROD` | AWS secret key for production | CD |
-| `AWS_ACCOUNT_ID_PROD` | AWS account ID for production | CD |
+| `AWS_ACCESS_KEY_ID_DEV` | AWS access key for PR validation (deprecated) | CI |
+| `AWS_SECRET_ACCESS_KEY_DEV` | AWS secret for PR validation (deprecated) | CI |
 | `CODECOV_TOKEN` | Codecov coverage upload token | CI |
 | `SEMGREP_APP_TOKEN` | Semgrep SAST token | CI |
 | `VITE_API_URL` | Frontend API URL | CI |
