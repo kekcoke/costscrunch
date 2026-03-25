@@ -93,6 +93,8 @@ costscrunch
 **GSI2:** `gsi2pk = CATEGORY#category`, `gsi2sk = DATE#date#expId`  
 → Analytics queries by category + time period
 
+**ReceiptHashIndex (GSI3):** `gsi3pk = RECEIPT_HASH#hash`, `gsi3sk = DATE#date`
+→ Duplicate receipt detection via exact hash lookup
 ---
 
 ## Receipt Scan Pipeline
@@ -180,6 +182,16 @@ User uploads file
       ↓
 [Lambda] Parses: merchant, amount, date, tax, tip, line items
       ↓
+[Lambda] Computes receipt hash (merchant + date + amount)
+      ↓
+[Lambda] Queries DynamoDB ReceiptHashIndex GSI
+      ↓ (if match found)
+[Lambda] Levenshtein fuzzy match on merchant name
+      ↓ (if similarity >= 85%)
+[DynamoDB] Updates existing scan status: "duplicate"
+      ↓
+[EventBridge] Emits DuplicateReceiptDetected
+      ↓
 [Lambda] Claude 3 Haiku (Bedrock) → category + confidence + policy flags
       │  ↳ Circuit breaker: 5 failures → OPEN (30s cooldown)
              ↓ (on Bedrock failure or circuit open)
@@ -234,6 +246,50 @@ The preprocessing layer is designed for seamless backwards compatibility:
 3. Update receipts Lambda env vars: add `BUCKET_UPLOADS_NAME`, `BUCKET_PROCESSED_NAME`
 4. Update S3 event sources via CDK (automatic on deploy)
 5. No frontend changes required
+
+### Duplicate Receipt Detection
+
+The pipeline detects potential duplicate receipts using a two-stage matching approach:
+
+```
+[New Receipt Scan]
+      ↓
+[Compute Hash] SHA-256(merchant + date + amount) normalized
+      ↓
+[DynamoDB Query] ReceiptHashIndex GSI (O(1) lookup)
+      ↓
+┌─────────────────────────────────────┐
+│ No match found                      │ Match found (same hash)
+│ → Continue normal processing        │ → Fuzzy match merchant names
+└─────────────────────────────────────┘
+                                              ↓
+                                    [Levenshtein Distance]
+                                              ↓
+                                    similarity >= 85%?
+                                    ┌─────────┴─────────┐
+                                    Yes                 No
+                                    ↓                   ↓
+                          [Mark as "duplicate"]  [Continue processing]
+                          [Emit DuplicateReceiptDetected event]
+```
+
+**Hash computation:**
+- Inputs: normalized merchant name, date, total amount
+- Normalization: lowercase, trim whitespace, remove common suffixes (Inc, LLC, etc.)
+- Result: deterministic SHA-256 hash stored as `receiptHash` attribute
+
+**Fuzzy matching:**
+- Algorithm: Levenshtein distance (edit distance)
+- Threshold: 85% similarity (handles "Walmart" vs "WALMART", minor typos)
+- Applied when exact hash matches (same merchant/date/amount)
+
+**Handling duplicate matches:**
+- Scan status updated to `"duplicate"`
+- Links to original scan via `duplicateOf` attribute
+- `DuplicateReceiptDetected` EventBridge event emitted for notifications
+- No expense created (avoids double-counting)
+
+**Graceful degradation:** If the `ReceiptHashIndex` GSI is missing (older deployments), the check is skipped and processing continues normally.
 
 ---
 
