@@ -1,0 +1,218 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GitHubActionsStack > matches snapshot 1`] = `
+{
+  "Outputs": {
+    "IAMRoleArn": {
+      "Description": "ARN of the GitHub Actions deploy role",
+      "Export": {
+        "Name": "costscrunch-staging-github-actions-role-arn",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "GitHubActionsDeployRoleA6F4AD3D",
+          "Arn",
+        ],
+      },
+    },
+    "OIDCProviderArn": {
+      "Description": "ARN of the GitHub OIDC Provider",
+      "Export": {
+        "Name": "costscrunch-staging-github-oidc-provider-arn",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "GitHubOIDCProvider",
+          "Arn",
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "GitHubActionsDeployRoleA6F4AD3D": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                },
+                "StringLike": {
+                  "token.actions.githubusercontent.com:sub": "repo:test-org/test-repo:ref:refs/heads/main",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "GitHubOIDCProvider",
+                },
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "GitHub Actions OIDC role for staging deployments",
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "sts:GetCallerIdentity",
+                    "sts:AssumeRole",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "cloudformation:CreateStack",
+                    "cloudformation:UpdateStack",
+                    "cloudformation:DeleteStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DescribeStackEvents",
+                    "cloudformation:GetTemplate",
+                    "cloudformation:ValidateTemplate",
+                    "cloudformation:EstimateTemplateCost",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    "arn:aws:cloudformation:us-east-1:123456789012:stack/costscrunch-staging-*/*",
+                    "arn:aws:cloudformation:us-east-1:123456789012:stack/cdk-*/*",
+                  ],
+                },
+                {
+                  "Action": [
+                    "s3:CreateBucket",
+                    "s3:DeleteBucket",
+                    "s3:DeleteObject",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:PutObject",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    "arn:aws:s3:::costscrunch-staging-*",
+                    "arn:aws:s3:::costscrunch-staging-*/*",
+                    "arn:aws:s3:::cdk-*",
+                    "arn:aws:s3:::cdk-*/*",
+                  ],
+                },
+                {
+                  "Action": "lambda:InvokeFunction",
+                  "Effect": "Allow",
+                  "Resource": [
+                    "arn:aws:lambda:us-east-1:123456789012:function:costscrunch-staging-*",
+                    "arn:aws:lambda:us-east-1:123456789012:function:cdk-*",
+                  ],
+                },
+                {
+                  "Action": [
+                    "cloudfront:CreateInvalidation",
+                    "cloudfront:GetInvalidation",
+                    "cloudfront:ListInvalidations",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "ecr:GetAuthorizationToken",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage",
+                    "ecr:PutImage",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "iam:AttachRolePolicy",
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:GetRole",
+                    "iam:GetRolePolicy",
+                    "iam:PassRole",
+                    "iam:PutRolePolicy",
+                    "iam:UpdateRole",
+                    "iam:TagRole",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    "arn:aws:iam::123456789012:role/costscrunch-staging-*",
+                    "arn:aws:iam::123456789012:role/cdk-*",
+                  ],
+                },
+                {
+                  "Action": "ssm:*",
+                  "Effect": "Allow",
+                  "Resource": [
+                    "arn:aws:ssm:us-east-1:123456789012:parameter/costscrunch-staging/*",
+                    "arn:aws:ssm:us-east-1:123456789012:parameter/cdk/*",
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "cdkDeployPolicy",
+          },
+        ],
+        "RoleName": "costscrunch-staging-github-actions-deploy",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "GitHubOIDCProvider": {
+      "Properties": {
+        "ClientIdList": [
+          "sts.amazonaws.com",
+        ],
+        "ThumbprintList": [
+          "6938fd4d98bab03faadb97b34396831e3780aea1",
+        ],
+        "Url": "https://token.actions.githubusercontent.com",
+      },
+      "Type": "AWS::IAM::OIDCProvider",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
