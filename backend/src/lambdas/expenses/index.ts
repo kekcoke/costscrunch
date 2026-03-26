@@ -38,6 +38,19 @@ const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Sanitizes an object to only include keys present in the target schema.
+ * Ensures compatibility with Zod .strict() when receiving proxy/express metadata.
+ */
+const sanitizeQuery = (raw: Record<string, any> | undefined, allowedKeys: string[]) => {
+  if (!raw) return {};
+  const cleaned: Record<string, any> = {};
+  for (const key of allowedKeys) {
+    if (raw[key] !== undefined) cleaned[key] = raw[key];
+  }
+  return cleaned;
+};
+
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, 
   headers: { 
@@ -86,7 +99,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses/export ─────────────────────────────────────────────────
   if (route === "GET /expenses/export") {
-    const qRaw = event.queryStringParameters || {};
+    const qRaw = sanitizeQuery(event.queryStringParameters, ["format", "groupId", "status", "category", "from", "to", "limit"]);
     const parsed = exportExpensesQuerySchema.safeParse(qRaw);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join("; "));
 
@@ -231,7 +244,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses ─────────────────────────────────────────────────────────
   if (route.startsWith("GET") && !expenseId) {
-    const qRaw = event.queryStringParameters || {};
+    const qRaw = sanitizeQuery(event.queryStringParameters, ["groupId", "status", "category", "startDate", "endDate", "limit", "nextToken"]);
     const parsed = getExpensesQuerySchema.safeParse(qRaw);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
