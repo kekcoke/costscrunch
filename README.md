@@ -586,12 +586,17 @@ npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)
 npx vitest run __tests__/localstack             # Service-level LocalStack tests
+npx vitest run rollback.test.ts                  # Rollback workflow validation tests
+npx vitest run GitHubActionsStack.test.ts        # OIDC stack tests
 
 # Backend tests
 cd backend
 npm run test:ut                                 # unit tests
 npm run test:ig                                 # integration tests (requires LocalStack)
+npx vitest run __tests__/unit/fuzzyMatch.unit.test.ts      # Fuzzy matching tests
+npx vitest run __tests__/unit/receiptHash.unit.test.ts      # Receipt hash tests
 npx vitest run __tests__/integration/cors.integration.test.ts # CORS verification (mocked handlers)
+npx vitest run __tests__/integration/duplicate-detection.integration.test.ts # Duplicate detection
 
 # Frontend tests
 cd frontend && npx vitest
