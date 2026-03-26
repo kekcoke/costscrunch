@@ -206,7 +206,7 @@ add_route /groups/{id}/settle GroupsFunction
 # Expenses (3 routes — sub-paths share one resource)
 add_route /expenses ExpensesFunction
 add_route /expenses/{id} ExpensesFunction
-add_route /expenses/export
+add_route /expenses/export ExpensesFunction
 
 # Receipts (3 routes)
 add_route /receipts ReceiptsFunction
