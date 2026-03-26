@@ -63,7 +63,7 @@ export function createMockExpense(
   };
 }
 
-export const MOCK_EXPENSES: Expense[] = [
+export const SEED_EXPENSES_MOCK: Expense[] = [
   createMockExpense({
     id: "e1",
     merchant: "Whole Foods Market",
