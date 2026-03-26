@@ -7,6 +7,7 @@ import { createSelector } from "reselect";
 
 import { MOCK_EXPENSES } from "../mocks/expenses";
 import type { Expense } from "../models/types";
+import { expensesApi } from "../services/api";
 import { tempId } from "../helpers/utils";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { shallow } from "zustand/shallow";
@@ -23,6 +24,7 @@ interface ExpenseStore {
   addExpense: (expenseData: Omit<Expense, "id">) => void;
   updateExpense: (id: string, patch: Partial<Expense>) => void;
   removeExpense: (id: string) => void;
+  fetchExpenses: () => Promise<void>;
 
   setFilter: (f: ExpenseFilter) => void;
   setSearch: (q: string) => void;
@@ -66,6 +68,15 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
     set((state) => ({
       expenses: state.expenses.filter((e) => e.id !== id),
     })),
+
+  fetchExpenses: async () => {
+    try {
+      const { items } = await expensesApi.list();
+      set({ expenses: items });
+    } catch (err) {
+      console.error("Failed to fetch expenses:", err);
+    }
+  },
 
   setFilter: (f) => set({ filter: f }),
   setSearch: (q) => set({ search: q }),

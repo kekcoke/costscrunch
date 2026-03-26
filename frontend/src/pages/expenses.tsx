@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useEffect } from "react";
 import {
   useExpenseStore,
   selectFiltered,
@@ -15,6 +16,11 @@ const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 export function ExpensesPage() {
   const { filter, search, setFilter, setSearch } = useFilterControls();
   const filtered = useExpenseStore(selectFiltered);
+  const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {
@@ -24,8 +30,13 @@ export function ExpensesPage() {
         format: "csv",
         status: filter !== "all" ? filter : undefined 
       });
+      // Basic feedback if download doesn't trigger automatically in some browsers
+      console.log("Export request successful");
     } catch (err) {
       console.error("Export failed:", err);
+      alert("Export failed. Please check the console for details.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
