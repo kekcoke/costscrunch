@@ -4,6 +4,8 @@ import {
   selectFiltered,
   useFilterControls,
 } from "../stores/useExpenseStore";
+import { expensesApi } from "../services/api";
+import { useState } from "react";
 import type { ExpenseFilter } from "../stores/useExpenseStore";
 import { fmt } from "../helpers/utils";
 import { ExpenseRow } from "../components";
@@ -13,6 +15,19 @@ const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 export function ExpensesPage() {
   const { filter, search, setFilter, setSearch } = useFilterControls();
   const filtered = useExpenseStore(selectFiltered);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      await expensesApi.export({ 
+        format: "csv",
+        status: filter !== "all" ? filter : undefined 
+      });
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
+  };
 
   const totalFiltered = useMemo(
     () => filtered.reduce((s, e) => s + e.amount, 0),
@@ -23,9 +38,37 @@ export function ExpensesPage() {
     <div style={{ animation: "fadeUp 0.4s both" }}>
       {/* Page Header */}
       <header className="page-header" style={{ marginBottom: "20px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
-          All Expenses
-        </h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 700, letterSpacing: "-0.5px", margin: 0 }}>
+              All Expenses
+            </h1>
+            <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
+              Manage and track your expenses
+            </div>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "8px",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-text)",
+              fontSize: "13px",
+              fontWeight: 500,
+              cursor: isExporting ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              transition: "all 0.2s",
+              opacity: isExporting ? 0.6 : 1,
+            }}
+          >
+            {isExporting ? "⌛ Exporting..." : "📥 Export CSV"}
+          </button>
+        </div>
         <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
           Manage and track your expenses
         </div>

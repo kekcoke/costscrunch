@@ -103,6 +103,7 @@ app.get('/analytics/chart-data', lambdaAdapter(analyticsHandler, 'GET /analytics
 
 // Routes - Expenses
 app.get('/expenses', lambdaAdapter(expensesHandler, '/expenses'));
+app.get('/expenses/export', lambdaAdapter(expensesHandler, '/expenses/export'));
 app.post('/expenses', lambdaAdapter(expensesHandler, '/expenses'));
 app.get('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
 app.patch('/expenses/:id', lambdaAdapter(expensesHandler, '/{id}'));
