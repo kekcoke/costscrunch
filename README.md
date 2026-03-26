@@ -605,7 +605,45 @@ cd frontend && npx vitest
 ### Deploy to AWS
 
 ```bash
+# Streamlined per-environment deployment (recommended)
+./infrastructure/scripts/deploy.sh dev|staging|prod
+
+# Or use npm scripts from project root
 npm run deploy:dev
+npm run deploy:staging
+npm run deploy:prod
+```
+
+> **Note:** The CDK entry point moved from `bin/app.ts` → `bin/costscrunch.ts`. The legacy `bin/app.ts` is maintained for backwards compatibility but will be removed in a future release. The new entry point uses `stage` context (`--context stage=dev`) instead of `env` context (`--context env=dev`).
+
+#### Entry Point Comparison
+
+| | `bin/app.ts` (legacy) | `bin/costscrunch.ts` (current) |
+|---|---|---|
+| Context key | `env` | `stage` |
+| Capacity mode | On-demand only | Dev: on-demand / Staging/Prod: provisioned |
+| Alarm thresholds | Fixed | Configurable via `cdk.json` |
+| Provisioned concurrency | None | 50 for receipts + sns-webhook (staging/prod) |
+| Removal policy | Delete | Retain for DynamoDB/S3 (prod) |
+| GitHub OIDC | Conditional on env vars | Same |
+
+#### CDK Context Configuration
+
+Environment-specific settings are defined in `infrastructure/cdk.json`:
+
+```json
+{
+  "context": {
+    "dev": { "alarmThreshold": 10, "provisionedConcurrency": 0 },
+    "staging": { "alarmThreshold": 5, "provisionedConcurrency": 50 },
+    "prod": { "alarmThreshold": 3, "provisionedConcurrency": 50 }
+  }
+}
+```
+
+Override at deploy time:
+```bash
+cdk deploy --context stage=prod --context alarmThreshold=1
 ```
 
 ---

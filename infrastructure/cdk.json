@@ -1,0 +1,33 @@
+{
+  "app": "npx ts-node --project tsconfig.json bin/costscrunch.ts",
+  "require": ["source-map-support/register"],
+  "context": {
+    "@default": {
+      "stage": "dev",
+      "capacityMode": "on-demand",
+      "alarmThreshold": {
+        "errorRate": 5,
+        "durationP99": 30000
+      },
+      "provisionedConcurrency": false
+    },
+    "staging": {
+      "stage": "staging",
+      "capacityMode": "on-demand",
+      "alarmThreshold": {
+        "errorRate": 3,
+        "durationP99": 20000
+      },
+      "provisionedConcurrency": false
+    },
+    "prod": {
+      "stage": "prod",
+      "capacityMode": "provisioned",
+      "alarmThreshold": {
+        "errorRate": 1,
+        "durationP99": 10000
+      },
+      "provisionedConcurrency": true
+    }
+  }
+}

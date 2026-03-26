@@ -35,10 +35,23 @@ import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { buildStackConfig } from "./StackConfig";
 
+export interface AlarmThreshold {
+  errorRate: number;
+  durationP99: number;
+}
+
 export interface CostsCrunchStackProps extends StackProps {
   environment: "dev" | "staging" | "prod";
   domainName?: string;
   config?: StackConfig;
+  /** DynamoDB and Lambda capacity mode: on-demand or provisioned */
+  capacityMode?: "on-demand" | "provisioned";
+  /** CloudWatch alarm thresholds */
+  alarmThreshold?: AlarmThreshold;
+  /** Enable Lambda provisioned concurrency for critical functions */
+  provisionedConcurrency?: boolean;
+  /** Removal policy for resources (destroy for dev, retain for prod) */
+  removalPolicy?: "destroy" | "retain";
 }
 
 export class CostsCrunchStack extends Stack {
@@ -47,7 +60,19 @@ export class CostsCrunchStack extends Stack {
 
         const { environment } = props;
         const isProd = environment === "prod";
+        const isStaging = environment === "staging";
         const prefix = `costscrunch-${environment}`;
+
+        // Stage-specific configuration with sensible defaults
+        const capacityMode = props.capacityMode ?? (isProd ? "provisioned" : "on-demand");
+        const alarmThreshold = props.alarmThreshold ?? {
+            errorRate: isProd ? 1 : isStaging ? 3 : 5,
+            durationP99: isProd ? 10000 : isStaging ? 20000 : 30000,
+        };
+        const useProvisionedConcurrency = props.provisionedConcurrency ?? isProd;
+        const removalPolicy = props.removalPolicy === "retain"
+            ? RemovalPolicy.RETAIN
+            : RemovalPolicy.DESTROY;
 
         // Build or use provided configuration (useful for unit tests/Vitest)
         const config = props.config ?? buildStackConfig(this, this.account, this.region);
@@ -98,7 +123,7 @@ export class CostsCrunchStack extends Stack {
             alias: `${prefix}-main`,
             enableKeyRotation: true,
             description: "Primary KMS encryption key",
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
         });
 
         // ── VPC & Subnets ───────────────────────────────────────────────────────
@@ -144,7 +169,7 @@ export class CostsCrunchStack extends Stack {
             pointInTimeRecovery: true,
             deletionProtection: isProd,
             timeToLiveAttribute: "ttl",
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
             // Global Table replicas for prod
             replicas: isProd ? [{ region: "us-west-2" }] : [],
             globalSecondaryIndexes: [
@@ -181,7 +206,7 @@ export class CostsCrunchStack extends Stack {
             billing:       dynamodb.Billing.onDemand(),
             encryption:    dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
             timeToLiveAttribute: "ttl",
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
         });
 
         // ── DynamoDB Cost Estimates & Outputs ─────────────────────────────────────
@@ -212,7 +237,7 @@ export class CostsCrunchStack extends Stack {
             encryptionKey: kmsKey,
             versioned: false,
             enforceSSL: true,
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
@@ -233,7 +258,7 @@ export class CostsCrunchStack extends Stack {
             encryptionKey: kmsKey,
             versioned: true,
             enforceSSL: true,
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
             lifecycleRules: 
             [
                 { 
@@ -256,7 +281,7 @@ export class CostsCrunchStack extends Stack {
             encryptionKey: kmsKey,
             versioned: true,
             enforceSSL: true,
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
             cors: [
                 {
                     allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
@@ -277,7 +302,7 @@ export class CostsCrunchStack extends Stack {
             encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
         });
 
         // ── Cognito User Pool ────────────────────────────────────────────────
@@ -305,7 +330,7 @@ export class CostsCrunchStack extends Stack {
                 plan: new cognito.StringAttribute({ mutable: true }),
                 orgId: new cognito.StringAttribute({ mutable: true }),
             },
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
             standardThreatProtectionMode: cognito.StandardThreatProtectionMode.FULL_FUNCTION,
         });
 
@@ -758,7 +783,7 @@ export class CostsCrunchStack extends Stack {
         const wafLogGroup = new logs.LogGroup(this, "WafLogGroup", {
             logGroupName: `/aws/wafv2/${prefix}-waf-logs`,
             retention: logs.RetentionDays.THREE_MONTHS,
-            removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            removalPolicy,
         });
 
         // ── WAF v2 WebACL ─────────────────────────────────────────────────
@@ -1102,9 +1127,7 @@ export class CostsCrunchStack extends Stack {
             { fn: wsNotifierLambda, timeout: 29 }
         ];
 
-        const errorRateThreshold = process.env.ALARM_LAMBDA_ERROR_RATE_THRESHOLD 
-            ? parseInt(process.env.ALARM_LAMBDA_ERROR_RATE_THRESHOLD, 10) 
-            : 5;
+        const errorRateThreshold = alarmThreshold.errorRate;
 
         lambdaMonitoring.forEach(({ fn, timeout }) => {
             // Error Rate Alarm (> 5% over 5m)
@@ -1124,15 +1147,14 @@ export class CostsCrunchStack extends Stack {
             });
             errorRateAlarm.addAlarmAction(alarmAction);
 
-            // Duration Alarm (> 80% of timeout)
-            const durationThreshold = timeout * 0.8;
+            // Duration Alarm (> alarmThreshold.durationP99)
             const durationAlarm = fn.metricDuration({
                 period: Duration.minutes(5),
-                statistic: "Maximum",
+                statistic: "p99",
             }).createAlarm(this, `${fn.node.id}DurationAlarm`, {
-                threshold: durationThreshold,
+                threshold: alarmThreshold.durationP99,
                 evaluationPeriods: 1,
-                alarmDescription: `Duration for ${fn.node.id} is > 80% of timeout (${durationThreshold}s)`,
+                alarmDescription: `Duration for ${fn.node.id} is > ${alarmThreshold.durationP99}ms P99`,
             });
             durationAlarm.addAlarmAction(alarmAction);
         });
