@@ -586,12 +586,17 @@ npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)
 npx vitest run __tests__/localstack             # Service-level LocalStack tests
+npx vitest run rollback.test.ts                  # Rollback workflow validation tests
+npx vitest run GitHubActionsStack.test.ts        # OIDC stack tests
 
 # Backend tests
 cd backend
 npm run test:ut                                 # unit tests
 npm run test:ig                                 # integration tests (requires LocalStack)
+npx vitest run __tests__/unit/fuzzyMatch.unit.test.ts      # Fuzzy matching tests
+npx vitest run __tests__/unit/receiptHash.unit.test.ts      # Receipt hash tests
 npx vitest run __tests__/integration/cors.integration.test.ts # CORS verification (mocked handlers)
+npx vitest run __tests__/integration/duplicate-detection.integration.test.ts # Duplicate detection
 
 # Frontend tests
 cd frontend && npx vitest
@@ -731,7 +736,42 @@ npm run deploy:staging  # Deploy to staging
 npm run deploy:prod     # Deploy to production (requires approval)
 ```
 
-### Rollback Procedure
+### Automated Post-Deploy Rollback
+
+Deployments include automated health checks and rollback on failure:
+
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────────────┐
+│  CDK Deploy     │───▶│ Wait 30s     │───▶│ Health Check (3x)   │
+└─────────────────┘    └──────────────┘    └──────────┬──────────┘
+                                                      │
+                         ┌────────────────────────────┴────────────────────────────┐
+                         ↓                                                      ↓
+                    Health OK                                              Health FAIL
+                         ↓                                                      ↓
+                   ✅ Slack: SUCCESS                                   🚨 Rollback Stack
+                                                                        ↓
+                                                               AWS CloudFormation
+                                                               rollback-stack
+                                                                        ↓
+                                                               ⏳ Wait complete
+                                                                        ↓
+                                                               ✅ Slack: ROLLED BACK
+```
+
+**Health check parameters:**
+- **Wait time:** 30 seconds for propagation
+- **Retries:** 3 attempts with 10-second intervals
+- **Timeout:** 30 seconds per attempt
+- **Success criteria:** HTTP 200 from `/health` endpoint
+
+**Rollback strategies:**
+1. **Primary:** Use CloudFormation `Previous` template from S3
+2. **Fallback:** Git checkout `HEAD~1` + CDK redeploy
+
+**Always runs:** Uses `if: always()` — executes even on partial failures.
+
+### Manual Rollback Procedure
 
 ```bash
 # Automatic rollback via CloudFormation

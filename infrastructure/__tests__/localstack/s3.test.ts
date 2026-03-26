@@ -66,8 +66,8 @@ describe("S3 Buckets", () => {
       expect(corsRules.length).toBeGreaterThan(0);
 
       const allowedOrigins = corsRules[0].AllowedOrigins ?? [];
-      expect(allowedOrigins).toContain("http://localhost:3000");
-      expect(allowedOrigins).toContain("http://localhost:5173");
+      expect(allowedOrigins).toContain("http://localhost:3001"); // SAM CLI / Option 3
+      expect(allowedOrigins).toContain("http://localhost:5173"); // Vite dev server
     });
 
     it("should allow PUT and GET methods", async () => {
