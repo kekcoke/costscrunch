@@ -22,6 +22,7 @@ import type {
   Expense,
 } from "../../shared/models/types.js";
 import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema, exportExpensesQuerySchema } from "../../shared/validation/schemas.js";
+import { validateQuery } from "../../shared/validation/middleware.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = createDynamoDBDocClient({
@@ -36,20 +37,6 @@ const S3_EXPORT_THRESHOLD = 1000;                       // inline response below
 const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-/**
- * Sanitizes an object to only include keys present in the target schema.
- * Ensures compatibility with Zod .strict() when receiving proxy/express metadata.
- */
-const sanitizeQuery = (raw: Record<string, any> | undefined, allowedKeys: string[]) => {
-  if (!raw) return {};
-  const cleaned: Record<string, any> = {};
-  for (const key of allowedKeys) {
-    if (raw[key] !== undefined) cleaned[key] = raw[key];
-  }
-  return cleaned;
-};
 
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, 
@@ -99,8 +86,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses/export ─────────────────────────────────────────────────
   if (route === "GET /expenses/export") {
-    const qRaw = sanitizeQuery(event.queryStringParameters, ["format", "groupId", "status", "category", "from", "to", "limit"]);
-    const parsed = exportExpensesQuerySchema.safeParse(qRaw);
+    const parsed = validateQuery(exportExpensesQuerySchema, event.queryStringParameters);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join("; "));
 
     const q = parsed.data;
@@ -244,8 +230,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses ─────────────────────────────────────────────────────────
   if (route.startsWith("GET") && !expenseId) {
-    const qRaw = sanitizeQuery(event.queryStringParameters, ["groupId", "status", "category", "startDate", "endDate", "limit", "nextToken"]);
-    const parsed = getExpensesQuerySchema.safeParse(qRaw);
+    const parsed = validateQuery(getExpensesQuerySchema, event.queryStringParameters);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
     const q = parsed.data;
