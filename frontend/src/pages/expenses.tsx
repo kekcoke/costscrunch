@@ -15,22 +15,21 @@ import { ExpenseRow } from "../components";
 const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 
 export function ExpensesPage() {
-  const { filter, search, setFilter, setSearch } = useFilterControls();
+  const filter = useExpenseStore((s) => s.filter);
+  const search = useExpenseStore((s) => s.search);
+  const limit = useExpenseStore((s) => s.limit);
+  const nextToken = useExpenseStore((s) => s.nextToken);
   const filtered = useExpenseStore(selectFiltered);
-  const { limit, nextToken, setLimit, fetchExpenses } = useExpenseStore(
-    (s) => ({ 
-      limit: s.limit, 
-      nextToken: s.nextToken,
-      setLimit: s.setLimit,
-      fetchExpenses: s.fetchExpenses 
-    }),
-    shallow
-  );
+  
+  const setFilter = useExpenseStore((s) => s.setFilter);
+  const setSearch = useExpenseStore((s) => s.setSearch);
+  const setLimit = useExpenseStore((s) => s.setLimit);
+  const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
 
-  // Initial load only. setLimit/setFilter handle their own refreshes.
   useEffect(() => {
     fetchExpenses();
-  }, []); // Empty dependency array to prevent re-triggering on state updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only fetch on mount. Setters in the store handle their own refreshes.
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {

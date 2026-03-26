@@ -154,8 +154,10 @@ export const selectActions = (s: ExpenseStore) => ({
   addExpense:    s.addExpense,
   updateExpense: s.updateExpense,
   removeExpense: s.removeExpense,
+  fetchExpenses: s.fetchExpenses,
   setFilter:     s.setFilter,
   setSearch:     s.setSearch,
+  setLimit:      s.setLimit,
 });
 
 // ─── Convenience hook for the full filter-bar state ───────────────────────────
