@@ -1,20 +1,19 @@
 import { useMemo } from "react";
-import { useEffect } from "react";
-import { shallow } from "zustand/shallow";
 import {
   useExpenseStore,
   selectFiltered,
-  useFilterControls,
 } from "../stores/useExpenseStore";
 import { expensesApi } from "../services/api";
 import { useState } from "react";
 import type { ExpenseFilter } from "../stores/useExpenseStore";
 import { fmt } from "../helpers/utils";
-import { ExpenseRow } from "../components";
+import { ExpenseRow, ExpenseDetail } from "../components";
+import type { Expense } from "../models/types";
 
 const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 
 export function ExpensesPage() {
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const filter = useExpenseStore((s) => s.filter);
   const search = useExpenseStore((s) => s.search);
   const limit = useExpenseStore((s) => s.limit);
@@ -25,11 +24,6 @@ export function ExpensesPage() {
   const setSearch = useExpenseStore((s) => s.setSearch);
   const setLimit = useExpenseStore((s) => s.setLimit);
   const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
-
-  useEffect(() => {
-    fetchExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only fetch on mount. Setters in the store handle their own refreshes.
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async (format: "csv" | "json" | "pdf") => {
@@ -52,6 +46,19 @@ export function ExpensesPage() {
     () => filtered.reduce((s, e) => s + e.amount, 0),
     [filtered]
   );
+
+  if (selectedExpense) {
+    return (
+      <ExpenseDetail 
+        expense={selectedExpense} 
+        onBack={() => setSelectedExpense(null)}
+        onUpdate={(updated) => {
+          useExpenseStore.getState().updateExpense(updated.id, updated);
+          setSelectedExpense(updated);
+        }}
+      />
+    );
+  }
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
@@ -195,13 +202,15 @@ export function ExpensesPage() {
         </div>
 
         {filtered.map((e, i) => (
-          <ExpenseRow key={e.id} expense={e} delay={i * 0.03} />
+          <div key={e.id} onClick={() => setSelectedExpense(e)}>
+            <ExpenseRow expense={e} delay={i * 0.03} />
+          </div>
         ))}
 
         {nextToken && (
           <div style={{ padding: "20px", textAlign: "center", borderTop: "1px solid var(--color-border-dim)" }}>
             <button
-              onClick={() => fetchExpenses(true)}
+              onClick={() => fetchExpenses()}
               style={{
                 padding: "8px 24px",
                 borderRadius: "8px",

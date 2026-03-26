@@ -109,7 +109,7 @@ export const expensesApi = {
    * - Large datasets (≥1000 rows): returns a presigned S3 download URL.
    */
   export: async (params?: {
-    format?: "csv" | "json";
+    format: "csv" | "json" | "pdf";
     groupId?: string;
     status?: string;
     category?: string;
