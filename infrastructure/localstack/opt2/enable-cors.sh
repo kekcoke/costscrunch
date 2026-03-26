@@ -15,6 +15,7 @@ AWS="/usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1"
 ORIGIN="'*'"
 METHODS="'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
 HEADERS="'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
+EXPOSE="'Content-Disposition'"
 
 echo "🌐 Enforcing CORS for API: $API_ID"
 
@@ -49,7 +50,8 @@ for RES_ID in $RESOURCES; do
     --response-parameters "{
       \"method.response.header.Access-Control-Allow-Origin\": true,
       \"method.response.header.Access-Control-Allow-Methods\": true,
-      \"method.response.header.Access-Control-Allow-Headers\": true
+      \"method.response.header.Access-Control-Allow-Headers\": true,
+      \"method.response.header.Access-Control-Expose-Headers\": true
     }" >/dev/null 2>&1 || true
 
   # 4. Map static values in Integration Response (Critical fix: Added double quotes around variables)
@@ -61,7 +63,8 @@ for RES_ID in $RESOURCES; do
     --response-parameters "{
       \"method.response.header.Access-Control-Allow-Origin\": \"$ORIGIN\",
       \"method.response.header.Access-Control-Allow-Methods\": \"$METHODS\",
-      \"method.response.header.Access-Control-Allow-Headers\": \"$HEADERS\"
+      \"method.response.header.Access-Control-Allow-Headers\": \"$HEADERS\",
+      \"method.response.header.Access-Control-Expose-Headers\": \"$EXPOSE\"
     }" >/dev/null 2>&1 || true
 done
 

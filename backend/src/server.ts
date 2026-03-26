@@ -20,6 +20,7 @@ const CORS_CONFIG: CorsOptions & {
   origin: "*",
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Idempotency-Key"],
+  exposedHeaders: ["Content-Disposition"],
   maxAge: 86400,
 };
 

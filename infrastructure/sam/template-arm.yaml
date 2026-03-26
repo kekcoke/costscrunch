@@ -23,6 +23,7 @@ Globals:
     Cors:
       AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
       AllowHeaders: "'Content-Type,Authorization,X-Requested-With,Accept,Origin,X-Idempotency-Key'"
+      ExposeHeaders: "'Content-Disposition'"
       AllowOrigin: "'*'"
       MaxAge: "'86400'"
     GatewayResponses:
