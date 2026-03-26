@@ -37,6 +37,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const addExpense = useExpenseStore((s) => s.addExpense);
+  const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
+  const expenses   = useExpenseStore((s) => s.expenses);
   const pending    = useExpenseStore(selectPending);
 
   // Theme integration - subscribe to mode directly for reactivity
@@ -49,7 +51,8 @@ export default function App() {
 
   useEffect(() => {
     initSystemThemeListener();
-  }, []);
+    fetchExpenses();
+  }, [fetchExpenses]);
 
   // Swipe to open sidebar (mobile only)
   useSwipeGesture(
@@ -99,7 +102,7 @@ export default function App() {
         <Sidebar
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as PageId)}
-          pendingCount={pending.length}
+          pendingCount={expenses.length}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isMobile={true}
@@ -111,7 +114,7 @@ export default function App() {
         <Sidebar
           activeTab={activeTab}
           onTabChange={(id) => setActiveTab(id as PageId)}
-          pendingCount={pending.length}
+          pendingCount={expenses.length}
         />
       )}
 

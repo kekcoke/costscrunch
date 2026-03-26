@@ -5,7 +5,6 @@
 import { create } from "zustand";
 import { createSelector } from "reselect";
 
-import { SEED_EXPENSES_MOCK } from "../mocks/expenses";
 import type { Expense } from "../models/types";
 import { expensesApi } from "../services/api";
 import { tempId } from "../helpers/utils";
@@ -36,7 +35,7 @@ interface ExpenseStore {
 export const useExpenseStore = create<ExpenseStore>((set) => ({
 
   // ── State ──────────────────────────────────────────────────────────────────
-  expenses: SEED_EXPENSES_MOCK,
+  expenses: [],
   filter: "all",
   search: "",
   limit: 10,
