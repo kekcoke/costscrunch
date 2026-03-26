@@ -66,7 +66,18 @@ const lambdaAdapter = (handler: any, routeKeyPattern: string) =>
       // Invoke the actual handler exported from your Lambda index.ts
       const result = await handler(event, { awsRequestId: requestId });
       
-      const responseBody = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
+      const contentType = result.headers?.["Content-Type"] || result.headers?.["content-type"] || "application/json";
+      let responseBody;
+
+      if (contentType.includes("application/json") && typeof result.body === "string") {
+        try {
+          responseBody = JSON.parse(result.body);
+        } catch (e) {
+          responseBody = result.body;
+        }
+      } else {
+        responseBody = result.body;
+      }
       
       // Strip CORS headers from Lambda response — let Express middleware be the authority
       const { "Access-Control-Allow-Origin": _,
@@ -87,7 +98,11 @@ const lambdaAdapter = (handler: any, routeKeyPattern: string) =>
         res.setHeader("Access-Control-Allow-Headers", CORS_CONFIG.allowedHeaders.join(", "));
       }
 
-      res.json(responseBody);
+      if (typeof responseBody === "string" && !contentType.includes("application/json")) {
+        res.send(responseBody);
+      } else {
+        res.json(responseBody);
+      }
     } catch (error: any) {
       console.error(`[Local Server Error - ${requestId}]:`, error);
       res.status(500).json({ error: "Internal Server Error", message: error.message });
