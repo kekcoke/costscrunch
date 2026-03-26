@@ -172,11 +172,14 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "2a4336135893b8d421b69ac8e2bc8fdb208bc1171f60effcf5001df5681d6a08.zip",
+          "S3Key": "8a9232c2c447efba61d086f13273c95369808622d572d8afcdcc1e22f441f8c5.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -273,7 +276,7 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for AnalyticsLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for AnalyticsLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -284,11 +287,11 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -299,7 +302,7 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for AnalyticsLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for AnalyticsLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -351,7 +354,7 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -1036,6 +1039,75 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
                 "Ref": "ApiF70053CD",
               },
               "/*/*/expenses",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiGETexpensesexport203717A4": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "GET /expenses/export",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiGETexpensesexportExpensesLambdaGETIntegration7E3DB4B8",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiGETexpensesexportExpensesLambdaGETIntegration7E3DB4B8": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ExpensesLambda7DDC2469",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiGETexpensesexportExpensesLambdaGETIntegrationPermission937CB6A5": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ExpensesLambda7DDC2469",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/expenses/export",
             ],
           ],
         },
@@ -3387,11 +3459,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "6021a4733fb83446f83e9a16194a1922f7fa38fa80a4a176b6816f0fa6e29233.zip",
+          "S3Key": "3fbfb369da1a56b835121077d2c5186d748c3d2b43e11cb45069c1a3ca0ae28b.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -3488,7 +3563,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for ExpensesLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for ExpensesLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -3499,11 +3574,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -3514,7 +3589,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for ExpensesLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for ExpensesLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -3566,7 +3641,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -3839,11 +3914,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "17c185d5c201f5515d4bbdfafc18078b60f182c4c54e12af14210d50464a2580.zip",
+          "S3Key": "41b188448cd5b4bcf05d1c260f2d63f4d4547963793dfce561224f6628ba4143.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -3940,7 +4018,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for GroupsLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for GroupsLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -3951,11 +4029,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -3966,7 +4044,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for GroupsLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for GroupsLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -4018,7 +4096,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -4267,6 +4345,9 @@ def sort_filter_rules(json_obj):
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -4363,7 +4444,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for HealthLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for HealthLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -4374,11 +4455,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -4389,7 +4470,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for HealthLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for HealthLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -4441,7 +4522,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -4588,11 +4669,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "6cf408ea14ed345d6f5050f63d6149ba1b81b6dc5dd0cff847c8ae26fc00666a.zip",
+          "S3Key": "d9caa78090caa522daf9155ca67028990af46282d9d7d4caf84b3c89630d8d48.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -4689,7 +4773,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for ImagePreprocessLambda is > 80% of timeout (48s)",
+        "AlarmDescription": "Duration for ImagePreprocessLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -4700,11 +4784,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 48,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -4715,7 +4799,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for ImagePreprocessLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for ImagePreprocessLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -4767,7 +4851,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -5090,6 +5174,18 @@ def sort_filter_rules(json_obj):
             "AttributeName": "gsi2sk",
             "AttributeType": "S",
           },
+          {
+            "AttributeName": "gsi3pk",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "gsi3sk",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "receiptHash",
+            "AttributeType": "S",
+          },
         ],
         "BillingMode": "PAY_PER_REQUEST",
         "GlobalSecondaryIndexes": [
@@ -5125,6 +5221,34 @@ def sort_filter_rules(json_obj):
               "ProjectionType": "ALL",
             },
           },
+          {
+            "IndexName": "GSI3",
+            "KeySchema": [
+              {
+                "AttributeName": "gsi3pk",
+                "KeyType": "HASH",
+              },
+              {
+                "AttributeName": "gsi3sk",
+                "KeyType": "RANGE",
+              },
+            ],
+            "Projection": {
+              "ProjectionType": "ALL",
+            },
+          },
+          {
+            "IndexName": "ReceiptHashIndex",
+            "KeySchema": [
+              {
+                "AttributeName": "receiptHash",
+                "KeyType": "HASH",
+              },
+            ],
+            "Projection": {
+              "ProjectionType": "ALL",
+            },
+          },
         ],
         "KeySchema": [
           {
@@ -5145,6 +5269,12 @@ def sort_filter_rules(json_obj):
               },
               {
                 "IndexName": "GSI2",
+              },
+              {
+                "IndexName": "GSI3",
+              },
+              {
+                "IndexName": "ReceiptHashIndex",
               },
             ],
             "PointInTimeRecoverySpecification": {
@@ -5279,11 +5409,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "b067db2b7153c75f386ab050f4026f870f54f2f7b9e27a923bd7c6b9ed28fe49.zip",
+          "S3Key": "df6e49853b247a8e783b29771cdc9cc14d5fd2f0dde2e1aa3418bb80dfac58fb.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -5380,7 +5513,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for NotificationsLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for NotificationsLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -5391,11 +5524,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -5406,7 +5539,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for NotificationsLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for NotificationsLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -5458,7 +5591,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -5990,11 +6123,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "611f620faa52ba744af6f11fb171af6142a7246c65476c884ec76e7051cf75cc.zip",
+          "S3Key": "c383ad07403b1cc413c6904035148ee82531dec30e7e2c4c675164fbba076f9a.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -6100,7 +6236,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for ReceiptsLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for ReceiptsLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -6111,11 +6247,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -6126,7 +6262,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for ReceiptsLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for ReceiptsLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -6178,7 +6314,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -6752,7 +6888,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for SnsWebhookLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for SnsWebhookLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -6763,11 +6899,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -6778,7 +6914,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for SnsWebhookLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for SnsWebhookLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -6830,7 +6966,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -6847,11 +6983,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "1193a569ff3ea17c6790b7127b84becd7d700b72664fd26c01be399bf531b310.zip",
+          "S3Key": "d0ffbdd4b0a5dfea242ac6d6c1f655348e5aa79e64c7c5c414779576f5ee969b.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -7994,11 +8133,14 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "7cbf64a38f8fc46af1d09f90893af5820c21da1b18c79ea9bc7132eaf76d8cec.zip",
+          "S3Key": "10643749a8e0469c500210a2036395f07ff4b2f9899e2160d11343e140bddb3a.zip",
         },
         "Environment": {
           "Variables": {
             "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
             "BUCKET_PROCESSED_NAME": {
               "Ref": "ProcessedBucketDE59930C",
             },
@@ -8111,7 +8253,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Duration for WsNotifierLambda is > 80% of timeout (23.200000000000003s)",
+        "AlarmDescription": "Duration for WsNotifierLambda is > 20000ms P99",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "Dimensions": [
           {
@@ -8122,11 +8264,11 @@ def sort_filter_rules(json_obj):
           },
         ],
         "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 300,
-        "Statistic": "Maximum",
-        "Threshold": 23.200000000000003,
+        "Threshold": 20000,
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
@@ -8137,7 +8279,7 @@ def sort_filter_rules(json_obj):
             "Ref": "AlarmsTopicABBEC356",
           },
         ],
-        "AlarmDescription": "Error rate for WsNotifierLambda is > 5% over 5 minutes",
+        "AlarmDescription": "Error rate for WsNotifierLambda is > 3% over 5 minutes",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "EvaluationPeriods": 3,
@@ -8189,7 +8331,7 @@ def sort_filter_rules(json_obj):
             "ReturnData": false,
           },
         ],
-        "Threshold": 5,
+        "Threshold": 3,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
