@@ -50,6 +50,17 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new ApiError(body.error ?? "Request failed", response.status);
   }
 
+  const contentType = response.headers.get("content-type") || "";
+
+  // Middleware: Handle non-JSON responses automatically
+  if (contentType.includes("text/csv") || contentType.includes("text/plain")) {
+    return response.text() as unknown as Promise<T>;
+  }
+
+  if (contentType.includes("application/pdf") || contentType.includes("application/octet-stream")) {
+    return response.blob() as unknown as Promise<T>;
+  }
+
   return response.json() as Promise<T>;
 }
 
