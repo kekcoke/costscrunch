@@ -89,15 +89,12 @@ export function ExpensesPage() {
                 opacity: isExporting ? 0.6 : 1,
               }}
             >
-              <option value="">📥 Export As...</option>
-              <option value="csv">CSV Spreadsheet</option>
-              <option value="pdf">PDF Report</option>
-              <option value="json">JSON Data</option>
+              <option value="">📥 Export</option>
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+              <option value="json">JSON</option>
             </select>
           </div>
-        </div>
-        <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
-          Manage and track your expenses
         </div>
       </header>
 
