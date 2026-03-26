@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useEffect } from "react";
+import { shallow } from "zustand/shallow";
 import {
   useExpenseStore,
   selectFiltered,
@@ -16,11 +17,20 @@ const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 export function ExpensesPage() {
   const { filter, search, setFilter, setSearch } = useFilterControls();
   const filtered = useExpenseStore(selectFiltered);
-  const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
+  const { limit, nextToken, setLimit, fetchExpenses } = useExpenseStore(
+    (s) => ({ 
+      limit: s.limit, 
+      nextToken: s.nextToken,
+      setLimit: s.setLimit,
+      fetchExpenses: s.fetchExpenses 
+    }),
+    shallow
+  );
 
+  // Initial load only. setLimit/setFilter handle their own refreshes.
   useEffect(() => {
     fetchExpenses();
-  }, [fetchExpenses]);
+  }, []); // Empty dependency array to prevent re-triggering on state updates
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {
@@ -158,12 +168,53 @@ export function ExpensesPage() {
           }}
         >
           <span>{filtered.length} expenses</span>
-          <span>{fmt(totalFiltered)} total</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span>{fmt(totalFiltered)} total</span>
+            <select
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+              style={{
+                background: "var(--color-surface-dim)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "6px",
+                padding: "2px 8px",
+                fontSize: "11px",
+                color: "var(--color-text)",
+                outline: "none",
+                cursor: "pointer"
+              }}
+            >
+              {[10, 20, 50].map(val => (
+                <option key={val} value={val}>Show {val}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {filtered.map((e, i) => (
           <ExpenseRow key={e.id} expense={e} delay={i * 0.03} />
         ))}
+
+        {nextToken && (
+          <div style={{ padding: "20px", textAlign: "center", borderTop: "1px solid var(--color-border-dim)" }}>
+            <button
+              onClick={() => fetchExpenses(true)}
+              style={{
+                padding: "8px 24px",
+                borderRadius: "8px",
+                background: "var(--color-surface-dim)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                fontSize: "13px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
 
         {filtered.length === 0 && (
           <div

@@ -19,12 +19,15 @@ interface ExpenseStore {
   expenses: Expense[];
   filter: ExpenseFilter;
   search: string;
+  limit: number;
+  nextToken: string | null;
 
   // ── Actions ─────────────────────────────────────────
   addExpense: (expenseData: Omit<Expense, "id">) => void;
   updateExpense: (id: string, patch: Partial<Expense>) => void;
   removeExpense: (id: string) => void;
   fetchExpenses: () => Promise<void>;
+  setLimit: (limit: number) => void;
 
   setFilter: (f: ExpenseFilter) => void;
   setSearch: (q: string) => void;
@@ -36,6 +39,8 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
   expenses: MOCK_EXPENSES as Expense[],
   filter: "all",
   search: "",
+  limit: 10,
+  nextToken: null,
 
   // ── Actions ────────────────────────────────────────────────────────────────
   /**
@@ -69,16 +74,33 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
       expenses: state.expenses.filter((e) => e.id !== id),
     })),
 
-  fetchExpenses: async () => {
+  fetchExpenses: async (isLoadMore = false) => {
+    const { limit, filter, nextToken, expenses } = useExpenseStore.getState();
     try {
-      const { items } = await expensesApi.list();
-      set({ expenses: items });
+      const result = await expensesApi.list({ 
+        limit, 
+        status: filter !== "all" ? filter : undefined,
+        nextToken: isLoadMore ? nextToken : undefined
+      });
+      
+      set({ 
+        expenses: isLoadMore ? [...expenses, ...result.items] : result.items,
+        nextToken: result.nextToken 
+      });
     } catch (err) {
       console.error("Failed to fetch expenses:", err);
     }
   },
 
-  setFilter: (f) => set({ filter: f }),
+  setLimit: (limit) => {
+    set({ limit });
+    useExpenseStore.getState().fetchExpenses();
+  },
+
+  setFilter: (f) => {
+    set({ filter: f });
+    useExpenseStore.getState().fetchExpenses();
+  },
   setSearch: (q) => set({ search: q }),
 }));
 
