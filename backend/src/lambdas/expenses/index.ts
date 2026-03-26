@@ -169,6 +169,10 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
       const useS3 = items.length > S3_EXPORT_THRESHOLD;
 
+      if (q.format === "pdf") {
+        return err("PDF Export is currently in development. Please use CSV or JSON for now.", 501);
+      }
+
       if (q.format === "json") {
         const body = JSON.stringify(items.map(stripInternal), null, 2);
         if (useS3) {

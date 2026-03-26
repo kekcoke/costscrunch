@@ -32,15 +32,14 @@ export function ExpensesPage() {
   }, []); // Only fetch on mount. Setters in the store handle their own refreshes.
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = async () => {
+  const handleExport = async (format: "csv" | "json" | "pdf") => {
     try {
       setIsExporting(true);
       await expensesApi.export({ 
-        format: "csv",
+        format,
         status: filter !== "all" ? filter : undefined 
       });
-      // Basic feedback if download doesn't trigger automatically in some browsers
-      console.log("Export request successful");
+      console.log(`${format.toUpperCase()} export request successful`);
     } catch (err) {
       console.error("Export failed:", err);
       alert("Export failed. Please check the console for details.");
@@ -67,27 +66,35 @@ export function ExpensesPage() {
               Manage and track your expenses
             </div>
           </div>
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "8px",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
-              fontSize: "13px",
-              fontWeight: 500,
-              cursor: isExporting ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              transition: "all 0.2s",
-              opacity: isExporting ? 0.6 : 1,
-            }}
-          >
-            {isExporting ? "⌛ Exporting..." : "📥 Export CSV"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <select
+              disabled={isExporting}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  handleExport(val as "csv" | "json" | "pdf");
+                  e.target.value = ""; // Reset for next selection
+                }
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                fontSize: "13px",
+                fontWeight: 500,
+                cursor: isExporting ? "not-allowed" : "pointer",
+                outline: "none",
+                opacity: isExporting ? 0.6 : 1,
+              }}
+            >
+              <option value="">📥 Export As...</option>
+              <option value="csv">CSV Spreadsheet</option>
+              <option value="pdf">PDF Report</option>
+              <option value="json">JSON Data</option>
+            </select>
+          </div>
         </div>
         <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
           Manage and track your expenses

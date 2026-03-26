@@ -82,7 +82,7 @@ export const getExpensesQuerySchema = z.object({
 }).strict();
 
 export const exportExpensesQuerySchema = z.object({
-  format: z.enum(["csv", "json"]).optional().default("csv"),
+  format: z.enum(["csv", "json", "pdf"]).optional().default("csv"),
   groupId: ulidSchema.optional(),
   status: expenseStatusSchema.optional(),
   category: z.string().max(50).optional(),
