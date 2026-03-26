@@ -1,6 +1,9 @@
 # Changelog — 2026-03-26
 
-## 🚀 Features: Export & Scalable Pagination
+## 🚀 Features: Export & Scalable Pagination, Expense Detail View
+
+### 📥 Expense Detail
+- **Front-End**: Expense details visible clicking expense row.
 
 ### 📥 Multi-Format Export
 - **Backend**: Implemented `GET /expenses/export` in `ExpensesFunction` with automatic S3 overflow for large datasets.
