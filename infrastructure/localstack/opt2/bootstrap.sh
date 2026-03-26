@@ -113,13 +113,15 @@ JSONEOF
 
 # ── Lambda Functions ────────────────────────────────────────────────────────
 echo "📦 Deploying Lambda functions"
-deploy_function "GroupsFunction"      "index.handler"
-deploy_function "ExpensesFunction"    "index.handler"
-deploy_function "ReceiptsFunction"    "index.handler"
-deploy_function "AnalyticsFunction"   "index.handler"
-deploy_function "SnsWebhookFunction"  "index.handler"
-deploy_function "WsNotifierFunction"  "index.handler"
-deploy_function "HealthFunction"      "index.handler"
+for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "SnsWebhookFunction" "WsNotifierFunction" "HealthFunction"; do
+  deploy_function "$FN" "index.handler"
+  # Add global permission once per function to prevent redundant "updates" during route registration
+  "${AWS_CMD[@]}" lambda add-permission --function-name "$FN" \
+    --statement-id "apigw-global-${FN}" \
+    --action lambda:InvokeFunction --principal apigateway.amazonaws.com \
+    --source-arn "arn:aws:execute-api:us-east-1:000000000000:*" \
+    2>/dev/null || true
+done
 
 # ── REST API (v1) ──────────────────────────────────────────────────────────
 echo "📦 Resolving REST API (idempotent — reuses existing)"
@@ -166,12 +168,8 @@ add_integration() {
       --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:${FUNCTION}/invocations" 2>/dev/null || true
   done
 
-  # Single broad permission covers all methods on this resource
-  "${AWS_CMD[@]}" lambda add-permission --function-name "$FUNCTION" \
-    --statement-id "apigw-${FUNCTION}-${RES_ID}" \
-    --action lambda:InvokeFunction --principal apigateway.amazonaws.com \
-    --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/*" \
-    2>/dev/null || true
+  # Permissions are now handled once per function in the deployment phase
+  return 0
 }
 
 # ── Register a full path with a Lambda (creates resource tree automatically) ─
