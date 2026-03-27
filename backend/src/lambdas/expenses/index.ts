@@ -48,7 +48,13 @@ const toResponse = (item: any) => {
   // Only normalize if it looks like an expense or contains an ID
   if (item.expenseId || item.id || item.sk?.startsWith("EXPENSE#")) {
     const id = item.id || item.expenseId || item.sk?.split("#")[1];
-    return { ...item, id, expenseId: id };  // TO-CHANGE TO ID in future.
+    return { 
+      ...item, 
+      id, 
+      expenseId: id,
+      // Ensure frontend indicator sees the receipt if a key exists
+      receipt: !!item.receiptKey || !!item.receipt
+    };
   }
   
   return item;
@@ -107,6 +113,10 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
   let auth;
   try {
     auth = getAuth(event);
+    // Local dev fallback: Ensure we query the seeded user if no real token is present
+    if (auth.userId === "local-user-uuid-123" || !auth.userId) {
+      auth.userId = "00000000-0000-0000-0000-test-user-001";
+    }
   } catch (e) {
     return err("Unauthorized", 401);
   }
