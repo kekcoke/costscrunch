@@ -7,7 +7,7 @@ import Modal from "../modal";
 
 // ─── Group Detail Component ──────────────────────────────────────────────────
 export default function GroupDetail({ groupId, onBack }: { groupId: string, onBack: () => void }) {
-  const { updateGroup: updateStoreGroup } = useGroupStore();
+  const { updateGroup: updateStoreGroup, deleteGroup: deleteStoreGroup } = useGroupStore();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -85,12 +85,13 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
     }
   };
 
-  const handleDeleteGroup = async () => {
+  const handleDeleteGroup = async (groupId: string) => {
     setSubmitting(true);
     setStatus(null);
     try {
       await groupsApi.delete(groupId);
       setStatus({ type: "success", msg: "Group deleted successfully. Redirecting..." });
+      deleteStoreGroup(groupId);
       setTimeout(() => {
         onBack(); // Go back to groups list
       }, 2000);

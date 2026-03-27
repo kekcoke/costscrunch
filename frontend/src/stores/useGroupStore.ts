@@ -9,6 +9,7 @@ interface GroupStore {
   error: string | null;
   fetchGroups: () => Promise<void>;
   updateGroup: (groupId: string, data: Partial<Group>) => void;
+  deleteGroup: (groupId: string) => void;
 }
 
 export const useGroupStore = create<GroupStore>((set) => ({
@@ -33,4 +34,10 @@ export const useGroupStore = create<GroupStore>((set) => ({
       ),
     }));
   },
+
+  deleteGroup: (groupId) => {
+    set((state) => ({
+      groups: state.groups.filter((g) => g.groupId !== groupId),
+    }));
+  }
 }));
