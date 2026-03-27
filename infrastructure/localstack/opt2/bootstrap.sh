@@ -212,6 +212,7 @@ add_route /expenses/export ExpensesFunction
 add_route /receipts ReceiptsFunction
 add_route /receipts/upload-url ReceiptsFunction
 add_route /receipts/{expenseId}/scan ReceiptsFunction
+add_route /receipts/{expenseId}/download ReceiptsFunction
 
 # Analytics (4 routes)
 add_route /analytics AnalyticsFunction
