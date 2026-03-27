@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import type { Group, GroupMember } from "../../models/types";
 import { groupsApi } from "../../services/api";
+import { useGroupStore } from "../../stores/useGroupStore";
 import { LoadingSpinner } from "../spinner";
 import Modal from "../modal";
 
 // ─── Group Detail Component ──────────────────────────────────────────────────
 export default function GroupDetail({ groupId, onBack }: { groupId: string, onBack: () => void }) {
+  const { updateGroup: updateStoreGroup, deleteGroup: deleteStoreGroup } = useGroupStore();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -83,12 +85,13 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
     }
   };
 
-  const handleDeleteGroup = async () => {
+  const handleDeleteGroup = async (groupId: string) => {
     setSubmitting(true);
     setStatus(null);
     try {
       await groupsApi.delete(groupId);
       setStatus({ type: "success", msg: "Group deleted successfully. Redirecting..." });
+      deleteStoreGroup(groupId);
       setTimeout(() => {
         onBack(); // Go back to groups list
       }, 2000);
@@ -104,7 +107,8 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
     setSubmitting(true);
     setStatus(null);
     try {
-      await groupsApi.update(groupId, editForm);
+      const updated = await groupsApi.update(groupId, editForm);
+      updateStoreGroup(groupId, updated);
       setStatus({ type: "success", msg: "Group updated successfully!" });
       setTimeout(() => {
         setIsEditing(false);
@@ -238,6 +242,15 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
             <span className="mobile-hide">+ Add Member</span>
             <span className="mobile-only">+</span>
           </button>
+          <button 
+            onClick={() => setIsDeleteGroupModalOpen(true)}
+            style={{ 
+              background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)", 
+              padding: "10px 18px", borderRadius: "10px", fontWeight: 600, cursor: "pointer"
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
 
@@ -360,6 +373,48 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
               style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", background: "#ef4444", color: "white", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
             >
               {submitting ? "Removing..." : "Confirm Remove"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Group Modal */}
+      <Modal
+        isOpen={isDeleteGroupModalOpen}
+        onClose={() => { setIsDeleteGroupModalOpen(false); setStatus(null); }}
+        title="Delete Group"
+        maxWidth="400px"
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔥</div>
+          <p style={{ margin: "0 0 24px", color: "var(--color-text-dim)" }}>
+            Are you sure you want to delete <strong>{group.name}</strong>? 
+            This action is permanent and will remove all associated expenses and data.
+          </p>
+
+          {status && (
+            <div style={{ 
+              padding: "10px", borderRadius: "8px", marginBottom: "16px", 
+              background: status.type === "success" ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)", 
+              color: status.type === "success" ? "#10b981" : "#ef4444" 
+            }}>
+              {status.msg}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button 
+              onClick={() => setIsDeleteGroupModalOpen(false)}
+              style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "transparent", color: "white", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={() => handleDeleteGroup(groupId)}
+              disabled={submitting}
+              style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", background: "#ef4444", color: "white", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
+            >
+              {submitting ? "Deleting..." : "Confirm Delete"}
             </button>
           </div>
         </div>

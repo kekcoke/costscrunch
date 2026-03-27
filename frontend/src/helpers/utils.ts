@@ -5,8 +5,10 @@
  * @param {number} value
  * @returns {string}  e.g. "$1,204.33"
  */
-export const fmt = (value: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
+export const fmt = (value: number | undefined | null) => {
+  if (value === undefined || value === null || isNaN(value)) return "$0.00";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
+};
 
 /**
  * Format an ISO date string as "Feb 28".

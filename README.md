@@ -848,6 +848,9 @@ npm run deploy:prod
 - [x] Secure receipt downloads with environment-aware DNS
 - [x] Advanced filtering (Category) and Sorting (Date/Amount)
 - [x] Standardized Lambda Authentication utility (`getAuth`)
+- [x] Group Deletion with business rule validation (pending expenses/balances)
+- [x] Frontend State Synchronization for group theme/persistence
+- [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 
 ---

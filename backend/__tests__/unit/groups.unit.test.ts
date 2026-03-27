@@ -19,7 +19,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sesMock = mockClient(SESClient);
 
-import { handler } from "../../src/lambdas/groups/index.js";
+import { rawHandler as handler } from "../../src/lambdas/groups/index.js";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -227,6 +227,7 @@ describe("Path Normalization", () => {
   });
 
   it("correctly routes POST /groups/g1/members", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
     ddbMock.on(TransactWriteCommand).resolves({});
     sesMock.on(SendEmailCommand).resolves({});
 
@@ -393,6 +394,7 @@ describe("GET /groups/{id}/balances — debt minimization", () => {
 // ── POST /groups/:id/members ──────────────────────────────────────────────────
 describe("POST /groups/{id}/members", () => {
   it("adds member and sends invite email", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
     ddbMock.on(TransactWriteCommand).resolves({});
     sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-123" });
 
@@ -424,6 +426,7 @@ describe("POST /groups/{id}/members", () => {
   });
 
   it("succeeds even if SES email fails (swallows error)", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_GROUP });
     ddbMock.on(TransactWriteCommand).resolves({});
     sesMock.on(SendEmailCommand).rejects(new Error("SES unavailable"));
 

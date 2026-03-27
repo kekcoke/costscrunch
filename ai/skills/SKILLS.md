@@ -250,6 +250,12 @@ When performing feature tests or troubleshooting patches:
     - **Final Solution**: Provide code snippets and verification results.
 4. **Knowledge Loop**: If a new pitfall is discovered, update section 6 of this document.
 
+### 3.7 Frontend State Synchronization
+When performing mutations (POST, PATCH, DELETE) in frontend handlers, always synchronize the local Zustand store immediately upon a successful API response to ensure UI consistency without requiring a full re-fetch:
+1. **Store Actions**: Implement granular actions in the store (e.g., `updateGroup`, `deleteGroup`) to modify the local state array.
+2. **Component Integration**: Call the store action within the component's `try/catch` block after the API call resolves successfully.
+3. **Immediate Feedback**: This pattern is critical for theme changes (colors), name updates, and item removals to prevent "stale" UI states.
+
 
 ---
 
@@ -334,6 +340,7 @@ cd frontend && npx vitest
     - `infrastructure/localstack/opt2/bootstrap.sh` (Lambda env injection)
     - `infrastructure/sam/template-*.yaml` (Local API emulation)
     - `infrastructure/.env.test` (Unit test mocks)
+    - **Resource Flushing**: Integration tests must implement an `afterAll` flush mechanism to remove all temporary resources (e.g., groups starting with `IntegTest-`) from LocalStack to prevent state pollution.
 
 ## 7. Environment Variable Management (Monorepo)
 To ensure consistency across Docker, Vitest, and frontend/backend projects, follow the **Centralized Source** pattern.

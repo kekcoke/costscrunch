@@ -138,7 +138,7 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) => {
+export const rawHandler = async (event: ApiEvent) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
   const method = event.httpMethod || event.requestContext?.http?.method || "";
   const path = event.path || event.requestContext?.http?.path || "";
@@ -231,6 +231,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
               sk: `GROUP_MEMBER#${id}`,
               entityType: "GROUP_MEMBER",
               groupId: id,
+              name: body.name,
               userId: auth.userId,
               role: "owner",
               joinedAt: now,
@@ -338,6 +339,15 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
     const body = parsed.data;
+    
+    // Fetch group profile to get name for denormalization
+    const groupResult = await ddb.send(new GetCommand({
+      TableName: TABLE,
+      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+    }));
+    const groupProfile = groupResult.Item;
+    if (!groupProfile) return err("Group not found", 404);
+
     const now = new Date().toISOString();
     const newMember: GroupMember = {
       userId: body.userId || `pending:${body.email}`,
@@ -366,7 +376,10 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
             Item: {
               pk: `USER#${newMember.userId}`,
               sk: `GROUP_MEMBER#${groupId}`,
-              groupId, groupName: "pending", role: newMember.role, joinedAt: now,
+              groupId,
+              name: groupProfile.name,
+              role: newMember.role,
+              joinedAt: now,
             },
           },
         },
@@ -506,4 +519,6 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
   }
 
   return err("Route not found", 404);
-}));
+};
+
+export const handler = withLocalAuth(withErrorHandler(rawHandler));
