@@ -212,12 +212,13 @@ async function writeScanCompleted(opts: {
   userId:       string;
   jobId:        string;
   extracted:    Extracted;
+  s3Key:        string;
   lineItems:    string[];
   aiEnrichment: AiEnrichment;
   processingMs: number;
   now:          string;
 }): Promise<void> {
-  const { expenseId, scanId, userId, jobId, extracted, lineItems, aiEnrichment, processingMs, now } = opts;
+  const { expenseId, scanId, userId, jobId, extracted, s3Key, lineItems, aiEnrichment, processingMs, now } = opts;
 
   // Atomically update scan record and back-fill parent expense in one transaction.
   // Condition: scan must still be "processing" — prevents duplicate completion
@@ -254,6 +255,7 @@ async function writeScanCompleted(opts: {
           TableName:           TABLE,
           Key:                 { pk: `USER#${userId}`, sk: `EXPENSE#${expenseId}` },
           UpdateExpression:    `SET scanId                           = :sid,
+                                   receiptKey  = :rkey,
                                    merchant    = if_not_exists(merchant,  :merchant),
                                    amount      = if_not_exists(amount,    :amount),
                                    #date       = if_not_exists(#date,     :date),
@@ -263,6 +265,7 @@ async function writeScanCompleted(opts: {
           ExpressionAttributeNames:  { "#date": "date" },
           ExpressionAttributeValues: {
             ":sid":      scanId,
+            ":rkey":     s3Key,
             ":merchant": extracted.merchant ?? "Unknown",
             ":amount":   extracted.total    ?? 0,
             ":date":     extracted.date     ?? now.slice(0, 10),
@@ -457,7 +460,8 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
 
     // JobTag was set by index.ts as "{expenseId}/{scanId}"
     const [expenseId, scanId] = jobTag.split("/");
-    const userId = message.DocumentLocation.S3ObjectName.split("/")[1]; // receipts/{userId}/…
+    const s3Key = message.DocumentLocation.S3ObjectName;
+    const userId = s3Key.split("/")[1]; // receipts/{userId}/…
 
     tracer.putAnnotation("receiptId", expenseId);
 
@@ -558,7 +562,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       try {
         await writeScanCompleted({
           expenseId, scanId, userId, jobId,
-          extracted, lineItems, aiEnrichment,
+          extracted, s3Key, lineItems, aiEnrichment,
           processingMs, now,
         });
         logger.info("DynamoDB updated", { status: "completed", processingMs });

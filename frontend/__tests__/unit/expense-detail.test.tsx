@@ -53,6 +53,7 @@ describe("ExpenseDetail Component", () => {
     const expense = createMockExpense({
       id: "exp-1",
       receipt: true,
+      receiptKey: "receipts/user-1/exp-1/file.pdf",
       status: "approved"
     });
 
