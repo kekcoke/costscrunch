@@ -471,7 +471,7 @@ with open('/localstack/dev/seed.csv', mode='r') as f:
                     "status": {"S": row["status"]},
                     "source": {"S": row["source"]},
                     "addedBy": {"S": row["addedBy"]},
-                    "s3Uri": {"S": row["s3Uri"]} if row.get("s3Uri") else {"NULL": True}
+                    "receiptKey": {"S": row["receiptKey"]} if row.get("receiptKey") else {"NULL": True}
                 }
             }
         }

@@ -104,7 +104,6 @@ export interface Expense {
   // Receipt
   receiptKey?: string;    // S3 key: receipts/{userId}/{expenseId}/{filename}
   receiptUrl?: string;    // Pre-signed URL (ephemeral)
-  s3Uri?: string;         // Full S3 URI: s3://bucket/key
   scanId?: string;        // Textract job ID
 
   // Splits (for group expenses)

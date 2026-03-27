@@ -87,7 +87,7 @@ const err = (msg: string, code = 400) => ({
 });
 
 async function handleUploadUrl(event: APIGatewayProxyEventV2) {
-  const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string;
+  const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string | undefined;
   if (!userId) return err("Unauthorized", 401);
 
   const bodyRaw = JSON.parse(event.body || "{}");
@@ -159,24 +159,13 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
       }));
 
       const expense = result.Item;
-      if (!expense || (!expense.receiptKey && !expense.s3Uri)) {
+      if (!expense || !expense.receiptKey) {
         return err("No receipt found for this expense", 404);
       }
 
-      // Resolve key from receiptKey (internal) or s3Uri (seeded/external)
-      let key = expense.receiptKey;
-      if (!key && expense.s3Uri) {
-        // Extract key from s3://bucket/key format
-        const uriParts = expense.s3Uri.replace("s3://", "").split("/");
-        uriParts.shift(); // remove bucket name
-        key = uriParts.join("/");
-      }
-
-      if (!key) return err("Could not resolve receipt location", 404);
-
       const url = await getSignedUrl(s3, new GetObjectCommand({
         Bucket: process.env.BUCKET_PROCESSED_NAME!,
-        Key: key,
+        Key: expense.receiptKey,
       }), { expiresIn: 3600 });
 
       return ok({ downloadUrl: url });
