@@ -5,6 +5,8 @@
 // Pipeline: UploadsBucket → image-preprocess → ProcessedBucket → [this file] → Textract
 
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   TextractClient,
   StartExpenseAnalysisCommand,
@@ -139,6 +141,32 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
       } catch {
         return err("Failed to generate upload URL", 500);
       }
+    }
+
+    // GET /receipts/{expenseId}/download — get secure link
+    if (route.includes("/download")) {
+      const authUserId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string 
+        ?? "00000000-0000-0000-0000-test-user-001";
+      if (!authUserId) return err("Unauthorized", 401);
+
+      const expenseId = (event.pathParameters as any)?.expenseId
+        || route.match(/\/receipts\/([^/]+)\/download/)?.[1];
+      if (!expenseId) return err("expenseId is required", 400);
+
+      const result = await ddb.send(new GetCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${authUserId}`, sk: `EXPENSE#${expenseId}` }
+      }));
+
+      const expense = result.Item;
+      if (!expense || !expense.receiptKey) return err("No receipt found for this expense", 404);
+
+      const url = await getSignedUrl(s3, new GetObjectCommand({
+        Bucket: process.env.BUCKET_PROCESSED_NAME!,
+        Key: expense.receiptKey,
+      }), { expiresIn: 3600 });
+
+      return ok({ downloadUrl: url });
     }
 
     // GET /receipts/{expenseId}/scan — poll scan result
