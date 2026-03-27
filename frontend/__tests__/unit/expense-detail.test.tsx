@@ -7,7 +7,9 @@ import { expensesApi } from "../../src/services/api";
 // Mock API
 vi.mock("../../src/services/api", () => ({
   expensesApi: {
+    get: vi.fn(),
     update: vi.fn(),
+    getDownloadUrl: vi.fn(),
   },
 }));
 
@@ -19,13 +21,16 @@ describe("ExpenseDetail Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders expense information correctly", () => {
+  it("fetches and renders expense information correctly", async () => {
     const expense = createMockExpense({
+      id: "exp-1",
       merchant: "Test Merchant",
       amount: 50.0,
       status: "pending",
       description: "Test Description"
     });
+
+    (expensesApi.get as any).mockResolvedValue(expense);
 
     render(
       <ExpenseDetail 
@@ -35,9 +40,41 @@ describe("ExpenseDetail Component", () => {
       />
     );
 
-    expect(screen.getByText("Test Merchant")).toBeDefined();
-    expect(screen.getByText("$50.00")).toBeDefined();
-    expect(screen.getByDisplayValue("Test Description")).toBeDefined();
+    expect(expensesApi.get).toHaveBeenCalledWith("exp-1");
+    
+    await waitFor(() => {
+      expect(screen.getByText("Test Merchant")).toBeDefined();
+      expect(screen.getByText("$50.00")).toBeDefined();
+      expect(screen.getByDisplayValue("Test Description")).toBeDefined();
+    });
+  });
+
+  it("renders the view receipt button and calls download API", async () => {
+    const expense = createMockExpense({
+      id: "exp-1",
+      receipt: true,
+      status: "approved"
+    });
+
+    (expensesApi.get as any).mockResolvedValue(expense);
+    (expensesApi.getDownloadUrl as any).mockResolvedValue({ downloadUrl: "https://fake.url" });
+    window.open = vi.fn();
+
+    render(
+      <ExpenseDetail 
+        expense={expense} 
+        onBack={mockOnBack} 
+        onUpdate={mockOnUpdate} 
+      />
+    );
+
+    const viewBtn = await screen.findByText(/View Receipt/i);
+    fireEvent.click(viewBtn);
+
+    await waitFor(() => {
+      expect(expensesApi.getDownloadUrl).toHaveBeenCalledWith("exp-1");
+      expect(window.open).toHaveBeenCalledWith("https://fake.url", "_blank");
+    });
   });
 
   it("disables fields when status is approved", () => {
