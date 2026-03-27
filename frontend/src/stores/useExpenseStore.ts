@@ -5,19 +5,22 @@
 import { create } from "zustand";
 import { createSelector } from "reselect";
 
-import type { Expense } from "../models/types";
+import type { CategoryName, Expense } from "../models/types";
 import { expensesApi } from "../services/api";
 import { tempId } from "../helpers/utils";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { shallow } from "zustand/shallow";
 
 export type ExpenseFilter = "all" | "pending" | "approved" | "rejected";
+export type SortOrder = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
 
 interface ExpenseStore {
   // ── State ───────────────────────────────────────────
   expenses: Expense[];
   filter: ExpenseFilter;
+  categoryFilter: string;
   search: string;
+  sortOrder: SortOrder;
   limit: number;
   nextToken: string | null;
 
@@ -29,7 +32,9 @@ interface ExpenseStore {
   setLimit: (limit: number) => void;
 
   setFilter: (f: ExpenseFilter) => void;
+  setCategoryFilter: (cat: string) => void;
   setSearch: (q: string) => void;
+  setSortOrder: (order: SortOrder) => void;
 }
 
 export const useExpenseStore = create<ExpenseStore>((set) => ({
@@ -37,7 +42,9 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
   // ── State ──────────────────────────────────────────────────────────────────
   expenses: [],
   filter: "all",
+  categoryFilter: "all",
   search: "",
+  sortOrder: "date-desc",
   limit: 10,
   nextToken: null,
 
@@ -74,11 +81,12 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
     })),
 
   fetchExpenses: async (isLoadMore = false) => {
-    const { limit, filter, nextToken, expenses } = useExpenseStore.getState();
+    const { limit, filter, categoryFilter, nextToken, expenses } = useExpenseStore.getState();
     try {
       const result = await expensesApi.list({ 
         limit, 
         status: filter !== "all" ? filter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter as CategoryName : undefined,
         nextToken: isLoadMore ? nextToken : undefined
       });
       
@@ -100,7 +108,12 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
     set({ filter: f, nextToken: null }); // Reset pagination on filter change
     useExpenseStore.getState().fetchExpenses();
   },
+  setCategoryFilter: (cat) => {
+    set({ categoryFilter: cat, nextToken: null });
+    useExpenseStore.getState().fetchExpenses();
+  },
   setSearch: (q) => set({ search: q }),
+  setSortOrder: (order) => set({ sortOrder: order }),
 }));
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
@@ -134,16 +147,32 @@ export const selectMyExpenses = createSelector(
 export const selectFiltered = createSelector(
   (s: ExpenseStore) => s.expenses,
   (s: ExpenseStore) => s.filter,
+  (s: ExpenseStore) => s.categoryFilter,
   (s: ExpenseStore) => s.search,
-  (expenses, filter, search) => {
+  (s: ExpenseStore) => s.sortOrder,
+  (expenses, filter, categoryFilter, search, sortOrder) => {
     const q = search.toLowerCase();
-    return expenses.filter((e) => {
-      const matchFilter = filter === "all" || e.status === filter;
+    
+    // 1. Filter
+    const filtered = expenses.filter((e) => {
+      const matchStatus = filter === "all" || e.status === filter;
+      const matchCategory = categoryFilter === "all" || e.category === categoryFilter;
       const matchSearch =
         !q ||
         e.merchant.toLowerCase().includes(q) ||
         e.category.toLowerCase().includes(q);
-      return matchFilter && matchSearch;
+      return matchStatus && matchCategory && matchSearch;
+    });
+
+    // 2. Sort
+    return [...filtered].sort((a, b) => {
+      switch (sortOrder) {
+        case "date-desc": return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case "date-asc":  return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case "amount-desc": return b.amount - a.amount;
+        case "amount-asc":  return a.amount - b.amount;
+        default: return 0;
+      }
     });
   }
 );

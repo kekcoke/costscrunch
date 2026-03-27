@@ -5,7 +5,8 @@ import {
 } from "../stores/useExpenseStore";
 import { expensesApi } from "../services/api";
 import { useState } from "react";
-import type { ExpenseFilter } from "../stores/useExpenseStore";
+import type { ExpenseFilter, SortOrder } from "../stores/useExpenseStore";
+import { CATEGORIES } from "../models/constants";
 import { fmt } from "../helpers/utils";
 import { ExpenseRow, ExpenseDetail } from "../components";
 import type { Expense } from "../models/types";
@@ -15,13 +16,17 @@ const FILTERS: ExpenseFilter[] = ["all", "pending", "approved", "rejected"];
 export function ExpensesPage() {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const filter = useExpenseStore((s) => s.filter);
+  const categoryFilter = useExpenseStore((s) => s.categoryFilter);
   const search = useExpenseStore((s) => s.search);
+  const sortOrder = useExpenseStore((s) => s.sortOrder);
   const limit = useExpenseStore((s) => s.limit);
   const nextToken = useExpenseStore((s) => s.nextToken);
   const filtered = useExpenseStore(selectFiltered);
   
   const setFilter = useExpenseStore((s) => s.setFilter);
+  const setCategoryFilter = useExpenseStore((s) => s.setCategoryFilter);
   const setSearch = useExpenseStore((s) => s.setSearch);
+  const setSortOrder = useExpenseStore((s) => s.setSortOrder);
   const setLimit = useExpenseStore((s) => s.setLimit);
   const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
   const [isExporting, setIsExporting] = useState(false);
@@ -155,6 +160,48 @@ export function ExpensesPage() {
             {f}
           </button>
         ))}
+
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "10px",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            color: categoryFilter !== "all" ? "var(--color-indigo)" : "var(--color-text-dim)",
+            fontSize: "13px",
+            fontWeight: 500,
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="all">All Categories</option>
+          {Object.keys(CATEGORIES).map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "10px",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-text-dim)",
+            fontSize: "13px",
+            fontWeight: 500,
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="date-desc">Newest First</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="amount-desc">Highest Amount</option>
+          <option value="amount-asc">Lowest Amount</option>
+        </select>
       </div>
 
       <div
