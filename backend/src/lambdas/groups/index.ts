@@ -138,7 +138,7 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) => {
+export const rawHandler = async (event: ApiEvent) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (httpMethod + path)
   const method = event.httpMethod || event.requestContext?.http?.method || "";
   const path = event.path || event.requestContext?.http?.path || "";
@@ -519,4 +519,6 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent) =>
   }
 
   return err("Route not found", 404);
-}));
+};
+
+export const handler = withLocalAuth(withErrorHandler(rawHandler));
