@@ -38,16 +38,47 @@ const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
-const ok = (body: unknown, statusCode = 200) => ({
-  statusCode, 
-  headers: { 
-    "Content-Type": "application/json", 
-    "X-Request-Id": ulid(),
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Credentials": "true",
-  },
-  body: JSON.stringify(body),
-});
+/**
+ * Normalizes an expense item for the frontend, ensuring both 'id' and 'expenseId' 
+ * are present and synchronized. This prevents 'undefined' IDs in URLs.
+ */
+const toResponse = (item: any) => {
+  if (!item || typeof item !== "object") return item;
+  
+  // Only normalize if it looks like an expense or contains an ID
+  if (item.expenseId || item.id || item.sk?.startsWith("EXPENSE#")) {
+    const id = item.id || item.expenseId || item.sk?.split("#")[1];
+    return { ...item, id, expenseId: id };  // TO-CHANGE TO ID in future.
+  }
+  
+  return item;
+};
+
+const ok = (body: unknown, statusCode = 200) => {
+  let normalizedBody = body;
+  if (Array.isArray(body)) {
+    normalizedBody = body.map(toResponse);
+  } else if (typeof body === "object" && body !== null) {
+    const b = body as any;
+    // Handle paginated list response
+    if (b.items && Array.isArray(b.items)) {
+      normalizedBody = { ...b, items: b.items.map(toResponse) };
+    } else {
+      normalizedBody = toResponse(b);
+    }
+  }
+
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Request-Id": ulid(),
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Credentials": "true",
+    },
+    body: JSON.stringify(normalizedBody),
+  };
+};
 const err = (msg: string, statusCode = 400) => ({
   statusCode, 
   headers: { 
