@@ -168,6 +168,10 @@ export const analyticsQuerySchema = z.object({
   endDate: isoDateSchema.optional(),
   groupId: ulidSchema.optional(),
   category: z.string().max(50).optional(),
+  currency: z.string().length(3).optional(),
+  scope: z.enum(['personal', 'group', 'all']).optional().default('all'),
+  chartType: z.enum(['donut', 'horizontalBar', 'bubble', 'stackedBar']).optional(),
+  categories: z.string().optional(), // Frontend sends as comma-separated or empty
 }).strict();
 
 // ── Validation Helper ────────────────────────────────────────────────────────

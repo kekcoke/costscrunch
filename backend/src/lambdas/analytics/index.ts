@@ -80,20 +80,83 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   const startDate = q.startDate || getStartDate(q.period);
   const endDate = q.endDate || new Date().toISOString().slice(0, 10);
 
-  const result = await ddb.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-    FilterExpression: "#date >= :startDate AND #date <= :endDate",
-    ExpressionAttributeNames: { "#date": "date" },
-    ExpressionAttributeValues: {
-      ":pk": `USER#${auth.userId}`,
-      ":prefix": "EXPENSE#",
-      ":startDate": startDate,
-      ":endDate": endDate,
-    },
-  }));
+  let expenses: any[] = [];
 
-  const expenses = result.Items || [];
+  if (q.scope === "personal") {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      FilterExpression: "#date >= :startDate AND #date <= :endDate",
+      ExpressionAttributeNames: { "#date": "date" },
+      ExpressionAttributeValues: {
+        ":pk": `USER#${auth.userId}`,
+        ":prefix": "EXPENSE#",
+        ":startDate": startDate,
+        ":endDate": endDate,
+      },
+    }));
+    expenses = res.Items || [];
+  } else if (q.scope === "group" && q.groupId) {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      FilterExpression: "#date >= :startDate AND #date <= :endDate",
+      ExpressionAttributeNames: { "#date": "date" },
+      ExpressionAttributeValues: {
+        ":pk": `GROUP#${q.groupId}`,
+        ":prefix": "EXPENSE#",
+        ":startDate": startDate,
+        ":endDate": endDate,
+      },
+    }));
+    expenses = res.Items || [];
+  } else {
+    // scope === 'all' or default
+    // In a single-table design, 'all' usually requires querying multiple partitions 
+    // or using a GSI if we want everything across users/groups.
+    // For now, we aggregate the user's personal expenses and their memberships.
+    
+    // 1. Get personal
+    const personalPromise = ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      FilterExpression: "#date >= :startDate AND #date <= :endDate",
+      ExpressionAttributeNames: { "#date": "date" },
+      ExpressionAttributeValues: {
+        ":pk": `USER#${auth.userId}`,
+        ":prefix": "EXPENSE#",
+        ":startDate": startDate,
+        ":endDate": endDate,
+      },
+    }));
+
+    // 2. Get memberships to find groups
+    const memberRes = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      ExpressionAttributeValues: {
+        ":pk": `USER#${auth.userId}`,
+        ":prefix": "GROUP_MEMBER#",
+      },
+    }));
+
+    const groupIds = (memberRes.Items || []).map(m => m.groupId);
+    const groupPromises = groupIds.map(gid => ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      FilterExpression: "#date >= :startDate AND #date <= :endDate",
+      ExpressionAttributeNames: { "#date": "date" },
+      ExpressionAttributeValues: {
+        ":pk": `GROUP#${gid}`,
+        ":prefix": "EXPENSE#",
+        ":startDate": startDate,
+        ":endDate": endDate,
+      },
+    })));
+
+    const allResults = await Promise.all([personalPromise, ...groupPromises]);
+    expenses = allResults.flatMap(r => r.Items || []);
+  }
 
   if (route.includes("/summary")) {
     const byCategory: Record<string, number> = {};

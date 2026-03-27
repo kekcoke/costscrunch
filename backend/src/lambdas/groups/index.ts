@@ -247,13 +247,15 @@ export const rawHandler = async (event: ApiEvent) => {
 
   // ── GET /groups ───────────────────────────────────────────────────────────
   if (route === "GET /groups") {
-    // Get all groups where user is a member (stored as USER#userId / GROUP_MEMBER#groupId)
+    // Get all active groups where user is a member
     const result = await ddb.send(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      FilterExpression: "active <> :false",
       ExpressionAttributeValues: {
         ":pk": `USER#${auth.userId}`,
         ":prefix": "GROUP_MEMBER#",
+        ":false": false,
       },
     }));
     return ok({ items: result.Items || [] });
@@ -502,17 +504,29 @@ export const rawHandler = async (event: ApiEvent) => {
       return err("Cannot delete group with outstanding balances. All members must be settled.", 400);
     }
 
-    // 4. Soft delete (set active = false)
-    await ddb.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
-      UpdateExpression: "SET active = :false, updatedAt = :now, deletedAt = :now",
-      ExpressionAttributeValues: {
-        ":false": false,
-        ":now": new Date().toISOString(),
-      },
-      ConditionExpression: "attribute_exists(pk)",
-    }));
+    // 4. Soft delete (set active = false) for both Profile and Membership
+    await transactWriteWithRetry(ddb, {
+      TransactItems: [
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+            UpdateExpression: "SET active = :false, updatedAt = :now, deletedAt = :now",
+            ExpressionAttributeValues: { ":false": false, ":now": now },
+            ConditionExpression: "attribute_exists(pk)",
+          },
+        },
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { pk: `USER#${auth.userId}`, sk: `GROUP_MEMBER#${groupId}` },
+            UpdateExpression: "SET active = :false",
+            ExpressionAttributeValues: { ":false": false },
+            ConditionExpression: "attribute_exists(pk)",
+          },
+        },
+      ],
+    });
 
     metrics.addMetric("GroupDeleted", MetricUnit.Count, 1);
     return ok({ deleted: true });
