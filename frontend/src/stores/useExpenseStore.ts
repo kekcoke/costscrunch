@@ -92,12 +92,12 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
   },
 
   setLimit: (limit) => {
-    set({ limit });
+    set({ limit, nextToken: null }); // Reset pagination on limit change
     useExpenseStore.getState().fetchExpenses();
   },
 
   setFilter: (f) => {
-    set({ filter: f });
+    set({ filter: f, nextToken: null }); // Reset pagination on filter change
     useExpenseStore.getState().fetchExpenses();
   },
   setSearch: (q) => set({ search: q }),
