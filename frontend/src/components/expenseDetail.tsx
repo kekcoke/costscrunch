@@ -189,24 +189,6 @@ export default function ExpenseDetail({ expense: initialExpense, onBack, onUpdat
                   >
                     📎 View Receipt
                   </button>
-                  {expense.s3Uri && (
-                    <div 
-                      title={expense.s3Uri}
-                      style={{ 
-                        fontSize: "10px", 
-                        color: "var(--color-text-dim)", 
-                        maxWidth: "200px",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        cursor: "pointer",
-                        textDecoration: "underline"
-                      }}
-                      onClick={handleDownload}
-                    >
-                      {expense.s3Uri}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <>
