@@ -345,7 +345,7 @@ Sensitive values are stored in AWS SSM Parameter Store and Secrets Manager. Lamb
 AUTH (all endpoints require Bearer JWT)
 
 Expenses
-  GET    /expenses                    list with filters
+  GET    /expenses                    list with status/category filters + sort
   POST   /expenses                    create
   GET    /expenses/:id                get single
   PATCH  /expenses/:id                update / approve / reject
@@ -846,6 +846,7 @@ npm run deploy:prod
 - [x] Multi-format "Export As" dropdown (CSV, JSON, PDF in dev)
 - [x] Cursor-based pagination for high-performance lists
 - [x] Secure receipt downloads with environment-aware DNS
+- [x] Advanced filtering (Category) and Sorting (Date/Amount)
 - [ ] Scheduled reports
 
 ---
