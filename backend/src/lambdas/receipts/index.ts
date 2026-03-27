@@ -163,7 +163,13 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
         return err("No receipt found for this expense", 404);
       }
 
-      const url = await getSignedUrl(s3, new GetObjectCommand({
+      // LocalStack Fix: For local development, signed URLs must use 'localhost' 
+      // instead of 'localstack' so the browser can resolve the DNS.
+      const signingS3 = process.env.ENVIRONMENT === "dev" 
+        ? createS3Client({ endpoint: (process.env.AWS_ENDPOINT_URL || "").replace("localstack", "localhost") })
+        : s3;
+
+      const url = await getSignedUrl(signingS3, new GetObjectCommand({
         Bucket: process.env.BUCKET_PROCESSED_NAME!,
         Key: expense.receiptKey,
       }), { expiresIn: 3600 });
