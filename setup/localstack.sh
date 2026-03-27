@@ -9,6 +9,16 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Unique run ID passed through to the seed container
 export RUN_ID="$(date +%s)-$$"
 
+echo "🧹 Cleaning up stale Lambda containers..."
+# Only look for containers matching the LocalStack Lambda naming convention
+STALE_CONTAINERS=$(docker ps -a --filter "name=costscrunch-localstack-lambda" --format "{{.ID}}" 2>/dev/null || echo "")
+if [ -n "$STALE_CONTAINERS" ]; then
+  echo "   ↳ Removing: $STALE_CONTAINERS"
+  docker rm -f $STALE_CONTAINERS >/dev/null 2>&1 || true
+else
+  echo "   ↳ No stale containers found."
+fi
+
 echo "🚀 [1/8] Starting base LocalStack (data layer)..."
 cd "$PROJECT_ROOT/infrastructure"
 
