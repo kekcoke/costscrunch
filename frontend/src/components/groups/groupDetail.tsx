@@ -410,7 +410,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
               Cancel
             </button>
             <button 
-              onClick={handleDeleteGroup}
+              onClick={() => handleDeleteGroup(groupId)}
               disabled={submitting}
               style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", background: "#ef4444", color: "white", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
             >
