@@ -334,6 +334,7 @@ cd frontend && npx vitest
     - `infrastructure/localstack/opt2/bootstrap.sh` (Lambda env injection)
     - `infrastructure/sam/template-*.yaml` (Local API emulation)
     - `infrastructure/.env.test` (Unit test mocks)
+    - **Resource Flushing**: Integration tests must implement an `afterAll` flush mechanism to remove all temporary resources (e.g., groups starting with `IntegTest-`) from LocalStack to prevent state pollution.
 
 ## 7. Environment Variable Management (Monorepo)
 To ensure consistency across Docker, Vitest, and frontend/backend projects, follow the **Centralized Source** pattern.

@@ -31,6 +31,23 @@ describe("Groups API Integration", () => {
   const testGroupName = `IntegTest-${ulid().slice(-6)}`;
   const AUTH_HEADERS = { Authorization: "Bearer mock", "x-mock-user-id": "user-owner" };
 
+  afterAll(async () => {
+    // Flush created resources: Scan for all groups starting with 'IntegTest-' and delete them
+    try {
+      const res = await axios.get(`${API_URL}/groups`, { headers: AUTH_HEADERS });
+      const groupsToFlush = res.data.items.filter((g: any) => 
+        g.name?.startsWith("IntegTest-") || g.name?.startsWith("Delete-Me")
+      );
+      
+      for (const group of groupsToFlush) {
+        await axios.delete(`${API_URL}/groups/${group.groupId}`, { headers: AUTH_HEADERS });
+        console.log(`[FLUSH] Deleted group: ${group.name} (${group.groupId})`);
+      }
+    } catch (err) {
+      console.warn("[FLUSH] Failed to clean up integration test groups");
+    }
+  });
+
   it("should create a new group", async () => {
     const res = await axios.post(`${API_URL}/groups`, {
       name: testGroupName,
