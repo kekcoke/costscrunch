@@ -119,7 +119,7 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | APIGatewayProxyEventV2) => {
+export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
 
   logger.info("Received event raw shape", { 
     keys: Object.keys(event),
@@ -145,9 +145,13 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
 
     // GET /receipts/{expenseId}/download — get secure link
     if (route.includes("/download")) {
-      const authUserId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string 
-        ?? "00000000-0000-0000-0000-test-user-001";
-      if (!authUserId) return err("Unauthorized", 401);
+      let authUserId: string;
+      try {
+        const auth = getAuth(event as any);
+        authUserId = auth.userId;
+      } catch (e) {
+        return err("Unauthorized", 401);
+      }
 
       const expenseId = (event.pathParameters as any)?.expenseId
         || route.match(/\/receipts\/([^/]+)\/download/)?.[1];
@@ -271,4 +275,6 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
     logger.info("Textract job started", { JobId });
     metrics.addMetric("TextractJobStarted", MetricUnit.Count, 1);
   }
-}));
+};
+
+export const handler = withLocalAuth(withErrorHandler(rawHandler));
