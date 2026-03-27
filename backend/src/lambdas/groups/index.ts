@@ -505,6 +505,7 @@ export const rawHandler = async (event: ApiEvent) => {
     }
 
     // 4. Soft delete (set active = false) for both Profile and Membership
+    const now = new Date().toISOString();
     await transactWriteWithRetry(ddb, {
       TransactItems: [
         {
