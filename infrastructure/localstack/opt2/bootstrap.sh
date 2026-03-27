@@ -13,15 +13,6 @@ LAMBDA_BUILD="/opt/lambda-build"
 
 echo "🔧 Lambda + API GW bootstrap starting..."
 
-# ── Cleanup: Remove any stale Lambda containers ─────────────────────────────
-echo "🧹 Cleaning up stale Lambda containers..."
-STALE_CONTAINERS=$(docker ps -a --filter "name=costscrunch-localstack-lambda" --format "{{.ID}}")
-if [ -n "$STALE_CONTAINERS" ]; then
-  echo "   ↳ Removing: $STALE_CONTAINERS"
-  docker rm -f $STALE_CONTAINERS >/dev/null 2>&1 || true
-else
-  echo "   ↳ No stale containers found."
-fi
 
 # ── Sync: Wait for data seed to be visible inside LocalStack ────────────────
 echo "⏳ Waiting for data layer to be ready (seed verification)..."
