@@ -161,22 +161,22 @@ export function GroupsPage() {
             <div style={{ background: `linear-gradient(135deg,${g.color}18,transparent)`, padding: "16px", borderBottom: "1px solid var(--color-border-dim)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "18px" }}>{g.name}</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>{g.memberCount} members · active</div>
+                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "18px" }}>{g.name || (g as any).groupName || "Untitled Group"}</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>{g.memberCount ?? 1} members · active</div>
                 </div>
-                <div style={{ background: g.color + "18", border: `1px solid ${g.color}33`, borderRadius: "6px", padding: "4px 8px", fontSize: "12px", fontWeight: 700, color: g.color }}>
-                  {fmt(g.total)}
+                <div style={{ background: (g.color || "#6366f1") + "18", border: `1px solid ${(g.color || "#6366f1")}33`, borderRadius: "6px", padding: "4px 8px", fontSize: "12px", fontWeight: 700, color: g.color || "var(--color-text)" }}>
+                  {fmt(g.total ?? g.totalSpend ?? 0)}
                 </div>
               </div>
             </div>
             <div style={{ padding: "16px", flex: 1 }}>
               <div style={{ marginBottom: "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--color-text-dim)", marginBottom: "6px" }}>
-                  <span>Your share: <b style={{ color: "var(--color-text)" }}>{fmt(g.myShare)}</b></span>
-                  <span>{((g.myShare / g.total) * 100).toFixed(0)}%</span>
+                  <span>Your share: <b style={{ color: "var(--color-text)" }}>{fmt(g.myShare || 0)}</b></span>
+                  <span>{g.total > 0 ? ((g.myShare / g.total) * 100).toFixed(0) : "0"}%</span>
                 </div>
                 <div style={{ height: "4px", background: "var(--color-surface-2)", borderRadius: "2px" }}>
-                  <div style={{ height: "100%", width: `${((g.myShare / g.total) * 100).toFixed(0)}%`, background: `linear-gradient(90deg,${g.color},${g.color}88)`, borderRadius: "2px" }} />
+                  <div style={{ height: "100%", width: `${g.total > 0 ? ((g.myShare / g.total) * 100).toFixed(0) : "0"}%`, background: `linear-gradient(90deg,${g.color || "#6366f1"},${(g.color || "#6366f1")}88)`, borderRadius: "2px" }} />
                 </div>
               </div>
               <div className="recent-expenses-desktop">
