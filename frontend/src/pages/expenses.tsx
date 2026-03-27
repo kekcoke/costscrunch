@@ -1,10 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   useExpenseStore,
   selectFiltered,
 } from "../stores/useExpenseStore";
 import { expensesApi } from "../services/api";
-import { useState } from "react";
 import type { ExpenseFilter, SortOrder } from "../stores/useExpenseStore";
 import { CATEGORIES } from "../models/constants";
 import { fmt } from "../helpers/utils";
@@ -30,6 +29,10 @@ export function ExpensesPage() {
   const setLimit = useExpenseStore((s) => s.setLimit);
   const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
 
   const handleExport = async (format: "csv" | "json" | "pdf") => {
     try {
