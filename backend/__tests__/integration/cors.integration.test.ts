@@ -34,6 +34,7 @@ const CORS_ROUTES: ReadonlyArray<[string, string]> = [
   // [method, path]
   ["OPTIONS", "/expenses"],
   ["OPTIONS", "/expenses/test-id"],
+  ["OPTIONS", "/expenses/export"],
   ["OPTIONS", "/groups"],
   ["OPTIONS", "/groups/test-id"],
   ["OPTIONS", "/groups/test-id/balances"],
@@ -54,6 +55,7 @@ const REQUIRED_CORS_HEADERS = [
   "access-control-allow-origin",
   "access-control-allow-methods",
   "access-control-allow-headers",
+  "access-control-expose-headers",
 ] as const;
 
 // Values that must appear in the respective headers
@@ -102,6 +104,9 @@ describe("CORS preflight — OPTIONS on all routes", () => {
       for (const h of EXPECTED_HEADERS) {
         expect(headersHeader, `Missing ${h} in Allow-Headers on OPTIONS ${path}`).toContain(h);
       }
+
+      // Verify exposed headers for downloads
+      expect(res.headers.get("access-control-expose-headers")).toContain("Content-Disposition");
     }
   );
 });

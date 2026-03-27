@@ -437,6 +437,60 @@ $AWS ses verify-email-identity \
   --no-cli-pager 2>/dev/null || true
 echo "✅ SES ready"
 
+# ── Import Seed CSV ───────────────────────────────────────────────────────────
+echo "📦 Importing seed expenses from CSV"
+# Using python3 to convert CSV to DynamoDB JSON format, then AWS CLI to batch load
+# This avoids the boto3 dependency in the aws-cli container image
+python3 << 'PYTHONEOF'
+import csv
+import json
+
+with open('/localstack/dev/seed.csv', mode='r') as f:
+    reader = csv.DictReader(f)
+    items = []
+    for row in reader:
+        # Convert flat CSV to DynamoDB JSON format (all strings/numbers)
+        item = {
+            "PutRequest": {
+                "Item": {
+                    "pk": {"S": row["pk"]},
+                    "sk": {"S": row["sk"]},
+                    "gsi1pk": {"S": row["gsi1pk"]},
+                    "gsi1sk": {"S": row["gsi1sk"]},
+                    "gsi2pk": {"S": row["gsi2pk"]},
+                    "gsi2sk": {"S": row["gsi2sk"]},
+                    "entityType": {"S": row["entityType"]},
+                    "expenseId": {"S": row["expenseId"]},
+                    "ownerId": {"S": row["ownerId"]},
+                    "merchant": {"S": row["merchant"]},
+                    "amount": {"N": row["amount"]},
+                    "currency": {"S": row["currency"]},
+                    "amountUSD": {"N": row["amountUSD"]},
+                    "category": {"S": row["category"]},
+                    "date": {"S": row["date"]},
+                    "status": {"S": row["status"]},
+                    "source": {"S": row["source"]},
+                    "addedBy": {"S": row["addedBy"]}
+                }
+            }
+        }
+        items.append(item)
+    
+    # Write chunks of 25 (DynamoDB BatchWrite limit)
+    for i in range(0, len(items), 25):
+        batch = {"costscrunch-dev-main": items[i:i+25]}
+        with open(f'/tmp/seed_batch_{i//25}.json', 'w') as out:
+            json.dump(batch, out)
+PYTHONEOF
+
+# Batch load using AWS CLI (available in container)
+for batch_file in /tmp/seed_batch_*.json; do
+  $AWS dynamodb batch-write-item --request-items "file://$batch_file" --no-cli-pager 2>/dev/null
+  rm "$batch_file"
+done
+
+echo "✅ CSV seed complete"
+
 # ── EventBridge ───────────────────────────────────────────────────────────────
 echo "📦 Creating EventBridge bus: $EVENT_BUS_NAME"
 $AWS events create-event-bus \

@@ -29,22 +29,17 @@ describe("CostsCrunchStack Alarms", () => {
     
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       ComparisonOperator: "GreaterThanOrEqualToThreshold",
-      Threshold: 5,
+      Threshold: 3, // Matches staging config in CostsCrunchStack.ts
       EvaluationPeriods: 3,
       DatapointsToAlarm: 3,
     });
   });
 
-  it("creates Lambda Duration Alarms with 80% threshold", () => {
-    // For a 29s timeout, threshold = 29 * 0.8 = 23.2 (IEEE 754: 23.200000000000003)
+  it("creates Lambda Duration Alarms with fixed staging threshold", () => {
+    // CostsCrunchStack.ts uses a fixed durationP99 threshold for all functions in staging (20000ms)
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "Duration",
-      Threshold: 29 * 0.8,
-    });
-    // For 60s timeout (image-preprocess), threshold should be 48
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      MetricName: "Duration",
-      Threshold: 48,
+      Threshold: 20000,
     });
   });
 

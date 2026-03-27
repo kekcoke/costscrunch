@@ -22,6 +22,7 @@ import type {
   Expense,
 } from "../../shared/models/types.js";
 import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema, exportExpensesQuerySchema } from "../../shared/validation/schemas.js";
+import { validateQuery } from "../../shared/validation/middleware.js";
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = createDynamoDBDocClient({
@@ -37,7 +38,6 @@ const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const ok = (body: unknown, statusCode = 200) => ({
   statusCode, 
   headers: { 
@@ -86,8 +86,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses/export ─────────────────────────────────────────────────
   if (route === "GET /expenses/export") {
-    const qRaw = event.queryStringParameters || {};
-    const parsed = exportExpensesQuerySchema.safeParse(qRaw);
+    const parsed = validateQuery(exportExpensesQuerySchema, event.queryStringParameters);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join("; "));
 
     const q = parsed.data;
@@ -170,6 +169,10 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
       const useS3 = items.length > S3_EXPORT_THRESHOLD;
 
+      if (q.format === "pdf") {
+        return err("PDF Export is currently in development. Please use CSV or JSON for now.", 501);
+      }
+
       if (q.format === "json") {
         const body = JSON.stringify(items.map(stripInternal), null, 2);
         if (useS3) {
@@ -231,8 +234,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses ─────────────────────────────────────────────────────────
   if (route.startsWith("GET") && !expenseId) {
-    const qRaw = event.queryStringParameters || {};
-    const parsed = getExpensesQuerySchema.safeParse(qRaw);
+    const parsed = validateQuery(getExpensesQuerySchema, event.queryStringParameters);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
     const q = parsed.data;

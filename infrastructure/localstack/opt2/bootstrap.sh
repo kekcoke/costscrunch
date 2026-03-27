@@ -203,9 +203,10 @@ add_route /groups/{id}/members GroupsFunction
 add_route /groups/{id}/members/{userId} GroupsFunction
 add_route /groups/{id}/settle GroupsFunction
 
-# Expenses (2 routes — {id} sub-paths share one resource)
+# Expenses (3 routes — sub-paths share one resource)
 add_route /expenses ExpensesFunction
 add_route /expenses/{id} ExpensesFunction
+add_route /expenses/export ExpensesFunction
 
 # Receipts (3 routes)
 add_route /receipts ReceiptsFunction

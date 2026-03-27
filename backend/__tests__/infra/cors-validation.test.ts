@@ -19,6 +19,7 @@ const endpoints = [
   '/groups/test-group-id/settle',
   // Nested — expenses
   '/expenses/test-expense-id',
+  '/expenses/export',
   // Nested — receipts
   '/receipts',
   '/receipts/upload-url',
@@ -42,6 +43,7 @@ describe('CORS Policy Enforcement', () => {
         });
         
         expect(response.headers['access-control-allow-origin']).toBe('*');
+        expect(response.headers['access-control-expose-headers']).toContain('Content-Disposition');
         expect(response.status).toBeLessThan(300);
       });
 
