@@ -210,7 +210,7 @@ export function ExpensesPage() {
         {nextToken && (
           <div style={{ padding: "20px", textAlign: "center", borderTop: "1px solid var(--color-border-dim)" }}>
             <button
-              onClick={() => fetchExpenses()}
+              onClick={() => fetchExpenses(true)}
               style={{
                 padding: "8px 24px",
                 borderRadius: "8px",
