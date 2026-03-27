@@ -470,7 +470,8 @@ with open('/localstack/dev/seed.csv', mode='r') as f:
                     "date": {"S": row["date"]},
                     "status": {"S": row["status"]},
                     "source": {"S": row["source"]},
-                    "addedBy": {"S": row["addedBy"]}
+                    "addedBy": {"S": row["addedBy"]},
+                    "s3Uri": {"S": row["s3Uri"]} if row.get("s3Uri") else {"NULL": True}
                 }
             }
         }
@@ -482,6 +483,10 @@ with open('/localstack/dev/seed.csv', mode='r') as f:
         with open(f'/tmp/seed_batch_{i//25}.json', 'w') as out:
             json.dump(batch, out)
 PYTHONEOF
+
+# Upload sample PDF to S3 for seeded expenses
+echo "📦 Uploading sample receipt PDF to S3"
+$AWS s3 cp /localstack/dev/sample.pdf s3://$BUCKET_PROCESSED_NAME/receipts/00000000-0000-0000-0000-test-user-001/exp-001/seed/sample.pdf --no-cli-pager
 
 # Batch load using AWS CLI (available in container)
 for batch_file in /tmp/seed_batch_*.json; do
