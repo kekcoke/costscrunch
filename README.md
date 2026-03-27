@@ -843,7 +843,10 @@ npm run deploy:prod
 - [ ] Recurring expense detection (ML)
 - [ ] Slack bot for expense submission
 - [x] CSV/JSON export with S3 fallback for large datasets
-- [ ] PDF export + scheduled reports
+- [x] Multi-format "Export As" dropdown (CSV, JSON, PDF in dev)
+- [x] Cursor-based pagination for high-performance lists
+- [x] Secure receipt downloads with environment-aware DNS
+- [ ] Scheduled reports
 
 ---
 
