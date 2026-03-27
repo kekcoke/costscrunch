@@ -847,6 +847,7 @@ npm run deploy:prod
 - [x] Cursor-based pagination for high-performance lists
 - [x] Secure receipt downloads with environment-aware DNS
 - [x] Advanced filtering (Category) and Sorting (Date/Amount)
+- [x] Standardized Lambda Authentication utility (`getAuth`)
 - [ ] Scheduled reports
 
 ---
