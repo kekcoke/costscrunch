@@ -69,8 +69,6 @@ export interface Expense {
   gsi1sk: string;       // DATE#date#expenseId (sorted by date)
   gsi2pk: string;       // CATEGORY#category
   gsi2sk: string;       // DATE#date#expenseId
-  gsi3pk: string;       // RECEIPT_HASH#sha256hex (duplicate detection)
-  gsi3sk: string;       // DATE#date#expenseId
   entityType: "EXPENSE";
 
   // Core fields
@@ -106,6 +104,7 @@ export interface Expense {
   // Receipt
   receiptKey?: string;    // S3 key: receipts/{userId}/{expenseId}/{filename}
   receiptUrl?: string;    // Pre-signed URL (ephemeral)
+  s3Uri?: string;         // Full S3 URI: s3://bucket/key
   scanId?: string;        // Textract job ID
 
   // Splits (for group expenses)

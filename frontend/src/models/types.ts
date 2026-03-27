@@ -46,6 +46,7 @@ export interface Expense {
   receipt: boolean;
   receiptKey?: string | null;
   receiptUrl?: string | null;
+  s3Uri?: string | null;
 
   /** Group splitting */
   splits?: Split[];

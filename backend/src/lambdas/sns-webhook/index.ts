@@ -259,8 +259,6 @@ async function writeScanCompleted(opts: {
                                    #date       = if_not_exists(#date,     :date),
                                    category    = if_not_exists(category,  :category),
                                    receiptHash = :hash,
-                                   gsi3pk      = :gsi3pk,
-                                   gsi3sk      = :gsi3sk,
                                    updatedAt   = :now`,
           ExpressionAttributeNames:  { "#date": "date" },
           ExpressionAttributeValues: {
@@ -274,12 +272,6 @@ async function writeScanCompleted(opts: {
                            String(extracted.date ?? now.slice(0, 10)).slice(0, 10),
                            Number(extracted.total)    ?? 0,
                          ),
-            ":gsi3pk":   `RECEIPT_HASH#${computeReceiptHash(
-                           String(extracted.merchant?.toString() ?? "Unknown"),
-                           String(extracted.date ?? now.slice(0, 10)).slice(0, 10),
-                           Number(extracted.total)    ?? 0,
-                         )}`,
-            ":gsi3sk":   `DATE#${(extracted.date ?? now.slice(0, 10)).toString().slice(0, 10)}#${expenseId}`,
             ":now":      now,
           },
         },
