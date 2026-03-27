@@ -20,7 +20,7 @@ export function createMockExpense(
     exchangeRate: 1,
     amountUSD: 100,
 
-    category: "Misc",
+    category: "Other",
     subcategory: null,
     tags: [],
 

@@ -7,6 +7,7 @@ export type ExpenseStatus = "draft" | "submitted" | "approved" | "rejected" | "r
 export type EntityType = "PERSONAL" | "GROUP" | "BUSINESS";
 export type SplitMethod = "equal" | "exact" | "percentage" | "shares";
 export type NotificationChannel = "email" | "push" | "sms" | "slack";
+export type CategoryName = "Groceries" | "Travel" | "Software" | "Meals" | "Office" | "Equipment" | "Other";
 // ─── DynamoDB Single-Table Keys ───────────────────────────────────────────────
 // pk              | sk                    | entity
 // USER#userId     | PROFILE#userId        | User profile
@@ -69,8 +70,6 @@ export interface Expense {
   gsi1sk: string;       // DATE#date#expenseId (sorted by date)
   gsi2pk: string;       // CATEGORY#category
   gsi2sk: string;       // DATE#date#expenseId
-  gsi3pk: string;       // RECEIPT_HASH#sha256hex (duplicate detection)
-  gsi3sk: string;       // DATE#date#expenseId
   entityType: "EXPENSE";
 
   // Core fields
@@ -86,7 +85,7 @@ export interface Expense {
   exchangeRate?: number;  // if non-base currency
   amountUSD: number;      // normalized for reports
 
-  category: string;
+  category: CategoryName;
   subcategory?: string;
   tags: string[];
 

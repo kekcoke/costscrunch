@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import { rawHandler as expensesHandler } from './lambdas/expenses/index.js';
 import { handler as groupsHandler } from './lambdas/groups/index.js';
 import { handler as analyticsHandler } from './lambdas/analytics/index.js';
+import { handler as receiptsHandler } from './lambdas/receipts/index.js';
 import { ulid } from 'ulid';
 
 export const app = express();
@@ -136,6 +137,11 @@ app.get('/groups/:id/balances', lambdaAdapter(groupsHandler, '/groups/{id}/balan
 app.post('/groups/:id/members', lambdaAdapter(groupsHandler, '/groups/{id}/members'));
 app.delete('/groups/:id/members/:userId', lambdaAdapter(groupsHandler, '/groups/{id}/members/{userId}'));
 app.post('/groups/:id/settle', lambdaAdapter(groupsHandler, '/groups/{id}/settle'));
+
+// Routes - Receipts
+app.post('/receipts/upload-url', lambdaAdapter(receiptsHandler, '/receipts/upload-url'));
+app.get('/receipts/:expenseId/scan', lambdaAdapter(receiptsHandler, '/receipts/{expenseId}/scan'));
+app.get('/receipts/:expenseId/download', lambdaAdapter(receiptsHandler, '/receipts/{expenseId}/download'));
 
 // Startup
 app.listen(PORT, () => {

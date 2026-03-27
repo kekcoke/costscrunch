@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { CATEGORIES, STATUS_COLORS } from "../models/constants";
 import type { Expense, CategoryName } from "../models/types";
-import { expensesApi } from "../services/api";
+import { expensesApi, receiptsApi } from "../services/api";
 import { fmt, fmtDate } from "../helpers/utils";
 
 interface ExpenseDetailProps {
@@ -10,19 +10,71 @@ interface ExpenseDetailProps {
   onUpdate: (updated: Expense) => void;
 }
 
-export default function ExpenseDetail({ expense, onBack, onUpdate }: ExpenseDetailProps) {
+export default function ExpenseDetail({ expense: initialExpense, onBack, onUpdate }: ExpenseDetailProps) {
+  const [expense, setExpense] = useState<Expense>(initialExpense);
+  const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
-    merchant: expense.merchant,
-    amount: expense.amount,
-    category: expense.category,
-    date: expense.date,
-    description: expense.description || "",
+    merchant: initialExpense.merchant,
+    amount: initialExpense.amount,
+    category: initialExpense.category,
+    date: initialExpense.date,
+    description: initialExpense.description || "",
   });
+
+  useEffect(() => {
+    setLoading(true);
+    expensesApi.get(initialExpense.id)
+      .then((data) => {
+        setExpense(data);
+        setForm({
+          merchant: data.merchant,
+          amount: data.amount,
+          category: data.category as any,
+          date: data.date,
+          description: data.description || "",
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [initialExpense.id]);
   const [submitting, setSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPending = expense.status === "pending" || expense.status === "draft";
+
+  const handleDownload = async () => {
+    try {
+      const { downloadUrl } = await receiptsApi.getDownloadUrl(expense.id);
+      window.open(downloadUrl, "_blank");
+    } catch (err: any) {
+      setError(err.message || "Failed to get download link");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+    try {
+      // 1. Upload to S3
+      const { uploadUrl } = await receiptsApi.getUploadUrl(file, expense.id);
+      await receiptsApi.uploadToS3(uploadUrl, file);
+
+      // 2. Update expense record to indicate it has a receipt
+      // The backend pipeline (image-preprocess -> receipts -> textract) 
+      // will handle the background processing and OCR update.
+      const updated = await expensesApi.update(expense.id, { receipt: true });
+      onUpdate(updated);
+    } catch (err: any) {
+      setError(err.message || "Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +90,7 @@ export default function ExpenseDetail({ expense, onBack, onUpdate }: ExpenseDeta
       };
       const updated = await expensesApi.update(expense.id, updatePayload);
  
+      setExpense(updated);
       onUpdate(updated);
       setIsEditing(false);
     } catch (err: any) {
@@ -48,6 +101,14 @@ export default function ExpenseDetail({ expense, onBack, onUpdate }: ExpenseDeta
   };
 
   const cat = (CATEGORIES as any)[expense.category] || CATEGORIES.Other;
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: "40px" }}>
+        ⌛ Loading expense details...
+      </div>
+    );
+  }
 
   return (
     <div style={{ animation: "fadeUp 0.4s both" }}>
@@ -105,6 +166,58 @@ export default function ExpenseDetail({ expense, onBack, onUpdate }: ExpenseDeta
               marginTop: "4px"
             }}>
               {expense.status}
+            </div>
+            
+            <div style={{ marginTop: "12px" }}>
+              {(expense.receipt || expense.s3Uri) ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+                  <button
+                    onClick={handleDownload}
+                    style={{
+                      background: "rgba(99, 102, 241, 0.1)",
+                      border: "1px solid var(--color-indigo)",
+                      color: "var(--color-indigo)",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    📎 View Receipt
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    style={{ display: "none" }}
+                    accept="image/*,application/pdf"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    style={{
+                      background: "var(--color-surface-2)",
+                      border: "1px dashed var(--color-border)",
+                      color: "var(--color-text-dim)",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: isUploading ? "not-allowed" : "pointer",
+                      opacity: isUploading ? 0.7 : 1
+                    }}
+                  >
+                    {isUploading ? "⌛ Uploading..." : "+ Attach Receipt"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -115,6 +115,23 @@ describe("GET /expenses (list)", () => {
     });
   });
 
+  it("applies category filter when provided", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    await handler(
+      makeEvent({
+        routeKey: "GET /expenses",
+        queryStringParameters: { category: "Travel" },
+      }) as any
+    );
+
+    expect(ddbMock).toHaveReceivedCommandWith(QueryCommand, {
+      FilterExpression: expect.stringContaining("category"),
+    });
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    expect(call.args[0].input.ExpressionAttributeValues[":category"]).toBe("Travel");
+  });
+
   it("decodes nextToken for pagination", async () => {
     const lastKey = { pk: "USER#user-abc", sk: "EXPENSE#01AA" };
     const nextToken = Buffer.from(JSON.stringify(lastKey)).toString("base64");

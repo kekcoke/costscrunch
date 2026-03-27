@@ -184,11 +184,6 @@ export class CostsCrunchStack extends Stack {
                     sortKey: { name: "gsi2sk", type: dynamodb.AttributeType.STRING },
                 },
                 {
-                    indexName: "GSI3",
-                    partitionKey: { name: "gsi3pk", type: dynamodb.AttributeType.STRING },
-                    sortKey: { name: "gsi3sk", type: dynamodb.AttributeType.STRING },
-                },
-                {
                     indexName: "ReceiptHashIndex",
                     partitionKey: { name: "receiptHash", type: dynamodb.AttributeType.STRING },
                     projectionType: dynamodb.ProjectionType.ALL,
@@ -628,6 +623,7 @@ export class CostsCrunchStack extends Stack {
         // Receipts: presigned POST generation for processed bucket
         processedBucket.grantPut(receiptsLambda);       // presigned POST generation
         receiptsBucket.grantRead(snsWebhookLambda);    // Textract reads from here (via IAM role)
+        receiptsBucket.grantRead(receiptsLambda);      // Receipt download from expense
 
         // EventBridge
         eventBus.grantPutEventsTo(snsWebhookLambda);  // emits ReceiptScanCompleted
@@ -963,9 +959,10 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.POST, "/groups/{id}/members", groupsLambda);
         addRoute(apigwv2.HttpMethod.DELETE, "/groups/{id}/members/{userId}", groupsLambda);
 
-        // Receipt upload
+        // Receipt upload & download
         addRoute(apigwv2.HttpMethod.POST, "/receipts/upload-url", receiptsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/receipts/{expenseId}/scan", receiptsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/receipts/{expenseId}/download", receiptsLambda);
 
         // Analytics
         addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);

@@ -223,6 +223,9 @@ export const receiptsApi = {
     }
     throw new Error("Scan timed out after maximum polling attempts");
   },
+
+  getDownloadUrl: (expenseId: string) =>
+    apiFetch<{ downloadUrl: string }>(`/receipts/${expenseId}/download`),
 };
 
 // ─── Groups ───────────────────────────────────────────────────────────────────

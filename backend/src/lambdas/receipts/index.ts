@@ -5,6 +5,8 @@
 // Pipeline: UploadsBucket → image-preprocess → ProcessedBucket → [this file] → Textract
 
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   TextractClient,
   StartExpenseAnalysisCommand,
@@ -117,7 +119,7 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | APIGatewayProxyEventV2) => {
+export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
 
   logger.info("Received event raw shape", { 
     keys: Object.keys(event),
@@ -139,6 +141,44 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
       } catch {
         return err("Failed to generate upload URL", 500);
       }
+    }
+
+    // GET /receipts/{expenseId}/download — get secure link
+    if (route.includes("/download")) {
+      let authUserId: string;
+      try {
+        const auth = getAuth(event as any);
+        authUserId = auth.userId;
+      } catch (e) {
+        return err("Unauthorized", 401);
+      }
+
+      const expenseId = (event.pathParameters as any)?.expenseId
+        || route.match(/\/receipts\/([^/]+)\/download/)?.[1];
+      if (!expenseId) return err("expenseId is required", 400);
+
+      const result = await ddb.send(new GetCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${authUserId}`, sk: `EXPENSE#${expenseId}` }
+      }));
+
+      const expense = result.Item;
+      if (!expense || !expense.receiptKey) {
+        return err("No receipt found for this expense", 404);
+      }
+
+      // LocalStack Fix: For local development, signed URLs must use 'localhost' 
+      // instead of 'localstack' so the browser can resolve the DNS.
+      const signingS3 = process.env.ENVIRONMENT === "dev" 
+        ? createS3Client({ endpoint: (process.env.AWS_ENDPOINT_URL || "").replace("localstack", "localhost") })
+        : s3;
+
+      const url = await getSignedUrl(signingS3, new GetObjectCommand({
+        Bucket: process.env.BUCKET_PROCESSED_NAME!,
+        Key: expense.receiptKey,
+      }), { expiresIn: 3600 });
+
+      return ok({ downloadUrl: url });
     }
 
     // GET /receipts/{expenseId}/scan — poll scan result
@@ -235,4 +275,6 @@ export const handler = withLocalAuth(withErrorHandler(async (event: S3Event | AP
     logger.info("Textract job started", { JobId });
     metrics.addMetric("TextractJobStarted", MetricUnit.Count, 1);
   }
-}));
+};
+
+export const handler = withLocalAuth(withErrorHandler(rawHandler));

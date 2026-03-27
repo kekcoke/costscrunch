@@ -172,7 +172,7 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "8a9232c2c447efba61d086f13273c95369808622d572d8afcdcc1e22f441f8c5.zip",
+          "S3Key": "4ad5d7960709a285023b486dafb14253a8b67b6edbda2509681ed7d542203877.zip",
         },
         "Environment": {
           "Variables": {
@@ -1453,6 +1453,75 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
                 "Ref": "ApiF70053CD",
               },
               "/*/*/health",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiGETreceiptsexpenseIddownload7CCBE410": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "GET /receipts/{expenseId}/download",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiGETreceiptsexpenseIddownloadReceiptsLambdaGETIntegration3E429D82",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiGETreceiptsexpenseIddownloadReceiptsLambdaGETIntegration3E429D82": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ReceiptsLambda3E9D3BB9",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiGETreceiptsexpenseIddownloadReceiptsLambdaGETIntegrationPermission04003C30": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ReceiptsLambda3E9D3BB9",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/receipts/{expenseId}/download",
             ],
           ],
         },
@@ -3459,7 +3528,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "3fbfb369da1a56b835121077d2c5186d748c3d2b43e11cb45069c1a3ca0ae28b.zip",
+          "S3Key": "5d2309c64eb4c1fc612920d5a91397108a5941f61b35023aa960bc8648fd73b1.zip",
         },
         "Environment": {
           "Variables": {
@@ -3914,7 +3983,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "41b188448cd5b4bcf05d1c260f2d63f4d4547963793dfce561224f6628ba4143.zip",
+          "S3Key": "63e38d766e293c7585ef4b175d6d18c2d0334cf3638547603037b83317e8c613.zip",
         },
         "Environment": {
           "Variables": {
@@ -5175,14 +5244,6 @@ def sort_filter_rules(json_obj):
             "AttributeType": "S",
           },
           {
-            "AttributeName": "gsi3pk",
-            "AttributeType": "S",
-          },
-          {
-            "AttributeName": "gsi3sk",
-            "AttributeType": "S",
-          },
-          {
             "AttributeName": "receiptHash",
             "AttributeType": "S",
           },
@@ -5222,22 +5283,6 @@ def sort_filter_rules(json_obj):
             },
           },
           {
-            "IndexName": "GSI3",
-            "KeySchema": [
-              {
-                "AttributeName": "gsi3pk",
-                "KeyType": "HASH",
-              },
-              {
-                "AttributeName": "gsi3sk",
-                "KeyType": "RANGE",
-              },
-            ],
-            "Projection": {
-              "ProjectionType": "ALL",
-            },
-          },
-          {
             "IndexName": "ReceiptHashIndex",
             "KeySchema": [
               {
@@ -5269,9 +5314,6 @@ def sort_filter_rules(json_obj):
               },
               {
                 "IndexName": "GSI2",
-              },
-              {
-                "IndexName": "GSI3",
               },
               {
                 "IndexName": "ReceiptHashIndex",
@@ -5409,7 +5451,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "df6e49853b247a8e783b29771cdc9cc14d5fd2f0dde2e1aa3418bb80dfac58fb.zip",
+          "S3Key": "ecd3623c65d87a569714c7a0836a10768f551a150ddfba5bc4d0c1b23c285119.zip",
         },
         "Environment": {
           "Variables": {
@@ -6123,7 +6165,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "c383ad07403b1cc413c6904035148ee82531dec30e7e2c4c675164fbba076f9a.zip",
+          "S3Key": "b0afc0bfddda247a9471478d006d4517d6b31ac9d635c2a5f4055f6819f0f6ae.zip",
         },
         "Environment": {
           "Variables": {
@@ -6560,6 +6602,49 @@ def sort_filter_rules(json_obj):
               },
             },
             {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ReceiptsBucket913676D9",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ReceiptsBucket913676D9",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+            {
               "Action": "textract:StartExpenseAnalysis",
               "Effect": "Allow",
               "Resource": "*",
@@ -6983,7 +7068,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "d0ffbdd4b0a5dfea242ac6d6c1f655348e5aa79e64c7c5c414779576f5ee969b.zip",
+          "S3Key": "4e97d92e2dfdfb1273b34143e01ff50cb89a8115cb021c09fc951a9caae83a61.zip",
         },
         "Environment": {
           "Variables": {
@@ -8133,7 +8218,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "10643749a8e0469c500210a2036395f07ff4b2f9899e2160d11343e140bddb3a.zip",
+          "S3Key": "4b65a70a1a3b964c7d6a7116f270f044dfe5e3403e48b74a82183e8b69a5fe34.zip",
         },
         "Environment": {
           "Variables": {
