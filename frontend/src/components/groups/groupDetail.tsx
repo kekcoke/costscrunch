@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import type { Group, GroupMember } from "../../models/types";
 import { groupsApi } from "../../services/api";
+import { useGroupStore } from "../../stores/useGroupStore";
 import { LoadingSpinner } from "../spinner";
 import Modal from "../modal";
 
 // ─── Group Detail Component ──────────────────────────────────────────────────
 export default function GroupDetail({ groupId, onBack }: { groupId: string, onBack: () => void }) {
+  const { updateGroup: updateStoreGroup } = useGroupStore();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -104,7 +106,8 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
     setSubmitting(true);
     setStatus(null);
     try {
-      await groupsApi.update(groupId, editForm);
+      const updated = await groupsApi.update(groupId, editForm);
+      updateStoreGroup(groupId, updated);
       setStatus({ type: "success", msg: "Group updated successfully!" });
       setTimeout(() => {
         setIsEditing(false);

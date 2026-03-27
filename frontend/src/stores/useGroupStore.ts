@@ -8,6 +8,7 @@ interface GroupStore {
   loading: boolean;
   error: string | null;
   fetchGroups: () => Promise<void>;
+  updateGroup: (groupId: string, data: Partial<Group>) => void;
 }
 
 export const useGroupStore = create<GroupStore>((set) => ({
@@ -23,5 +24,13 @@ export const useGroupStore = create<GroupStore>((set) => ({
     } catch (err: any) {
       set({ error: err.message || "Failed to fetch groups", loading: false });
     }
+  },
+
+  updateGroup: (groupId, data) => {
+    set((state) => ({
+      groups: state.groups.map((g) =>
+        g.groupId === groupId ? { ...g, ...data } : g
+      ),
+    }));
   },
 }));
