@@ -485,8 +485,26 @@ with open('/localstack/dev/seed.csv', mode='r') as f:
 PYTHONEOF
 
 # Upload sample PDF to S3 for seeded expenses
-echo "📦 Uploading sample receipt PDF to S3"
-$AWS s3 cp /localstack/dev/sample.pdf s3://$BUCKET_PROCESSED_NAME/receipts/00000000-0000-0000-0000-test-user-001/exp-001/seed/sample.pdf --no-cli-pager
+echo "📦 Uploading sample receipt PDFs to S3 for all test users"
+# Iterate through the seed.csv and upload the sample file to every referenced receiptKey
+python3 << 'PYTHONEOF'
+import csv
+import subprocess
+import os
+
+bucket = os.environ.get("BUCKET_PROCESSED_NAME", "costscrunch-dev-processed-000000000000")
+aws_cmd = "aws --endpoint-url=http://localstack:4566 --region us-east-1"
+
+with open('/localstack/dev/seed.csv', mode='r') as f:
+    reader = csv.DictReader(f)
+    uploaded_keys = set()
+    for row in reader:
+        key = row.get("receiptKey")
+        if key and key != "" and key not in uploaded_keys:
+            print(f"  ↳ Uploading to s3://{bucket}/{key}")
+            subprocess.run(f"{aws_cmd} s3 cp /localstack/dev/sample.pdf s3://{bucket}/{key} --no-cli-pager", shell=True, capture_output=True)
+            uploaded_keys.add(key)
+PYTHONEOF
 
 # Batch load using AWS CLI (available in container)
 for batch_file in /tmp/seed_batch_*.json; do
