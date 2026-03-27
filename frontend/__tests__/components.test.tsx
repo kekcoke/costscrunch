@@ -5,21 +5,20 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 
-import { selectFiltered, useExpenseStore } from "./../src/stores/useExpenseStore";
 import StatCard   from "../src/components/statCard";
 import ExpenseRow from "../src/components/expenseRow";
 import DonutChart from "../src/components/charts/donutChart";
 import ScanModal  from "../src/components/scanModal";
 import GroupDetail from "../src/components/groups/groupDetail";
-import { MOCK_EXPENSES } from "../src/mocks/expenses";
+import { SEED_EXPENSES_MOCK } from "../src/mocks/expenses";
 
-const EXPENSE_APPROVED = MOCK_EXPENSES[1];
-const EXPENSE_PENDING = MOCK_EXPENSES[2];
+const EXPENSE_APPROVED = SEED_EXPENSES_MOCK[1];
+const EXPENSE_PENDING = SEED_EXPENSES_MOCK[2];
 const DONUT_DATA = [
   { label: "Travel",   value: 450,  color: "#6366f1" },
   { label: "Meals",    value: 287,  color: "#f59e0b" },

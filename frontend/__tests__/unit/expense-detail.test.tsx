@@ -9,7 +9,11 @@ vi.mock("../../src/services/api", () => ({
   expensesApi: {
     get: vi.fn(),
     update: vi.fn(),
+  },
+  receiptsApi: {
     getDownloadUrl: vi.fn(),
+    getUploadUrl: vi.fn(),
+    uploadToS3: vi.fn(),
   },
 }));
 
@@ -57,8 +61,9 @@ describe("ExpenseDetail Component", () => {
       status: "approved"
     });
 
+    const { receiptsApi } = await import("../../src/services/api");
     (expensesApi.get as any).mockResolvedValue(expense);
-    (expensesApi.getDownloadUrl as any).mockResolvedValue({ downloadUrl: "https://fake.url" });
+    (receiptsApi.getDownloadUrl as any).mockResolvedValue({ downloadUrl: "https://fake.url" });
     window.open = vi.fn();
 
     render(
@@ -73,15 +78,17 @@ describe("ExpenseDetail Component", () => {
     fireEvent.click(viewBtn);
 
     await waitFor(() => {
-      expect(expensesApi.getDownloadUrl).toHaveBeenCalledWith("exp-1");
+      expect(receiptsApi.getDownloadUrl).toHaveBeenCalledWith("exp-1");
       expect(window.open).toHaveBeenCalledWith("https://fake.url", "_blank");
     });
   });
 
-  it("disables fields when status is approved", () => {
+  it("disables fields when status is approved", async () => {
     const expense = createMockExpense({
       status: "approved",
     });
+
+    (expensesApi.get as any).mockResolvedValue(expense);
 
     render(
       <ExpenseDetail 
@@ -91,7 +98,7 @@ describe("ExpenseDetail Component", () => {
       />
     );
 
-    const descriptionField = screen.getByLabelText(/Description/i);
+    const descriptionField = await screen.findByLabelText(/Description/i);
     expect(descriptionField).toBeDisabled();
     expect(screen.queryByText(/Save Changes/i)).toBeNull();
     expect(screen.getByText(/cannot be edited/i)).toBeDefined();
@@ -105,6 +112,7 @@ describe("ExpenseDetail Component", () => {
     });
     const updatedExpense = { ...expense, merchant: "New Merchant" };
     
+    (expensesApi.get as any).mockResolvedValue(expense);
     (expensesApi.update as any).mockResolvedValue(updatedExpense);
 
     render(
@@ -115,7 +123,7 @@ describe("ExpenseDetail Component", () => {
       />
     );
 
-    const saveButton = screen.getByText(/Save Changes/i);
+    const saveButton = await screen.findByText(/Save Changes/i);
     fireEvent.click(saveButton);
 
     await waitFor(() => {
@@ -124,8 +132,9 @@ describe("ExpenseDetail Component", () => {
     });
   });
 
-  it("triggers onBack when back button is clicked", () => {
+  it("triggers onBack when back button is clicked", async () => {
     const expense = createMockExpense();
+    (expensesApi.get as any).mockResolvedValue(expense);
 
     render(
       <ExpenseDetail 
@@ -135,7 +144,7 @@ describe("ExpenseDetail Component", () => {
       />
     );
 
-    fireEvent.click(screen.getByText(/Back to list/i));
+    fireEvent.click(await screen.findByText(/Back to list/i));
     expect(mockOnBack).toHaveBeenCalled();
   });
 });
