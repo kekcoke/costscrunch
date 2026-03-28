@@ -28,6 +28,7 @@
      ├── sns-webhook/    Textract completion → circuit breaker → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends (Decoupled DAL)
+     ├── profile/        user account + settings management
      ├── notifications/  SES + Pinpoint push/SMS
      └── health/         Monitoring + CI/CD smoke tests
         ↓
@@ -370,6 +371,10 @@ Analytics
   GET    /analytics/summary?period=month|quarter|year
   GET    /analytics/trends
   GET    /analytics/chart-data
+
+Profile
+  GET    /profile                     get my profile
+  PATCH  /profile                     update profile / preferences
 
 Monitoring
   GET    /health                      isolated health check
@@ -853,6 +858,7 @@ npm run deploy:prod
 - [x] Frontend State Synchronization for group theme/persistence
 - [x] Decoupled Analytics Data Access Layer (DAL) with Repository Pattern
 - [x] Interactive Chart Tooltips (Bubble & Stacked Bar)
+- [x] User Profile & Settings Management (Name, Currency, Timezone, Notifications)
 - [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 

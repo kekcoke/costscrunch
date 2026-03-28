@@ -61,6 +61,8 @@ export interface User {
   ttl?: number;         // DynamoDB TTL (deleted accounts)
 }
 
+export interface Profile extends Omit<User, "pk" | "sk" | "gsi1pk" | "gsi1sk" | "entityType"> {}
+
 // ─── Expense ──────────────────────────────────────────────────────────────────
 export interface Expense {
   // DynamoDB keys

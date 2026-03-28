@@ -28,6 +28,7 @@ const functions = [
   { name: "ExpensesFunction", entry: "src/lambdas/_local/expenses.ts" },
   { name: "ReceiptsFunction", entry: "src/lambdas/_local/receipts.ts" },
   { name: "AnalyticsFunction", entry: "src/lambdas/_local/analytics.ts" },
+  { name: "ProfileFunction", entry: "src/lambdas/profile/index.ts" },
   { name: "SnsWebhookFunction", entry: "src/lambdas/sns-webhook/index.ts" },
   {
     name: "WsNotifierFunction",

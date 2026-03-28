@@ -285,6 +285,16 @@ export const analyticsApi = {
     ),
 };
 
+// ─── Profile ──────────────────────────────────────────────────────────────────
+export const profileApi = {
+  get: () => apiFetch<any>("/profile"),
+  update: (data: any) =>
+    apiFetch<any>("/profile", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+};
+
 // ─── React Query hook patterns (wire up when ready) ───────────────────────────
 //
 // import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
