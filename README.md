@@ -29,6 +29,8 @@
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends (Decoupled DAL)
      ├── profile/        user account + settings management
+     ├── auth/           Custom Cognito Identity Flow (Login, MFA, Reset)
+     ├── auth-trigger/   Post-confirmation DynamoDB profile automation
      ├── notifications/  SES + Pinpoint push/SMS
      └── health/         Monitoring + CI/CD smoke tests
         ↓
@@ -316,7 +318,7 @@ The pipeline detects potential duplicate receipts using a two-stage matching app
 | Layer | Control |
 |---|---|
 | Edge | CloudFront + WAF OWASP/SQLi rules + global & path rate limiting + access logging + Shield |
-| Auth | Cognito JWT (RS256) + PKCE + MFA optional |
+| Auth | Custom Auth Lambda + Cognito JWT (RS256) + PKCE + MFA |
 | Network | VPC private subnets + VPC Endpoints (no internet for AWS APIs) |
 | Data | DynamoDB + S3 encrypted with KMS CMK (Rotation Enforced) |
 | Secrets | SSM Parameter Store + Secrets Manager (no plain-text secrets in env vars or outputs) |
@@ -344,7 +346,16 @@ Sensitive values are stored in AWS SSM Parameter Store and Secrets Manager. Lamb
 ## API Endpoints
 
 ```
-AUTH (all endpoints require Bearer JWT)
+Authentication (Public)
+  POST   /auth/register               create unconfirmed user
+  POST   /auth/confirm                verify email with code
+  POST   /auth/login                  sign-in (returns JWTs + detects MFA)
+  POST   /auth/confirm-mfa            verify TOTP code
+  POST   /auth/forgot-password        trigger reset email
+  POST   /auth/confirm-password       complete reset
+  POST   /auth/refresh                rotate access tokens
+
+Authenticated (require Bearer JWT)
 
 Expenses
   GET    /expenses                    list with status/category filters + sort
@@ -859,6 +870,7 @@ npm run deploy:prod
 - [x] Decoupled Analytics Data Access Layer (DAL) with Repository Pattern
 - [x] Interactive Chart Tooltips (Bubble & Stacked Bar)
 - [x] User Profile & Settings Management (Name, Currency, Timezone, Notifications)
+- [x] Vertical Auth Integration (Custom Backend + Cognito + MFA + Reset)
 - [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 
