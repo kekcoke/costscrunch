@@ -610,6 +610,22 @@ export class CostsCrunchStack extends Stack {
             },
         });
 
+        // ── Auth Trigger Lambda (post-confirmation) ─────────────────────────────
+        // Triggered after user sign-up confirmation to create initial user profile in DynamoDB.
+        const authTriggerLambda = new NodejsFunction(this, "AuthTriggerLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/auth-trigger/post-confirmation.ts"),
+            functionName: `${prefix}-auth-trigger`,
+            environment: { ...sharedEnv },
+            logRetention: logs.RetentionDays.ONE_WEEK,
+        });
+
+        // Wire the auth trigger into the already-deployed UserPool via L1 construct
+        const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
+        cfnUserPool.lambdaConfig = {
+            postConfirmation: authTriggerLambda.functionName,
+        };
+
         // ── IAM Permissions ──────────────────────────────────────────────────────
         // Main table
         table.grantReadWriteData(expensesLambda);
@@ -619,6 +635,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadData(analyticsLambda);
         table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
+        table.grantWriteData(authTriggerLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
         connTable.grantReadWriteData(wsNotifierLambda);
@@ -678,6 +695,7 @@ export class CostsCrunchStack extends Stack {
         kmsKey.grantEncryptDecrypt(groupsLambda);
         kmsKey.grantEncryptDecrypt(profileLambda);
         kmsKey.grantEncryptDecrypt(wsNotifierLambda);
+        kmsKey.grantEncryptDecrypt(authTriggerLambda);
 
         // SSM Parameter Store: Bedrock model ID
         bedrockModelIdParam.grantRead(snsWebhookLambda);
@@ -1135,7 +1153,8 @@ export class CostsCrunchStack extends Stack {
             { fn: profileLambda, timeout: 29 },
             { fn: notificationsLambda, timeout: 29 },
             { fn: snsWebhookLambda, timeout: 29 },
-            { fn: wsNotifierLambda, timeout: 29 }
+            { fn: wsNotifierLambda, timeout: 29 },
+            { fn: authTriggerLambda, timeout: 29 }
         ];
 
         const errorRateThreshold = alarmThreshold.errorRate;

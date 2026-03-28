@@ -679,7 +679,7 @@ for SUB in "${!USERS[@]}"; do
       "plan":      {"S": "'"$PLAN"'"},
       "notificationPreferences": {"M": {
         "email":           {"BOOL": true},
-        "push":            {"BOOL": false},
+        "push":            {"BOOL": true},
         "sms":             {"BOOL": false},
         "digestFrequency": {"S": "weekly"}
       }},

@@ -86,15 +86,15 @@ describe("Rollback Workflow", () => {
     });
 
     it("health check exits 1 on failure", async () => {
-      const httpCode = 500;
+      const httpCode: number = 500;
       const passed = httpCode === 200;
       expect(passed).toBe(false);
     });
 
     it("health check accepts various HTTP codes as failure", async () => {
-      const failureCodes = [0, 301, 400, 403, 404, 500, 502, 503];
+      const failureCodes: number[] = [0, 301, 400, 403, 404, 500, 502, 503];
       failureCodes.forEach((code) => {
-        const passed = code === 200;
+        const passed = (code as any) === 200;
         expect(passed).toBe(false);
       });
     });
@@ -102,14 +102,14 @@ describe("Rollback Workflow", () => {
 
   describe("Rollback Conditions", () => {
     it("triggers rollback when health_check_passed is false", () => {
-      const healthCheckPassed = "false";
+      const healthCheckPassed: string = "false";
       const shouldRollback = healthCheckPassed === "false";
       expect(shouldRollback).toBe(true);
     });
 
     it("does not rollback when health_check_passed is true", () => {
-      const healthCheckPassed = "true";
-      const shouldRollback = healthCheckPassed === "false";
+      const healthCheckPassed: string = "true";
+      const shouldRollback = (healthCheckPassed as any) === "false";
       expect(shouldRollback).toBe(false);
     });
   });
