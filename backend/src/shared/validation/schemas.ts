@@ -171,6 +171,8 @@ export const analyticsQuerySchema = z.object({
   period: z.enum(['month', 'quarter', 'year']).optional().default('month'),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
+  from: isoDateSchema.optional(), // Alias for startDate
+  to: isoDateSchema.optional(),   // Alias for endDate
   groupId: ulidSchema.optional(),
   category: z.string().max(50).optional(),
   currency: z.string().length(3).optional(),

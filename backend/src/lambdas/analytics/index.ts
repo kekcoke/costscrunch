@@ -80,8 +80,8 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   }
 
   const q = parsedQ.data;
-  const startDate = q.startDate || getStartDate(q.period);
-  const endDate = q.endDate || new Date().toISOString().slice(0, 10);
+  const startDate = q.from || q.startDate || getStartDate(q.period);
+  const endDate = q.to || q.endDate || new Date().toISOString().slice(0, 10);
 
   // Validation: Prevent inverted date ranges
   if (startDate > endDate) {
@@ -168,6 +168,16 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
 
     const allResults = await Promise.all([personalPromise, ...groupPromises]);
     expenses = allResults.flatMap(r => r.Items || []);
+  }
+
+  // Post-fetch filtering: Categories
+  if (q.categories) {
+    const catList = q.categories.split(',').filter(Boolean);
+    if (catList.length > 0) {
+      expenses = expenses.filter(e => catList.includes(e.category));
+    }
+  } else if (q.category) {
+    expenses = expenses.filter(e => e.category === q.category);
   }
 
   if (route.includes("/summary")) {
