@@ -1,0 +1,20 @@
+{
+  "Clients": {
+    "bwnhik1nimmtg7haloq5rfkqm": {
+      "ClientId": "bwnhik1nimmtg7haloq5rfkqm",
+      "ClientName": "LocalClient",
+      "CreationDate": "2026-03-28T07:19:59.159Z",
+      "ExplicitAuthFlows": [
+        "ALLOW_USER_PASSWORD_AUTH",
+        "ALLOW_REFRESH_TOKEN_AUTH"
+      ],
+      "LastModifiedDate": "2026-03-28T07:19:59.159Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_4K0XD9CK"
+    }
+  }
+}
