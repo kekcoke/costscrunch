@@ -477,8 +477,8 @@ export class CostsCrunchStack extends Stack {
             BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
-            USER_POOL_ID: userPool.userPoolId,
-            USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+            // USER_POOL_ID and USER_POOL_CLIENT_ID are injected into specific lambdas 
+            // after the UserPool is defined to avoid cyclic dependencies during synthesis.
             POWERTOOLS_SERVICE_NAME: "costscrunch",
             LOG_LEVEL: isProd ? "INFO" : "DEBUG",
             ENVIRONMENT: environment,
