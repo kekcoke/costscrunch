@@ -149,6 +149,26 @@ Resources:
             Path: /analytics/{proxy+}
             Method: ANY
 
+  ProfileFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/profile/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Events:
+        ProfileRoot:
+          Type: Api
+          Properties:
+            Path: /profile
+            Method: ANY
+
   HealthFunction:
     Type: AWS::Serverless::Function
     Metadata:
