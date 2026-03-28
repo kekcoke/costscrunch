@@ -518,17 +518,23 @@ describe("DELETE /groups/{id}", () => {
     ddbMock
       .on(GetCommand).resolves({ Item: { ...SAMPLE_GROUP, ownerId: "user-owner" } })
       .on(QueryCommand).resolves({ Items: [] })
-      .on(UpdateCommand).resolves({});
+      .on(TransactWriteCommand).resolves({});
 
     const res = await handler(event as any);
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).deleted).toBe(true);
     
-    // Check if UpdateCommand was called with active: false
-    expect(ddbMock).toHaveReceivedCommandWith(UpdateCommand, {
-      Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
-      UpdateExpression: expect.stringContaining("active = :false"),
-    });
+    // Check if TransactWriteCommand was called with both updates
+    expect(ddbMock).toHaveReceivedCommand(TransactWriteCommand);
+    const transactItems = ddbMock.commandCalls(TransactWriteCommand)[0].args[0].input.TransactItems;
+    
+    // Check Profile update
+    const profileUpdate = transactItems.find((i: any) => i.Update?.Key.sk === `PROFILE#${groupId}`);
+    expect(profileUpdate.Update.UpdateExpression).toContain("active = :false");
+    
+    // Check Member update
+    const memberUpdate = transactItems.find((i: any) => i.Update?.Key.sk === `GROUP_MEMBER#${groupId}`);
+    expect(memberUpdate.Update.UpdateExpression).toContain("active = :false");
   });
 
   it("fails if requester is not the owner", async () => {

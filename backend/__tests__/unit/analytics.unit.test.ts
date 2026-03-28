@@ -19,7 +19,7 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
     routeKey: "GET /analytics/summary",
     body: null,
     pathParameters: {},
-    queryStringParameters: {},
+    queryStringParameters: { scope: "personal" },
     requestContext: {
       authorizer: {
         jwt: { claims: { sub: "user-abc", email: "test@example.com" } },
@@ -255,6 +255,49 @@ describe("GET /analytics/chart-data", () => {
 
     expect(donut).toContainEqual(expect.objectContaining({ label: "Food", value: 100 }));
     expect(donut).toContainEqual(expect.objectContaining({ label: "Travel", value: 50 }));
+  });
+
+  it("returns stackedBar data with category breakdown", async () => {
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const expenses = [
+      makeExpense({ amount: 100, amountUSD: 100, category: "Food", date: `${thisMonth}-01` }),
+      makeExpense({ amount: 50, amountUSD: 50, category: "Travel", date: `${thisMonth}-02` }),
+    ];
+    ddbMock.on(QueryCommand).resolves({ Items: expenses });
+
+    const res = await handler(
+      makeEvent({ 
+        routeKey: "GET /analytics/chart-data",
+        queryStringParameters: { scope: "personal", chartType: "stackedBar" }
+      }) as any
+    );
+    const { stackedBar } = JSON.parse(res.body);
+
+    expect(stackedBar).toHaveLength(1);
+    expect(stackedBar[0].label).toBe(thisMonth);
+    expect(stackedBar[0].categories.Food).toBe(100);
+    expect(stackedBar[0].categories.Travel).toBe(50);
+    expect(stackedBar[0].total).toBe(150);
+  });
+
+  it("sets sortBy to amount when chartType is stackedBar", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+    await handler(
+      makeEvent({ 
+        routeKey: "GET /analytics/chart-data",
+        queryStringParameters: { scope: "personal", chartType: "stackedBar" }
+      }) as any
+    );
+
+    // The repo call should have been triggered with sortBy: 'amount'
+    // Since we mock the repo indirectly via ddb, we check if the handler's internal 
+    // logic correctly passed the override to the repo.
+    const calls = ddbMock.commandCalls(QueryCommand);
+    // In stackedBar mode, it should be sorting by amount (desc) 
+    // which translates to ScanIndexForward: false in the DDB query
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
   });
 
   it("returns empty arrays when no expenses", async () => {

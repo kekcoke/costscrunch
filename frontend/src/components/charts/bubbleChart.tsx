@@ -1,12 +1,8 @@
 // ─── SpendLens — BubbleChart ─────────────────────────────────────────────────
-// Tests verify:
-//   - role="img" aria-label=/bubble chart/i
-//   - Y-axis label "Amount (USD)"
-//   - X-axis label shows time unit (date|week|month)
-
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { fmt, fmtDate } from "../../helpers/utils";
 import { CATEGORIES, type Category } from "../../models/constants";
+import ChartTooltip from "./chartTooltip";
 
 interface BubblePoint {
   date:      string;
@@ -29,6 +25,13 @@ const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top  - PAD.bottom;
 
 export default function BubbleChart({ data, currency = "USD", period = "month" }: Props) {
+  const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; content: React.ReactNode }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    content: null,
+  });
+
   const axisYLabel = `Amount (${currency})`;
   const axisXLabel = period === "year" ? "Month" : period === "quarter" ? "Week" : "Date";
 
@@ -58,7 +61,6 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
       r:  pr(d.frequency),
     }));
 
-    // X ticks: pick up to 5 evenly spaced dates
     const step = Math.max(1, Math.floor(data.length / 5));
     const xTicks = data
       .filter((_, i) => i % step === 0)
@@ -67,7 +69,6 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
         label: fmtDate(d.date),
       }));
 
-    // Y ticks: 5 evenly spaced amounts from 0 to maxAmount
     const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
       y: PAD.top + (1 - f) * PLOT_H,
       label: fmt(maxAmount * f),
@@ -88,7 +89,7 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
     <div
       role="img"
       aria-label={`Bubble chart — ${axisYLabel} over ${axisXLabel}`}
-      style={{ width: "100%", overflowX: "auto" }}
+      style={{ width: "100%", overflowX: "auto", position: "relative" }}
     >
       <svg
         viewBox={`0 0 ${W} ${H + 20}`}
@@ -142,7 +143,7 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
 
         {/* Bubbles */}
         {points.map((p, i) => {
-          const cat   = CATEGORIES[p.category as Category] ?? CATEGORIES.Other;
+          const cat = CATEGORIES[p.category as Category] ?? CATEGORIES.Other;
           return (
             <g key={i}>
               <circle
@@ -153,9 +154,26 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
                 stroke={cat.color}
                 strokeWidth="1.5"
                 style={{ cursor: "pointer", transition: "r 0.15s" }}
-              >
-                <title>{p.category} · {fmtDate(p.date)} · {fmt(p.amount)} · {p.frequency} transactions</title>
-              </circle>
+                onMouseEnter={(e) => {
+                  setTooltip({
+                    visible: true,
+                    x: e.clientX,
+                    y: e.clientY,
+                    content: (
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: "4px" }}>{p.category}</div>
+                        <div style={{ color: "var(--color-indigo)", fontWeight: 700 }}>{fmt(p.amount)}</div>
+                        <div style={{ opacity: 0.7, fontSize: "10px", marginTop: "2px" }}>{fmtDate(p.date)}</div>
+                        <div style={{ opacity: 0.7, fontSize: "10px" }}>{p.frequency} transactions</div>
+                      </div>
+                    )
+                  });
+                }}
+                onMouseMove={(e) => {
+                  setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
+                }}
+                onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+              />
             </g>
           );
         })}
@@ -187,6 +205,8 @@ export default function BubbleChart({ data, currency = "USD", period = "month" }
           {axisXLabel}
         </text>
       </svg>
+
+      <ChartTooltip {...tooltip} />
 
       {/* Legend */}
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>

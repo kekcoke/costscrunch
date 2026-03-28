@@ -1,6 +1,4 @@
 // ─── CostsCrunch — Analytics Lambda ────────────────────────────────────────────
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
@@ -8,15 +6,13 @@ import { getAuth } from "../../utils/auth.js";
 import { withLocalAuth } from "../_local/mockAuth.js";
 import type { ApiEvent } from "../../shared/models/types.js";
 import type { 
-  AnalyticsQuery, 
   ExpenseSummaryStats, 
   AnalyticsTrends, 
   AnalyticsChartData, BubbleChartDatum 
 } from "./../../shared/models/charts.js";
 import { analyticsQuerySchema } from "../../shared/validation/schemas.js";
+import { analyticsRepo } from "../../logic/analyticsRepository.js";
 
-const ddb = createDynamoDBDocClient();
-const TABLE = process.env.TABLE_NAME_MAIN!;
 const logger = new Logger({ serviceName: "analytics" });
 const metrics = new Metrics({ namespace: "CostsCrunch" });
 
@@ -48,8 +44,9 @@ const getStartDate = (period: string = "month"): string => {
 };
 
 export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
-  // Support both HTTP API v2 (routeKey) and REST API v1 (path)
-  const route = event.routeKey || event.path || "";
+  const fullPath = event.path || event.requestContext?.http?.path || "";
+  const routeKey = event.routeKey || "";
+  const route = routeKey || fullPath;
   
   let auth;
   try {
@@ -77,23 +74,30 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   }
 
   const q = parsedQ.data;
-  const startDate = q.startDate || getStartDate(q.period);
-  const endDate = q.endDate || new Date().toISOString().slice(0, 10);
+  const startDate = q.from || q.startDate || getStartDate(q.period);
+  const endDate = q.to || q.endDate || new Date().toISOString().slice(0, 10);
 
-  const result = await ddb.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-    FilterExpression: "#date >= :startDate AND #date <= :endDate",
-    ExpressionAttributeNames: { "#date": "date" },
-    ExpressionAttributeValues: {
-      ":pk": `USER#${auth.userId}`,
-      ":prefix": "EXPENSE#",
-      ":startDate": startDate,
-      ":endDate": endDate,
-    },
-  }));
+  if (startDate > endDate) {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ error: "Invalid date range: startDate cannot be ahead of endDate" }),
+    };
+  }
 
-  const expenses = result.Items || [];
+  // Use the new Data Layer
+  const isStackedBar = route.includes("/chart-data") && q.chartType === "stackedBar";
+  const expenses = await analyticsRepo.getExpenses({
+    userId: auth.userId,
+    scope: (q.scope as any) || "all",
+    groupId: q.groupId,
+    startDate,
+    endDate,
+    categories: q.categories ? q.categories.split(',').filter(Boolean) : undefined,
+    category: q.category,
+    sortBy: isStackedBar ? "amount" : (q as any).sortBy,
+    sortOrder: isStackedBar ? "desc" : (q as any).sortOrder,
+  });
 
   if (route.includes("/summary")) {
     const byCategory: Record<string, number> = {};
@@ -163,6 +167,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   if (route.includes("/chart-data")) {
     const categoryTotals: Record<string, number> = {};
     const bubbleMap: Record<string, BubbleChartDatum> = {};
+    const trendMap: Record<string, { total: number; count: number; categories: Record<string, number> }> = {};
 
     expenses.forEach(e => {
       const amount = e.amountUSD || e.amount || 0;
@@ -174,6 +179,17 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
       }
       bubbleMap[key].amount += amount;
       bubbleMap[key].frequency += 1;
+
+      // Group by month for stacked bar
+      const month = (e.date || "").slice(0, 7);
+      if (month) {
+        if (!trendMap[month]) {
+          trendMap[month] = { total: 0, count: 0, categories: {} };
+        }
+        trendMap[month].total += amount;
+        trendMap[month].count += 1;
+        trendMap[month].categories[e.category] = (trendMap[month].categories[e.category] || 0) + amount;
+      }
     });
 
     const chartData: AnalyticsChartData = {
@@ -184,7 +200,16 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
         category, amount: Math.round(amount * 100) / 100
       })),
       bubble: Object.values(bubbleMap),
-      stackedBar: [], // Implementation depends on specific requirements
+      stackedBar: Object.entries(trendMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([label, data]) => ({
+          label,
+          total: Math.round(data.total * 100) / 100,
+          count: data.count,
+          categories: Object.fromEntries(
+            Object.entries(data.categories).map(([k, v]) => [k, Math.round(v * 100) / 100])
+          )
+        })), 
     };
 
     return ok(chartData);

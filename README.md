@@ -27,7 +27,7 @@
      ├── image-preprocess/ Lossless image compression (Sharp)
      ├── sns-webhook/    Textract completion → circuit breaker → Claude AI → DB
      ├── ws-notifier/    Real-time WebSocket updates
-     ├── analytics/      aggregations + trends
+     ├── analytics/      aggregations + trends (Decoupled DAL)
      ├── notifications/  SES + Pinpoint push/SMS
      └── health/         Monitoring + CI/CD smoke tests
         ↓
@@ -47,6 +47,7 @@ costscrunch
 │   ├── __tests__/           # Unit (mocked) and Integration (LocalStack) suites
 │   ├── src/
 │   │   ├── lambdas/         # Service handlers (Groups, Expenses, Analytics, etc.)
+│   │   ├── logic/           # Domain logic & Repositories (DAL)
 │   │   ├── utils/           # Shared utilities (Structured Logger, Error Handler, etc.)
 │   │   ├── _local/          # Local dev auth wrappers (mock authorizer)
 │   │   ├── shared/          # Domain models and common types
@@ -850,6 +851,8 @@ npm run deploy:prod
 - [x] Standardized Lambda Authentication utility (`getAuth`)
 - [x] Group Deletion with business rule validation (pending expenses/balances)
 - [x] Frontend State Synchronization for group theme/persistence
+- [x] Decoupled Analytics Data Access Layer (DAL) with Repository Pattern
+- [x] Interactive Chart Tooltips (Bubble & Stacked Bar)
 - [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 
