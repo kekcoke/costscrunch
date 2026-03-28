@@ -1,12 +1,8 @@
 // ─── SpendLens — StackedBarChart ─────────────────────────────────────────────
-// Tests verify:
-//   - role="img" aria-label=/stacked bar chart/i
-//   - Y-axis label "Amount (USD)"
-//   - X-axis shows time period labels (e.g. "2026-01", "2026-02")
-
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { fmt } from "../../helpers/utils.js";
 import { CATEGORIES, type Category } from "../../models/constants.js";
+import ChartTooltip from "./chartTooltip";
 
 interface StackedBucket {
   period:     string;
@@ -27,6 +23,13 @@ const PLOT_H    = BAR_H - PAD.top - PAD.bottom;
 const GAP_PCT   = 0.3; // 30% of slot is gap
 
 export default function StackedBarChart({ data, currency = "USD" }: Props) {
+  const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; content: React.ReactNode }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    content: null,
+  });
+
   const axisYLabel = `Amount (${currency})`;
 
   const { bars, yTicks, catKeys } = useMemo(() => {
@@ -72,7 +75,7 @@ export default function StackedBarChart({ data, currency = "USD" }: Props) {
     <div
       role="img"
       aria-label={`Stacked bar chart — ${axisYLabel} by period`}
-      style={{ width: "100%", overflowX: "auto" }}
+      style={{ width: "100%", overflowX: "auto", position: "relative" }}
     >
       <svg
         viewBox={`0 0 ${W} ${BAR_H + 10}`}
@@ -108,10 +111,29 @@ export default function StackedBarChart({ data, currency = "USD" }: Props) {
                   height={seg.h}
                   fill={cat.color + (si % 2 === 0 ? "ee" : "aa")}
                   rx={isTop ? 4 : 0}
-                  style={{ transition: "height 0.6s ease" }}
-                >
-                  <title>{seg.cat}: {fmt(seg.val)}</title>
-                </rect>
+                  style={{ transition: "height 0.6s ease", cursor: "pointer" }}
+                  onMouseEnter={(e) => {
+                    setTooltip({
+                      visible: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      content: (
+                        <div>
+                          <div style={{ fontWeight: 600, marginBottom: "2px" }}>{bar.period}</div>
+                          <div style={{ opacity: 0.7, fontSize: "10px", marginBottom: "6px" }}>Total: {fmt(bar.total)}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                             <div style={{ width: "8px", height: "8px", borderRadius: "2px", background: cat.color }} />
+                             <span>{seg.cat}: <strong>{fmt(seg.val)}</strong></span>
+                          </div>
+                        </div>
+                      )
+                    });
+                  }}
+                  onMouseMove={(e) => {
+                    setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
+                  }}
+                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                />
               );
             })}
 
@@ -148,6 +170,8 @@ export default function StackedBarChart({ data, currency = "USD" }: Props) {
           {axisYLabel}
         </text>
       </svg>
+
+      <ChartTooltip {...tooltip} />
 
       {/* Category legend */}
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
