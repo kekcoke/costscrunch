@@ -256,16 +256,35 @@ export default function AnalyticsPage() {
               </button>
               {showCategoryMenu && (
                 <div style={{ position: "absolute", top: "56px", left: 0, zIndex: 20, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "10px", minWidth: "180px" }}>
-                  {CATEGORY_NAMES.map((name) => (
-                    <label key={name} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--color-text)", marginBottom: "6px" }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.categories.includes(name)}
-                        onChange={() => toggleCategory(name)}
-                      />
-                      {name}
-                    </label>
-                  ))}
+                  {CATEGORY_NAMES.map((name) => {
+                    const isSelected = filters.categories.includes(name);
+                    return (
+                      <label 
+                        key={name} 
+                        style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "8px", 
+                          fontSize: "12px", 
+                          color: isSelected ? "var(--color-indigo)" : "var(--color-text)", 
+                          marginBottom: "6px",
+                          cursor: "pointer",
+                          fontWeight: isSelected ? 600 : 400
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleCategory(name)}
+                          style={{ display: "none" }}
+                        />
+                        <span style={{ width: "14px", height: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {isSelected ? "✓" : ""}
+                        </span>
+                        {name}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -335,6 +354,47 @@ export default function AnalyticsPage() {
               Reset Filters
             </button>
           </div>
+
+          {/* Selected Categories Tags */}
+          {filters.categories.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--color-border-dim)" }}>
+              {filters.categories.map(cat => (
+                <div 
+                  key={cat}
+                  style={{ 
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    gap: "6px", 
+                    background: "rgba(99, 102, 241, 0.1)", 
+                    color: "var(--color-indigo)", 
+                    padding: "4px 10px", 
+                    borderRadius: "6px", 
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    border: "1px solid rgba(99, 102, 241, 0.2)"
+                  }}
+                >
+                  {cat}
+                  <button 
+                    onClick={() => toggleCategory(cat)}
+                    aria-label={`Remove ${cat}`}
+                    style={{ 
+                      background: "none", 
+                      border: "none", 
+                      color: "var(--color-indigo)", 
+                      cursor: "pointer", 
+                      padding: "0 2px",
+                      fontSize: "14px",
+                      lineHeight: 1,
+                      opacity: 0.7
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "16px", padding: "28px" }}>
