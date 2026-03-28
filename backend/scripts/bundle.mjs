@@ -9,6 +9,7 @@ const __dirname = dirname(__filename);
 const entryPoints = [
   "src/server.ts",
   "src/lambdas/analytics/index.ts",
+  "src/lambdas/profile/index.ts",
   "src/lambdas/expenses/index.ts",
   "src/lambdas/groups/index.ts",
   "src/lambdas/image-preprocess/index.ts",
