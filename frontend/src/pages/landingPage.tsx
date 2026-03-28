@@ -1,14 +1,9 @@
 // ─── CostsCrunch — LandingPage ──────────────────────────────────────────────────
 // Public marketing / home page. No auth required.
-// Tests expect:
-//   - h1 heading
-//   - <a href="/register"> with text matching /get started|sign up|try free/i
-//   - <a> with text matching /sign in|log in/i
-//   - ≥3 role="article" feature cards
-//   - text matching /free|plan|pricing/i
-//   - role="main" landmark
 
-import { Link } from "react-router-dom";
+interface Props {
+  onNavigate: (page: any) => void;
+}
 
 const FEATURES = [
   {
@@ -26,16 +21,6 @@ const FEATURES = [
     title: "Analytics",
     body: "Donut, stacked bar, bubble and horizontal bar charts with filters by period, category, currency, and scope.",
   },
-//   {
-//     icon: "🏦",
-//     title: "Bank Statement Import",
-//     body: "Upload any CSV or PDF statement. CostsCrunch auto-maps columns, deduplicates, and categorises every transaction.",
-//   },
-//   {
-//     icon: "🔐",
-//     title: "Enterprise-Grade Security",
-//     body: "PKCE OAuth, TOTP MFA, JWT access tokens, WAF protection, and end-to-end encryption at rest.",
-//   },
   {
     icon: "⚡",
     title: "Serverless at Scale",
@@ -50,7 +35,7 @@ const STATS = [
   { value: "80ms",  label: "P99 latency"      },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({ onNavigate }: Props) {
   return (
     <div
       style={{
@@ -86,42 +71,46 @@ export default function LandingPage() {
             background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
+            cursor: "pointer"
           }}
+          onClick={() => onNavigate("landing")}
         >
           CostsCrunch
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Link
-            to="/login"
+          <button
+            onClick={() => onNavigate("login")}
             style={{
               padding: "8px 20px",
               borderRadius: "9px",
               border: "1px solid var(--color-border)",
+              background: "transparent",
               color: "var(--color-text-muted)",
-              textDecoration: "none",
               fontSize: "13px",
               fontWeight: 500,
+              cursor: "pointer",
               transition: "all 0.15s",
             }}
           >
             Sign in
-          </Link>
-          <Link
-            to="/register"
+          </button>
+          <button
+            onClick={() => onNavigate("register")}
             style={{
               padding: "8px 20px",
               borderRadius: "9px",
               background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
+              border: "none",
               color: "#fff",
-              textDecoration: "none",
               fontSize: "13px",
               fontWeight: 700,
+              cursor: "pointer",
               boxShadow: "0 0 20px rgba(99,102,241,0.35)",
             }}
           >
             Get started free
-          </Link>
+          </button>
         </div>
       </nav>
 
@@ -136,7 +125,6 @@ export default function LandingPage() {
             overflow: "hidden",
           }}
         >
-          {/* Background glow */}
           <div
             aria-hidden
             style={{
@@ -209,18 +197,19 @@ export default function LandingPage() {
           </p>
 
           <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-            <Link
-              to="/register"
+            <button
+              onClick={() => onNavigate("register")}
               aria-label="Get started free"
               style={{
                 display: "inline-block",
                 padding: "15px 36px",
                 borderRadius: "12px",
                 background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
+                border: "none",
                 color: "#fff",
-                textDecoration: "none",
                 fontWeight: 700,
                 fontSize: "15px",
+                cursor: "pointer",
                 boxShadow: "0 0 40px rgba(99,102,241,0.4)",
                 transition: "transform 0.15s, box-shadow 0.15s",
               }}
@@ -234,7 +223,7 @@ export default function LandingPage() {
               }}
             >
               Get started — it&apos;s free →
-            </Link>
+            </button>
             <a
               href="#features"
               style={{
@@ -404,7 +393,7 @@ export default function LandingPage() {
                 period: "forever",
                 features: ["50 expenses / month", "1 group", "CSV import", "Email support"],
                 cta: "Get started free",
-                href: "/register",
+                page: "register",
                 highlight: false,
               },
               {
@@ -413,7 +402,7 @@ export default function LandingPage() {
                 period: "per month",
                 features: ["Unlimited expenses", "Unlimited groups", "AI receipt scanning", "PDF import", "Priority support"],
                 cta: "Try Pro free",
-                href: "/register",
+                page: "register",
                 highlight: true,
               },
               {
@@ -422,7 +411,7 @@ export default function LandingPage() {
                 period: "per user / month",
                 features: ["Everything in Pro", "Team approval workflows", "QuickBooks & Xero sync", "SAML SSO", "SLA 99.99%"],
                 cta: "Contact sales",
-                href: "/register",
+                page: "register",
                 highlight: false,
               },
             ].map((plan) => (
@@ -506,27 +495,28 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to={plan.href}
+                <button
+                  onClick={() => onNavigate(plan.page)}
                   style={{
                     display: "block",
+                    width: "100%",
                     textAlign: "center",
                     padding: "11px",
                     borderRadius: "10px",
-                    textDecoration: "none",
-                    fontWeight: 700,
-                    fontSize: "13px",
-                    background: plan.highlight
-                      ? "linear-gradient(135deg, #0ea5e9, #6366f1)"
-                      : "transparent",
                     border: plan.highlight
                       ? "none"
                       : "1px solid var(--color-border)",
+                    background: plan.highlight
+                      ? "linear-gradient(135deg, #0ea5e9, #6366f1)"
+                      : "transparent",
                     color: plan.highlight ? "#fff" : "var(--color-text-muted)",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    cursor: "pointer",
                   }}
                 >
                   {plan.cta}
-                </Link>
+                </button>
               </div>
             ))}
           </div>
@@ -553,22 +543,23 @@ export default function LandingPage() {
           <p style={{ color: "var(--color-text-dim)", marginBottom: "36px" }}>
             Free forever plan. No credit card. Setup in 2 minutes.
           </p>
-          <Link
-            to="/register"
+          <button
+            onClick={() => onNavigate("register")}
             style={{
               display: "inline-block",
               padding: "15px 40px",
               borderRadius: "12px",
               background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
+              border: "none",
               color: "#fff",
-              textDecoration: "none",
               fontWeight: 700,
               fontSize: "15px",
+              cursor: "pointer",
               boxShadow: "0 0 40px rgba(99,102,241,0.4)",
             }}
           >
             Sign up free — no card needed
-          </Link>
+          </button>
         </section>
       </main>
 

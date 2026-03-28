@@ -74,6 +74,11 @@ export default function App() {
   const isAuthView = activeTab in AUTH_PAGES;
   const PageComponent = (isAuthView ? AUTH_PAGES[activeTab] : APP_PAGES[activeTab]) ?? LandingPage;
 
+  const navigate = useCallback((page: PageId) => {
+    setActiveTab(page);
+    window.scrollTo(0, 0);
+  }, []);
+
   const handleAddBlankExpense = () => {
     addExpense({
       merchant:  "New Expense",
@@ -105,7 +110,7 @@ export default function App() {
              <button onClick={() => setActiveTab('login')}>Login</button>
              <button onClick={() => setActiveTab('register')}>Sign up</button>
           </div>
-          <PageComponent />
+          <PageComponent onNavigate={navigate} />
         </main>
       </div>
     );
@@ -140,7 +145,7 @@ export default function App() {
           onMenuClick={() => setSidebarOpen(true)}
         />
         <main style={{ padding: isMobile ? "16px" : "32px" }}>
-          <PageComponent />
+          <PageComponent onNavigate={navigate} />
         </main>
       </div>
     </div>
