@@ -148,6 +148,9 @@ export default function AnalyticsPage() {
   }, []);
 
   const handleDateChange = useCallback((key: "from" | "to", value: string) => {
+    if (value && value > new Date().toISOString().split('T')[0]) {
+      return;
+    }
     setFilters((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
   }, []);
 
@@ -272,6 +275,7 @@ export default function AnalyticsPage() {
               <input
                 aria-label="From"
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={filters.from}
                 onChange={(e) => handleDateChange("from", e.target.value)}
                 style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
@@ -283,6 +287,7 @@ export default function AnalyticsPage() {
               <input
                 aria-label="To"
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={filters.to}
                 onChange={(e) => handleDateChange("to", e.target.value)}
                 style={{ background: "var(--color-surface-2)", color: "var(--color-text)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "6px 10px" }}
