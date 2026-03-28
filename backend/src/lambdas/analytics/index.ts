@@ -49,7 +49,10 @@ const getStartDate = (period: string = "month"): string => {
 
 export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
   // Support both HTTP API v2 (routeKey) and REST API v1 (path)
-  const route = event.routeKey || event.path || "";
+  // In LocalStack/REST v1, path may include stage/resource prefix.
+  const fullPath = event.path || event.requestContext?.http?.path || "";
+  const routeKey = event.routeKey || "";
+  const route = routeKey || fullPath;
   
   let auth;
   try {
@@ -79,6 +82,15 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   const q = parsedQ.data;
   const startDate = q.startDate || getStartDate(q.period);
   const endDate = q.endDate || new Date().toISOString().slice(0, 10);
+
+  // Validation: Prevent inverted date ranges
+  if (startDate > endDate) {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ error: "Invalid date range: startDate cannot be ahead of endDate" }),
+    };
+  }
 
   let expenses: any[] = [];
 

@@ -7,7 +7,12 @@ import { z } from 'zod';
 
 const uuidSchema = z.string().uuid();
 const emailSchema = z.string().email();
-const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
+const isoDateSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+  .refine((val) => {
+    if (!val) return true;
+    return val <= new Date().toISOString().split('T')[0];
+  }, 'Date cannot be in the future');
 const isoDateTimeSchema = z.string().datetime();
 const ulidSchema = z.string().min(1).max(36);
 const currencySchema = z.string().length(3).toUpperCase();
