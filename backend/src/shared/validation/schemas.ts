@@ -181,6 +181,28 @@ export const analyticsQuerySchema = z.object({
   categories: z.string().optional(), // Frontend sends as comma-separated or empty
 }).strict();
 
+// ── User Schemas ─────────────────────────────────────────────────────────────
+
+export const notificationPreferencesSchema = z.object({
+  email: z.boolean().optional(),
+  push: z.boolean().optional(),
+  sms: z.boolean().optional(),
+  slack: z.string().url().optional().nullable(),
+  digestFrequency: z.enum(['daily', 'weekly', 'none']).optional(),
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  currency: currencySchema.optional(),
+  timezone: z.string().max(100).optional(),
+  locale: z.string().max(20).optional(),
+  notificationPreferences: notificationPreferencesSchema.optional(),
+  phone: z.string().max(20).optional().nullable(),
+  avatarKey: z.string().max(500).optional().nullable(),
+  defaultApprover: z.string().max(50).optional().nullable(),
+  autoApproveBelow: z.number().nonnegative().optional().nullable(),
+}).strict();
+
 // ── Validation Helper ────────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
