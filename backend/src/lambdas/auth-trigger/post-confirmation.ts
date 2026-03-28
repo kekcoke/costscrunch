@@ -5,9 +5,12 @@ import type { PostConfirmationConfirmSignUpTriggerEvent } from "aws-lambda";
 
 const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
-const logger = new Logger({ serviceName: "auth-trigger" });
+
+// Lazily instantiated to avoid constructor mocking issues in unit tests
+const getLogger = () => new Logger({ serviceName: "auth-trigger" });
 
 export const handler = async (event: PostConfirmationConfirmSignUpTriggerEvent) => {
+  const logger = getLogger();
   logger.info("Post-confirmation trigger invoked", { event });
 
   const { sub, email, name } = event.request.userAttributes;
