@@ -86,6 +86,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   }
 
   // Use the new Data Layer
+  const isStackedBar = route.includes("/chart-data") && q.chartType === "stackedBar";
   const expenses = await analyticsRepo.getExpenses({
     userId: auth.userId,
     scope: (q.scope as any) || "all",
@@ -94,8 +95,8 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
     endDate,
     categories: q.categories ? q.categories.split(',').filter(Boolean) : undefined,
     category: q.category,
-    sortBy: (q as any).sortBy,
-    sortOrder: (q as any).sortOrder,
+    sortBy: isStackedBar ? "amount" : (q as any).sortBy,
+    sortOrder: isStackedBar ? "desc" : (q as any).sortOrder,
   });
 
   if (route.includes("/summary")) {
@@ -166,6 +167,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   if (route.includes("/chart-data")) {
     const categoryTotals: Record<string, number> = {};
     const bubbleMap: Record<string, BubbleChartDatum> = {};
+    const trendMap: Record<string, { total: number; count: number; categories: Record<string, number> }> = {};
 
     expenses.forEach(e => {
       const amount = e.amountUSD || e.amount || 0;
@@ -177,6 +179,17 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
       }
       bubbleMap[key].amount += amount;
       bubbleMap[key].frequency += 1;
+
+      // Group by month for stacked bar
+      const month = (e.date || "").slice(0, 7);
+      if (month) {
+        if (!trendMap[month]) {
+          trendMap[month] = { total: 0, count: 0, categories: {} };
+        }
+        trendMap[month].total += amount;
+        trendMap[month].count += 1;
+        trendMap[month].categories[e.category] = (trendMap[month].categories[e.category] || 0) + amount;
+      }
     });
 
     const chartData: AnalyticsChartData = {
@@ -187,7 +200,16 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
         category, amount: Math.round(amount * 100) / 100
       })),
       bubble: Object.values(bubbleMap),
-      stackedBar: [], 
+      stackedBar: Object.entries(trendMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([label, data]) => ({
+          label,
+          total: Math.round(data.total * 100) / 100,
+          count: data.count,
+          categories: Object.fromEntries(
+            Object.entries(data.categories).map(([k, v]) => [k, Math.round(v * 100) / 100])
+          )
+        })), 
     };
 
     return ok(chartData);

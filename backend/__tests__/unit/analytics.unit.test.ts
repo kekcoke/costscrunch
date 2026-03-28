@@ -19,7 +19,7 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
     routeKey: "GET /analytics/summary",
     body: null,
     pathParameters: {},
-    queryStringParameters: {},
+    queryStringParameters: { scope: "personal" },
     requestContext: {
       authorizer: {
         jwt: { claims: { sub: "user-abc", email: "test@example.com" } },
