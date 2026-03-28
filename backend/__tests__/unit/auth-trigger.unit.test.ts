@@ -3,7 +3,7 @@ import type { PostConfirmationConfirmSignUpTriggerEvent } from "aws-lambda";
 
 // vi.hoisted runs before vi.mock hoisting — mockSend must be vi.fn()
 const { mockSend } = vi.hoisted(() => ({
-  mockSend: vi.fn<[any], Promise<any>>().mockResolvedValue({}),
+  mockSend: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../src/utils/awsClients.js", () => ({

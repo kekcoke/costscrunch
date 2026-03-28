@@ -11,21 +11,21 @@ const { mockSend } = vi.hoisted(() => {
   process.env.USER_POOL_CLIENT_ID = "test-client-id";
   process.env.AWS_REGION = "us-east-1";
   return {
-    mockSend: vi.fn<[any], Promise<any>>().mockResolvedValue({}),
+    mockSend: vi.fn().mockResolvedValue({}),
   };
 });
 
 const { MockSignUpCommand, MockConfirmSignUpCommand, MockInitiateAuthCommand } = vi.hoisted(() => {
-  function makeCmd(name) {
-    const Cmd = function(input) { this.input = input; this._name = name; };
+  function makeCmd(name: string) {
+    const Cmd = function(this: any, input: any) { this.input = input; this._name = name; };
     Cmd.prototype.constructor = Cmd;
     Object.defineProperty(Cmd, "name", { value: name });
     return Cmd;
   }
   return {
-    MockSignUpCommand: makeCmd("SignUpCommand"),
-    MockConfirmSignUpCommand: makeCmd("ConfirmSignUpCommand"),
-    MockInitiateAuthCommand: makeCmd("InitiateAuthCommand"),
+    MockSignUpCommand: makeCmd("SignUpCommand") as any,
+    MockConfirmSignUpCommand: makeCmd("ConfirmSignUpCommand") as any,
+    MockInitiateAuthCommand: makeCmd("InitiateAuthCommand") as any,
   };
 });
 

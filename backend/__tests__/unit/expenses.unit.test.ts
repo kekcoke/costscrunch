@@ -129,7 +129,7 @@ describe("GET /expenses (list)", () => {
       FilterExpression: expect.stringContaining("category"),
     });
     const call = ddbMock.commandCalls(QueryCommand)[0];
-    expect(call.args[0].input.ExpressionAttributeValues[":category"]).toBe("Travel");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":category"]).toBe("Travel");
   });
 
   it("decodes nextToken for pagination", async () => {

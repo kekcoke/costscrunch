@@ -34,7 +34,7 @@ describe("Receipts Download Logic", () => {
     const event = makeEvent("exp-1");
     delete (event.requestContext.authorizer as any).jwt;
     
-    const res = await handler(event as any, {} as any);
+    const res = await handler(event as any) as any;
     expect(res.statusCode).toBe(401);
   });
 
@@ -43,7 +43,7 @@ describe("Receipts Download Logic", () => {
       Item: { id: "exp-1", receiptKey: null }
     });
 
-    const res = await handler(makeEvent("exp-1") as any, {} as any);
+    const res = await handler(makeEvent("exp-1") as any) as any;
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).error).toContain("No receipt found");
   });
@@ -56,7 +56,7 @@ describe("Receipts Download Logic", () => {
       }
     });
 
-    const res = await handler(makeEvent("exp-1") as any, {} as any);
+    const res = await handler(makeEvent("exp-1") as any) as any;
     
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
