@@ -58,8 +58,18 @@ export default function LoginPage({ onNavigate }: Props) {
     try {
       await authApi.login(email, password);
       onNavigate("dashboard");
-    } catch (e) {
-      setError((e as Error).message ?? "Sign in failed. Please try again.");
+    } catch (e: any) {
+      // Check for MFA requirement
+      try {
+        const errorBody = JSON.parse(e.message);
+        if (errorBody.challenge === "MFA") {
+          onNavigate("mfa", { email, session: errorBody.session });
+          return;
+        }
+      } catch {
+        // Not a JSON error, handle normally
+      }
+      setError(e.message ?? "Sign in failed. Please try again.");
     } finally {
       setLoading(false);
     }

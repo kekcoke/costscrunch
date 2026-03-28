@@ -46,6 +46,14 @@ export const authApi = {
     return request("/auth/confirm-password", { email, code, password });
   },
 
+  async confirmMfa(email: string, code: string, session: string) {
+    const tokens = await request("/auth/confirm-mfa", { email, code, session });
+    localStorage.setItem("cc_access_token", tokens.accessToken);
+    localStorage.setItem("cc_id_token", tokens.idToken);
+    localStorage.setItem("cc_refresh_token", tokens.refreshToken);
+    return tokens;
+  },
+
   async logout() {
     localStorage.removeItem("cc_access_token");
     localStorage.removeItem("cc_id_token");

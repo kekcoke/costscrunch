@@ -10,18 +10,21 @@
 //   - only numeric input accepted
 //   - text matching /backup code|recovery code/i
 
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { confirmSignIn } from "aws-amplify/auth";
+import { useState, useEffect } from "react";
+import { authApi } from "../helpers/auth-api";
+
+interface Props {
+  onNavigate: (page: any) => void;
+  email?: string;
+  session?: string;
+}
 
 // TOTP codes expire every 30 seconds; count down within the current window
 function getSecondsLeft(): number {
   return 30 - (Math.floor(Date.now() / 1000) % 30);
 }
 
-export default function MFAPage() {
-  const navigate = useNavigate();
-
+export default function MFAPage({ onNavigate, email, session }: Props) {
   const [code,    setCode]    = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
@@ -38,17 +41,19 @@ export default function MFAPage() {
       setError("Please enter the 6-digit code from your authenticator app");
       return;
     }
+    if (!email || !session) {
+      setError("Session expired. Please sign in again.");
+      setTimeout(() => onNavigate("login"), 2000);
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
-      const result = await confirmSignIn({ challengeResponse: code });
-      if (result.isSignedIn) {
-        navigate("/dashboard");
-      } else if (result.nextStep?.signInStep) {
-        setError("Additional verification required. Please contact support.");
-      }
-    } catch (e) {
-      setError("Invalid or expired code. Please try again.");
+      await authApi.confirmMfa(email, code, session);
+      onNavigate("dashboard");
+    } catch (e: any) {
+      setError(e.message || "Invalid or expired code. Please try again.");
     } finally {
       setLoading(false);
     }
