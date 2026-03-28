@@ -1,6 +1,4 @@
 // ─── CostsCrunch — Analytics Lambda ────────────────────────────────────────────
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Metrics, MetricUnit } from "@aws-lambda-powertools/metrics";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
@@ -8,15 +6,13 @@ import { getAuth } from "../../utils/auth.js";
 import { withLocalAuth } from "../_local/mockAuth.js";
 import type { ApiEvent } from "../../shared/models/types.js";
 import type { 
-  AnalyticsQuery, 
   ExpenseSummaryStats, 
   AnalyticsTrends, 
   AnalyticsChartData, BubbleChartDatum 
 } from "./../../shared/models/charts.js";
 import { analyticsQuerySchema } from "../../shared/validation/schemas.js";
+import { analyticsRepo } from "../../logic/analyticsRepository.js";
 
-const ddb = createDynamoDBDocClient();
-const TABLE = process.env.TABLE_NAME_MAIN!;
 const logger = new Logger({ serviceName: "analytics" });
 const metrics = new Metrics({ namespace: "CostsCrunch" });
 
@@ -48,8 +44,6 @@ const getStartDate = (period: string = "month"): string => {
 };
 
 export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { routeKey?: string }) => {
-  // Support both HTTP API v2 (routeKey) and REST API v1 (path)
-  // In LocalStack/REST v1, path may include stage/resource prefix.
   const fullPath = event.path || event.requestContext?.http?.path || "";
   const routeKey = event.routeKey || "";
   const route = routeKey || fullPath;
@@ -83,7 +77,6 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
   const startDate = q.from || q.startDate || getStartDate(q.period);
   const endDate = q.to || q.endDate || new Date().toISOString().slice(0, 10);
 
-  // Validation: Prevent inverted date ranges
   if (startDate > endDate) {
     return {
       statusCode: 400,
@@ -92,93 +85,18 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
     };
   }
 
-  let expenses: any[] = [];
-
-  if (q.scope === "personal") {
-    const res = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: "#date >= :startDate AND #date <= :endDate",
-      ExpressionAttributeNames: { "#date": "date" },
-      ExpressionAttributeValues: {
-        ":pk": `USER#${auth.userId}`,
-        ":prefix": "EXPENSE#",
-        ":startDate": startDate,
-        ":endDate": endDate,
-      },
-    }));
-    expenses = res.Items || [];
-  } else if (q.scope === "group" && q.groupId) {
-    const res = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: "#date >= :startDate AND #date <= :endDate",
-      ExpressionAttributeNames: { "#date": "date" },
-      ExpressionAttributeValues: {
-        ":pk": `GROUP#${q.groupId}`,
-        ":prefix": "EXPENSE#",
-        ":startDate": startDate,
-        ":endDate": endDate,
-      },
-    }));
-    expenses = res.Items || [];
-  } else {
-    // scope === 'all' or default
-    // In a single-table design, 'all' usually requires querying multiple partitions 
-    // or using a GSI if we want everything across users/groups.
-    // For now, we aggregate the user's personal expenses and their memberships.
-    
-    // 1. Get personal
-    const personalPromise = ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: "#date >= :startDate AND #date <= :endDate",
-      ExpressionAttributeNames: { "#date": "date" },
-      ExpressionAttributeValues: {
-        ":pk": `USER#${auth.userId}`,
-        ":prefix": "EXPENSE#",
-        ":startDate": startDate,
-        ":endDate": endDate,
-      },
-    }));
-
-    // 2. Get memberships to find groups
-    const memberRes = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${auth.userId}`,
-        ":prefix": "GROUP_MEMBER#",
-      },
-    }));
-
-    const groupIds = (memberRes.Items || []).map(m => m.groupId);
-    const groupPromises = groupIds.map(gid => ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: "#date >= :startDate AND #date <= :endDate",
-      ExpressionAttributeNames: { "#date": "date" },
-      ExpressionAttributeValues: {
-        ":pk": `GROUP#${gid}`,
-        ":prefix": "EXPENSE#",
-        ":startDate": startDate,
-        ":endDate": endDate,
-      },
-    })));
-
-    const allResults = await Promise.all([personalPromise, ...groupPromises]);
-    expenses = allResults.flatMap(r => r.Items || []);
-  }
-
-  // Post-fetch filtering: Categories
-  if (q.categories) {
-    const catList = q.categories.split(',').filter(Boolean);
-    if (catList.length > 0) {
-      expenses = expenses.filter(e => catList.includes(e.category));
-    }
-  } else if (q.category) {
-    expenses = expenses.filter(e => e.category === q.category);
-  }
+  // Use the new Data Layer
+  const expenses = await analyticsRepo.getExpenses({
+    userId: auth.userId,
+    scope: (q.scope as any) || "all",
+    groupId: q.groupId,
+    startDate,
+    endDate,
+    categories: q.categories ? q.categories.split(',').filter(Boolean) : undefined,
+    category: q.category,
+    sortBy: (q as any).sortBy,
+    sortOrder: (q as any).sortOrder,
+  });
 
   if (route.includes("/summary")) {
     const byCategory: Record<string, number> = {};
@@ -269,7 +187,7 @@ export const handler = withLocalAuth(withErrorHandler(async (event: ApiEvent & {
         category, amount: Math.round(amount * 100) / 100
       })),
       bubble: Object.values(bubbleMap),
-      stackedBar: [], // Implementation depends on specific requirements
+      stackedBar: [], 
     };
 
     return ok(chartData);
