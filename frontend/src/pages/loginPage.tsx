@@ -1,6 +1,6 @@
 // ─── CostsCrunch — LoginPage ────────────────────────────────────────────────────
 import { useState } from "react";
-import { signIn, signInWithRedirect } from "aws-amplify/auth";
+import { authApi } from "../helpers/auth-api";
 
 interface Props {
   onNavigate: (page: any) => void;
@@ -56,14 +56,7 @@ export default function LoginPage({ onNavigate }: Props) {
 
     setLoading(true);
     try {
-      const result = await signIn({ username: email, password });
-
-      if (result.nextStep?.signInStep === "CONFIRM_SIGN_IN_WITH_TOTP_CODE" ||
-          result.nextStep?.signInStep === "CONFIRM_SIGN_IN_WITH_SMS_CODE") {
-        onNavigate("mfa");
-        return;
-      }
-
+      await authApi.login(email, password);
       onNavigate("dashboard");
     } catch (e) {
       setError((e as Error).message ?? "Sign in failed. Please try again.");
@@ -73,7 +66,9 @@ export default function LoginPage({ onNavigate }: Props) {
   };
 
   const handleOAuth = (provider: "Google" | "GitHub") => {
-    signInWithRedirect({ provider });
+    // Placeholder for OAuth implementation
+    console.log(`OAuth with ${provider} not yet implemented`);
+    setError(`${provider} login coming soon!`);
   };
 
   return (

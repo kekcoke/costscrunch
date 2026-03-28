@@ -190,4 +190,19 @@ describe("Rollback Workflow", () => {
       expect(content).toMatch(/curl.*--max-time\s+30/);
     });
   });
+
+  describe("Cognito Resource Protection", () => {
+    /**
+     * Note: RemovalPolicy is asserted via CDK unit tests in 
+     * CostsCrunchStack.cognito.test.ts. This block ensures 
+     * the rollback logic doesn't inadvertently trigger 
+     * full deletions of stateful auth resources.
+     */
+    it("rollback logic targets stack updates not deletion", () => {
+      const content = fs.readFileSync(workflowPath, "utf8");
+      expect(content).toContain("aws cloudformation rollback-stack");
+      // ensure we are not using delete-stack in the rollback workflow
+      expect(content).not.toContain("aws cloudformation delete-stack");
+    });
+  });
 });

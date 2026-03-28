@@ -1,6 +1,6 @@
 // ─── CostsCrunch — RegisterPage ─────────────────────────────────────────────────
 import { useState } from "react";
-import { signUp, confirmSignUp } from "aws-amplify/auth";
+import { authApi } from "../helpers/auth-api";
 
 interface Props {
   onNavigate: (page: any) => void;
@@ -53,11 +53,7 @@ export default function RegisterPage({ onNavigate }: Props) {
     if (!validate()) return;
     setLoading(true);
     try {
-      await signUp({
-        username: email,
-        password,
-        options: { userAttributes: { email, name: fullName } },
-      });
+      await authApi.register(email, password, fullName);
       setStep("confirm");
     } catch (err) {
       setErrors({ global: (err as Error).message });
@@ -69,7 +65,7 @@ export default function RegisterPage({ onNavigate }: Props) {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      await confirmSignUp({ username: email, confirmationCode: code });
+      await authApi.confirm(email, code);
       onNavigate("login");
     } catch (err) {
       setErrors({ confirm: (err as Error).message });

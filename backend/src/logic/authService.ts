@@ -11,9 +11,13 @@ import {
   SignUpCommand,
   ConfirmSignUpCommand,
   InitiateAuthCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
   type SignUpCommandInput,
   type ConfirmSignUpCommandInput,
   type InitiateAuthCommandInput,
+  type ForgotPasswordCommandInput,
+  type ConfirmForgotPasswordCommandInput,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { Logger } from "@aws-lambda-powertools/logger";
 
@@ -186,6 +190,51 @@ export async function refreshAuth(refreshToken: string): Promise<Omit<AuthTokens
       throw new AuthError("Refresh token expired", 401, error.name);
     }
     logger.error("Refresh failed", { error });
+    throw error;
+  }
+}
+
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<void> {
+  const params: ForgotPasswordCommandInput = {
+    ClientId: CLIENT_ID,
+    Username: email,
+  };
+
+  try {
+    await cognito.send(new ForgotPasswordCommand(params));
+    logger.info("Password reset requested", { email });
+  } catch (error: any) {
+    if (error.name === "UserNotFoundException") {
+      // Don't leak user existence; return success
+      logger.info("Password reset requested for non-existent user", { email });
+      return;
+    }
+    logger.error("ForgotPassword failed", { error, email });
+    throw error;
+  }
+}
+
+export async function confirmPasswordReset(email: string, code: string, newPassword: string): Promise<void> {
+  const params: ConfirmForgotPasswordCommandInput = {
+    ClientId: CLIENT_ID,
+    Username: email,
+    ConfirmationCode: code,
+    Password: newPassword,
+  };
+
+  try {
+    await cognito.send(new ConfirmForgotPasswordCommand(params));
+    logger.info("Password reset confirmed", { email });
+  } catch (error: any) {
+    if (error.name === "CodeMismatchException") {
+      throw new AuthError("Invalid confirmation code", 400, error.name);
+    }
+    if (error.name === "ExpiredCodeException") {
+      throw new AuthError("Confirmation code expired", 400, error.name);
+    }
+    logger.error("ConfirmForgotPassword failed", { error, email });
     throw error;
   }
 }
