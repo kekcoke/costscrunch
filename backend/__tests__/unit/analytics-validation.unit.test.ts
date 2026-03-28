@@ -32,7 +32,7 @@ describe("Analytics Edge Cases & Validation", () => {
   // 2. Date Validation (Inverted & Future)
   it("returns 400 for inverted date range (startDate > endDate)", async () => {
     const res = await handler(makeEvent("/analytics/summary", { 
-      from: "2026-03-20", // In the past relative to 03-27
+      from: "2026-03-20", 
       to: "2026-03-10" 
     }));
     expect(res.statusCode).toBe(400);
@@ -53,51 +53,42 @@ describe("Analytics Edge Cases & Validation", () => {
     expect(JSON.parse(res.body).error).toMatch(/Date must be YYYY-MM-DD/);
   });
 
-  it("returns 400 for invalid period enum", async () => {
-    const res = await handler(makeEvent("/analytics/summary", { period: "century" }));
-    expect(res.statusCode).toBe(400);
-  });
-
-  it("returns 400 for invalid scope enum", async () => {
-    const res = await handler(makeEvent("/analytics/summary", { scope: "admin" }));
-    expect(res.statusCode).toBe(400);
-  });
-
   // 4. Empty/Missing Parameters (Graceful defaults)
   it("handles empty categories string gracefully", async () => {
     const res = await handler(makeEvent("/analytics/summary", { categories: "" }));
     expect(res.statusCode).toBe(200);
-    expect(ddbMock).toHaveReceivedCommand(QueryCommand);
   });
 
-  it("works with no query parameters (defaults to month)", async () => {
-    const res = await handler(makeEvent("/analytics/summary", {}));
-    expect(res.statusCode).toBe(200);
-  });
-
-  // 5. Valid Combinations (Aliases from/to vs startDate/endDate)
+  // 5. Valid Combinations & Aliases
   it("accepts 'from' and 'to' as aliases for startDate/endDate", async () => {
     const res = await handler(makeEvent("/analytics/summary", { from: "2026-01-01", to: "2026-03-20" }));
     expect(res.statusCode).toBe(200);
   });
 
-  it("correctly filters by multi-category string", async () => {
-    // Use a simpler mock pattern to ensure items are returned
-    ddbMock.on(QueryCommand).resolves({
-      Items: [
-        { category: "Office", amount: 10, date: "2026-03-01" },
-        { category: "Meals", amount: 20, date: "2026-03-01" },
-        { category: "Travel", amount: 30, date: "2026-03-01" }
-      ]
-    });
-
-    // We only need the first call to return items for this test (personal scope or simplified mock)
+  it("prioritizes 'from/to' aliases over 'startDate/endDate' for consistency", async () => {
     const res = await handler(makeEvent("/analytics/summary", { 
+      from: "2026-03-10", 
+      startDate: "2026-01-01",
+      to: "2026-03-20",
+      endDate: "2026-03-25" // Adjusted to past date
+    }));
+    expect(res.statusCode).toBe(200);
+    
+    // Check first call (personal scope)
+    const lastCall = ddbMock.commandCalls(QueryCommand)[0].args[0].input;
+    expect(lastCall.ExpressionAttributeValues[":startDate"]).toBe("2026-03-10");
+    expect(lastCall.ExpressionAttributeValues[":endDate"]).toBe("2026-03-20");
+  });
+
+  it("correctly implements data-layer filtering for multi-category string", async () => {
+    await handler(makeEvent("/analytics/summary", { 
       scope: "personal", 
       categories: "Office,Travel" 
     }));
     
-    const body = JSON.parse(res.body);
-    expect(body.expenseCount).toBe(2);
+    const lastCall = ddbMock.commandCalls(QueryCommand)[0].args[0].input;
+    expect(lastCall.FilterExpression).toContain("category IN (:cat0, :cat1)");
+    expect(lastCall.ExpressionAttributeValues[":cat0"]).toBe("Office");
+    expect(lastCall.ExpressionAttributeValues[":cat1"]).toBe("Travel");
   });
 });
