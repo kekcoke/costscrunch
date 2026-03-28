@@ -565,6 +565,13 @@ export class CostsCrunchStack extends Stack {
             environment: { ...sharedEnv },
         });
 
+        const profileLambda = new NodejsFunction(this, "ProfileLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/profile/index.ts"),
+            functionName: `${prefix}-profile`,
+            environment: { ...sharedEnv },
+        });
+
         const notificationsLambda = new NodejsFunction(this, "NotificationsLambda", {
             ...sharedLambdaProps as any,
             entry: path.resolve(__dirname, "../../backend/src/lambdas/notifications/index.ts"),
@@ -610,6 +617,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadWriteData(receiptsLambda);      // writes initial scan record
         table.grantReadWriteData(snsWebhookLambda);    // updates scan + expense records
         table.grantReadData(analyticsLambda);
+        table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
@@ -668,6 +676,7 @@ export class CostsCrunchStack extends Stack {
         kmsKey.grantEncryptDecrypt(receiptsLambda);
         kmsKey.grantEncryptDecrypt(snsWebhookLambda);
         kmsKey.grantEncryptDecrypt(groupsLambda);
+        kmsKey.grantEncryptDecrypt(profileLambda);
         kmsKey.grantEncryptDecrypt(wsNotifierLambda);
 
         // SSM Parameter Store: Bedrock model ID
@@ -970,6 +979,10 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/analytics/chartData", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/health", healthLambda);
 
+        // Profile
+        addRoute(apigwv2.HttpMethod.GET, "/profile", profileLambda);
+        addRoute(apigwv2.HttpMethod.PATCH, "/profile", profileLambda);
+
         // ── CloudFront Response Headers Policy (CORS for all /api/* responses) ──────
         // Adds CORS headers at the CDN layer — covers 4XX/5XX errors from API GW
         // that never reach Lambda, making per-handler CORS headers unnecessary.
@@ -1119,6 +1132,7 @@ export class CostsCrunchStack extends Stack {
             { fn: imagePreprocessLambda, timeout: 60 },
             { fn: receiptsLambda, timeout: 29 },
             { fn: analyticsLambda, timeout: 29 },
+            { fn: profileLambda, timeout: 29 },
             { fn: notificationsLambda, timeout: 29 },
             { fn: snsWebhookLambda, timeout: 29 },
             { fn: wsNotifierLambda, timeout: 29 }
