@@ -13,11 +13,13 @@ import {
   InitiateAuthCommand,
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
+  RespondToAuthChallengeCommand,
   type SignUpCommandInput,
   type ConfirmSignUpCommandInput,
   type InitiateAuthCommandInput,
   type ForgotPasswordCommandInput,
   type ConfirmForgotPasswordCommandInput,
+  type RespondToAuthChallengeCommandInput,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { Logger } from "@aws-lambda-powertools/logger";
 
@@ -135,10 +137,13 @@ export async function signInUser(input: SignInInput): Promise<AuthTokens> {
   try {
     const result = await cognito.send(new InitiateAuthCommand(params));
     const auth = result.AuthenticationResult;
+
     if (!auth?.AccessToken) {
       throw new AuthError("Authentication challenge not supported", 400, "ChallengePending");
     }
+
     logger.info("User signed in", { email: input.email });
+    
     return {
       accessToken: auth.AccessToken,
       idToken: auth.IdToken!,
@@ -146,17 +151,23 @@ export async function signInUser(input: SignInInput): Promise<AuthTokens> {
       expiresIn: auth.ExpiresIn!,
       tokenType: auth.TokenType ?? "Bearer",
     };
+
   } catch (error: any) {
+    
     if (error.name === "NotAuthorizedException") {
       throw new AuthError("Invalid credentials", 401, error.name);
     }
+    
     if (error.name === "UserNotConfirmedException") {
       throw new AuthError("User is not confirmed", 403, error.name);
     }
+    
     if (error.name === "UserNotFoundException") {
       throw new AuthError("Invalid credentials", 401, error.name);
     }
+    
     if (error instanceof AuthError) throw error;
+    
     logger.error("SignIn failed", { error, email: input.email });
     throw error;
   }
@@ -165,6 +176,7 @@ export async function signInUser(input: SignInInput): Promise<AuthTokens> {
 // ─── Refresh Token ────────────────────────────────────────────────────────────
 
 export async function refreshAuth(refreshToken: string): Promise<Omit<AuthTokens, "refreshToken">> {
+
   const params: InitiateAuthCommandInput = {
     AuthFlow: "REFRESH_TOKEN_AUTH",
     ClientId: CLIENT_ID,
@@ -235,6 +247,45 @@ export async function confirmPasswordReset(email: string, code: string, newPassw
       throw new AuthError("Confirmation code expired", 400, error.name);
     }
     logger.error("ConfirmForgotPassword failed", { error, email });
+    throw error;
+  }
+}
+
+// ─── MFA ──────────────────────────────────────────────────────────────────────
+
+export async function confirmMfa(email: string, code: string, session: string): Promise<AuthTokens> {
+  const params: RespondToAuthChallengeCommandInput = {
+    ChallengeName: "SOFTWARE_TOKEN_MFA",
+    ClientId: CLIENT_ID,
+    ChallengeResponses: {
+      USERNAME: email,
+      SOFTWARE_TOKEN_MFA_CODE: code,
+    },
+    Session: session,
+  };
+
+  try {
+    const result = await cognito.send(new RespondToAuthChallengeCommand(params));
+    const auth = result.AuthenticationResult;
+    if (!auth?.AccessToken) {
+      throw new AuthError("MFA verification failed", 401, "MfaFailed");
+    }
+    return {
+      accessToken: auth.AccessToken,
+      idToken: auth.IdToken!,
+      refreshToken: auth.RefreshToken!,
+      expiresIn: auth.ExpiresIn!,
+      tokenType: auth.TokenType ?? "Bearer",
+    };
+  } catch (error: any) {
+    if (error.name === "CodeMismatchException") {
+      throw new AuthError("Invalid MFA code", 400, error.name);
+    }
+    if (error.name === "ExpiredCodeException") {
+      throw new AuthError("MFA code expired", 400, error.name);
+    }
+    if (error instanceof AuthError) throw error;
+    logger.error("MFA verification failed", { error, email });
     throw error;
   }
 }

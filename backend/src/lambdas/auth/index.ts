@@ -10,6 +10,9 @@ import {
   confirmUserSignUp,
   signInUser,
   refreshAuth,
+  forgotPassword,
+  confirmPasswordReset,
+  confirmMfa,
   AuthError,
 } from "../../logic/authService.js";
 
@@ -114,6 +117,33 @@ export async function handler(event: LambdaEvent): Promise<LambdaResponse> {
           return error(400, "Missing required field: refreshToken");
         }
         const tokens = await refreshAuth(body.refreshToken);
+        return success(200, tokens);
+      }
+
+      case "POST /auth/forgot-password": {
+        const body = parseBody(event);
+        if (!body.email) {
+          return error(400, "Missing required field: email");
+        }
+        await forgotPassword(body.email);
+        return success(200, { message: "Password reset code sent" });
+      }
+
+      case "POST /auth/confirm-password": {
+        const body = parseBody(event);
+        if (!body.email || !body.code || !body.password) {
+          return error(400, "Missing required fields: email, code, password");
+        }
+        await confirmPasswordReset(body.email, body.code, body.password);
+        return success(200, { message: "Password reset successful" });
+      }
+
+      case "POST /auth/confirm-mfa": {
+        const body = parseBody(event);
+        if (!body.email || !body.code || !body.session) {
+          return error(400, "Missing required fields: email, code, session");
+        }
+        const tokens = await confirmMfa(body.email, body.code, body.session);
         return success(200, tokens);
       }
 

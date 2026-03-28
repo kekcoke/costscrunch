@@ -355,7 +355,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const id = ulid();
     const now = new Date().toISOString();
     const expense: Expense = {
-      ...buildExpenseKeys(auth.userId, id, { status: "submitted", category: body.category, date: body.date }),
+      ...buildExpenseKeys(auth.userId, id, { status: "submitted", category: body.category as any, date: body.date }),
       entityType: "EXPENSE",
       expenseId: id,
       ownerId: auth.userId,
@@ -363,7 +363,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
       amount: body.amount,
       currency: body.currency,
       amountUSD: body.amount,
-      category: body.category,
+      category: body.category as any,
       date: body.date,
       description: body.description,
       tags: body.tags ?? [],
