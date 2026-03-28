@@ -118,5 +118,23 @@ describe("AnalyticsRepository", () => {
         expect(sortedResult[0].amount).toBe(50);
         expect(sortedResult[1].amount).toBe(10);
     });
+
+    it("falls back to single category filter if categories list is missing", async () => {
+      ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+      await repo.getExpenses({
+        userId: "user-123",
+        scope: "personal",
+        startDate: "2023-01-01",
+        endDate: "2023-01-31",
+        category: "Food"
+      });
+
+      const input = ddbMock.commandCalls(QueryCommand)[0].args[0].input;
+      expect(input.FilterExpression).toContain("category = :category");
+      expect(input.ExpressionAttributeValues).toMatchObject({
+        ":category": "Food"
+      });
+    });
   });
 });
