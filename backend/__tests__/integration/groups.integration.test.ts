@@ -59,6 +59,17 @@ describe("Groups & Settlements Integration", () => {
     expect(verifyRes.data.status).toBe("reimbursed");
 
     // 6. Cleanup
-    await axios.delete(`${BASE_URL}/groups/${gid}`, { headers: AUTH_HEADERS });
+    console.log(`[TEST] DELETE URL: ${BASE_URL}/groups/${gid}`);
+    try {
+      const delRes = await axios.delete(`${BASE_URL}/groups/${gid}`, { headers: AUTH_HEADERS });
+      console.log(`[TEST] Delete success: ${delRes.status}`);
+    } catch (e: any) {
+      if (e.response) {
+        console.error(`[TEST] Delete failed: ${e.response.status}`, JSON.stringify(e.response.data));
+      } else {
+        console.error(`[TEST] Delete error:`, e.message);
+      }
+      throw e;
+    }
   });
 });
