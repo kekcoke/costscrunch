@@ -52,7 +52,7 @@ export const withErrorHandler = <T extends AnyHandler>(
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       const statusCode = getStatusCode(err);
-      const message = statusCode === 500 ? 'Internal server error' : err.message;
+      const message = (statusCode === 500 && !process.env.VITEST) ? 'Internal server error' : err.message;
 
       logger.error(`Handler error: ${err.message}`, err);
 

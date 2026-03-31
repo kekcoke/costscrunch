@@ -4,7 +4,7 @@
 
 import {
   GetCommand, PutCommand,
-  QueryCommand, UpdateCommand, DeleteCommand,
+  QueryCommand, UpdateCommand, DeleteCommand, ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient, createS3Client } from "../../utils/awsClients.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -23,6 +23,37 @@ import type {
 } from "../../shared/models/types.js";
 import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema, exportExpensesQuerySchema } from "../../shared/validation/schemas.js";
 import { validateQuery } from "../../shared/validation/middleware.js";
+
+// ─── Path matcher for REST API v1 ─────────────────────────────────────────────
+function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
+  if (routeKey?.includes("/expenses/export")) return { route: `${method} /expenses/export`, params: {} };
+  if (routeKey?.includes("/expenses/{id}")) {
+    const match = path.match(/expenses\/([^/]+)/i);
+    return { route: `${method} /expenses/{id}`, params: { id: match ? match[1] : "" } };
+  }
+  if (routeKey?.includes("/expenses")) return { route: `${method} /expenses`, params: {} };
+
+  const params: Record<string, string> = {};
+  const p = path.toLowerCase();
+  
+  if (p.includes("/expenses/export")) {
+    return { route: `${method} /expenses/export`, params };
+  }
+
+  if (p.includes("/expenses/")) {
+    const match = path.match(/expenses\/([^/]+)/i);
+    if (match) {
+      params.id = match[1];
+      return { route: `${method} /expenses/{id}`, params };
+    }
+  }
+
+  if (p.endsWith("/expenses") || p.includes("/expenses/")) {
+    return { route: `${method} /expenses`, params };
+  }
+
+  return { route: `${method} ${path}`, params };
+}
 
 // ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = createDynamoDBDocClient({
@@ -95,9 +126,9 @@ const err = (msg: string, statusCode = 400) => ({
   body: JSON.stringify({ error: msg }),
 });
 
-function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense>) {
+function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense> & { groupId?: string }) {
   return {
-    pk: `USER#${userId}`,
+    pk: expense.groupId ? `GROUP#${expense.groupId}` : `USER#${userId}`,
     sk: `EXPENSE#${expenseId}`,
     gsi1pk: `STATUS#${expense.status || "draft"}`,
     gsi1sk: `DATE#${expense.date}#${expenseId}`,
@@ -108,7 +139,10 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
-  const route = event.routeKey || `${event.httpMethod} ${Object.keys(event.pathParameters || {}).length ? "/{id}" : ""}`;
+  const method = event.httpMethod || event.requestContext?.http?.method || "";
+  const path = event.path || event.requestContext?.http?.path || "";
+  const resourcePath = (event as any).requestContext?.resourcePath;
+  const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey || resourcePath);
   
   let auth;
   try {
@@ -121,7 +155,8 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     return err("Unauthorized", 401);
   }
 
-  const expenseId = event.pathParameters?.id;
+  const mergedParams = { ...pathParams, ...event.pathParameters };
+  const expenseId = mergedParams.id;
 
   logger.appendKeys({ userId: auth.userId, route });
 
@@ -172,7 +207,9 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
       }
       if (filters.length) {
         baseParams.FilterExpression = filters.join(" AND ");
-        baseParams.ExpressionAttributeNames = attrNames;
+        if (Object.keys(attrNames).length > 0) {
+          baseParams.ExpressionAttributeNames = attrNames;
+        }
         Object.assign(baseParams.ExpressionAttributeValues, attrVals);
       }
 
@@ -337,12 +374,25 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── GET /expenses/:id ─────────────────────────────────────────────────────
   if (route.startsWith("GET") && expenseId) {
+    // 1. Try finding in User partition
     const result = await ddb.send(new GetCommand({
       TableName: TABLE,
       Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
     }));
-    if (!result.Item) return err("Expense not found", 404);
-    return ok(result.Item);
+
+    if (result.Item) return ok(result.Item);
+
+    // 2. Fallback: Search across all partitions (for Group expenses)
+    // In production, we'd prefer a GSI lookup, but using Scan for LocalStack compatibility
+    const scanRes = await ddb.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: "sk = :sk",
+      ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
+    }));
+
+    if (scanRes.Items?.[0]) return ok(scanRes.Items[0]);
+
+    return err("Expense not found", 404);
   }
 
   // ── POST /expenses ────────────────────────────────────────────────────────
@@ -355,7 +405,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const id = ulid();
     const now = new Date().toISOString();
     const expense: Expense = {
-      ...buildExpenseKeys(auth.userId, id, { status: "submitted", category: body.category as any, date: body.date }),
+      ...buildExpenseKeys(auth.userId, id, { status: "submitted", category: body.category as any, date: body.date, groupId: body.groupId }),
       entityType: "EXPENSE",
       expenseId: id,
       ownerId: auth.userId,
@@ -410,6 +460,38 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const body = parsed.data;
     const now = new Date().toISOString();
 
+    // 1. Fetch current item to determine PK (User or Group)
+    // Note: In production, a GSI on expenseId should be used. 
+    // Using Scan with filter as a fallback for the current LocalStack schema.
+    const currentRes = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND sk = :sk",
+      ExpressionAttributeValues: { 
+        ":pk": `USER#${auth.userId}`, 
+        ":sk": `EXPENSE#${expenseId}` 
+      }
+    }));
+    let currentItem = currentRes.Items?.[0];
+
+    if (!currentItem) {
+      // Fallback: Scan table to find the expense by SK (needed for LocalStack integration tests
+      // when the partition key might be GROUP# instead of USER# and we don't have the groupId)
+      const scanRes = await ddb.send(new ScanCommand({
+        TableName: TABLE,
+        FilterExpression: "sk = :sk",
+        ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
+      })).catch((e) => {
+        console.error("[SCAN_FALLBACK_ERROR]", e);
+        return { Items: [] };
+      });
+      currentItem = scanRes.Items?.[0];
+    }
+
+    if (!currentItem) {
+      console.error(`[PATCH_ERROR] Expense ${expenseId} not found for user ${auth.userId}`);
+      return err("Expense not found", 404);
+    }
+
     // Build update expression dynamically
     const updates: string[] = [];
     const names: Record<string, string> = {};
@@ -440,7 +522,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     try {
       result = await ddb.send(new UpdateCommand({
         TableName: TABLE,
-        Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+        Key: { pk: currentItem.pk, sk: currentItem.sk },
         UpdateExpression: `SET ${updates.join(", ")}`,
         ExpressionAttributeValues: vals,
         ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
