@@ -1,6 +1,7 @@
 // ─── CostsCrunch — RegisterPage ─────────────────────────────────────────────────
 import { useState } from "react";
-import { authApi } from "../helpers/auth-api";
+import { authApi } from "../services/api";
+import { guestSession } from "../helpers/guestSession";
 
 interface Props {
   onNavigate: (page: any) => void;
@@ -66,6 +67,13 @@ export default function RegisterPage({ onNavigate }: Props) {
     setLoading(true);
     try {
       await authApi.confirm(email, code);
+      
+      // Auto-login or just prompt for login? 
+      // If the backend /confirm doesn't return tokens, we stay on login path.
+      // But we can clear guest session here if we want the user to start fresh,
+      // or wait for the actual login. 
+      // Based on the plan, claiming happens after success.
+      
       onNavigate("login");
     } catch (err) {
       setErrors({ confirm: (err as Error).message });

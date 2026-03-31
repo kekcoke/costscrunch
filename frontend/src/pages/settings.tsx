@@ -1,6 +1,6 @@
 // ─── CostsCrunch — SettingsPage ──────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { profileApi } from "../services/api.js";
+import { profileApi, authApi } from "../services/api";
 
 export function SettingsPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -143,12 +143,72 @@ export function SettingsPage() {
             fontWeight: 600, 
             cursor: saving ? "not-allowed" : "pointer",
             opacity: saving ? 0.7 : 1,
-            transition: "opacity 0.2s"
+            transition: "opacity 0.2s",
+            marginBottom: "16px"
           }}
         >
           {saving ? "Saving Changes..." : "Save Changes"}
         </button>
       </form>
+
+      <div style={{ marginTop: "40px", borderTop: "1px solid var(--color-border)", paddingTop: "24px" }}>
+        <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "15px", color: "#f87171", marginBottom: "8px" }}>Danger Zone</div>
+        <p style={{ fontSize: "12px", color: "var(--color-text-dim)", marginBottom: "16px" }}>
+          Once you delete your account, there is no going back. Please be certain.
+        </p>
+        
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button 
+            onClick={async () => {
+              if (confirm("Are you sure you want to delete your account? This will archive your data and disable your login.")) {
+                try {
+                  await authApi.deleteAccount(profile.userId, profile.email);
+                  localStorage.clear();
+                  window.location.href = "/";
+                } catch (e: any) {
+                  alert("Failed to delete account: " + e.message);
+                }
+              }
+            }}
+            style={{ 
+              flex: 1,
+              background: "rgba(239, 68, 68, 0.1)", 
+              color: "#f87171", 
+              border: "1px solid rgba(239, 68, 68, 0.2)", 
+              borderRadius: "10px", 
+              padding: "10px", 
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            Delete Account
+          </button>
+
+          <button 
+            onClick={async () => {
+              try {
+                await authApi.logout();
+              } catch (e) {}
+              localStorage.clear();
+              window.location.href = "/";
+            }}
+            style={{ 
+              flex: 1,
+              background: "var(--color-surface-2)", 
+              color: "var(--color-text-muted)", 
+              border: "1px solid var(--color-border)", 
+              borderRadius: "10px", 
+              padding: "10px", 
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

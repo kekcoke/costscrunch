@@ -1,6 +1,7 @@
 // ─── CostsCrunch — LoginPage ────────────────────────────────────────────────────
 import { useState } from "react";
-import { authApi } from "../helpers/auth-api";
+import { authApi } from "../services/api";
+import { guestSession } from "../helpers/guestSession";
 
 interface Props {
   onNavigate: (page: any) => void;
@@ -57,6 +58,17 @@ export default function LoginPage({ onNavigate }: Props) {
     setLoading(true);
     try {
       await authApi.login(email, password);
+      
+      // Claim guest data if it exists
+      if (guestSession.exists()) {
+        try {
+          await authApi.claimData(guestSession.getOrCreate());
+          guestSession.clear();
+        } catch (claimErr) {
+          console.error("Failed to claim guest data:", claimErr);
+        }
+      }
+      
       onNavigate("dashboard");
     } catch (e: any) {
       // Check for MFA requirement

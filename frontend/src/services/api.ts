@@ -330,6 +330,36 @@ export const profileApi = {
 
 // ─── Authentication ───────────────────────────────────────────────────────────
 export const authApi = {
+  register: (email: string, password: string, name: string) =>
+    apiFetch<{ message: string; email: string; userSub: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+
+  confirm: (email: string, code: string) =>
+    apiFetch<{ message: string }>("/auth/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  login: async (email: string, password: string) => {
+    const tokens = await apiFetch<{
+      accessToken: string;
+      idToken: string;
+      refreshToken: string;
+      expiresIn: number;
+    }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    
+    // Store tokens for persistence
+    localStorage.setItem("cc_access_token", tokens.accessToken);
+    localStorage.setItem("cc_id_token", tokens.idToken);
+    localStorage.setItem("cc_refresh_token", tokens.refreshToken);
+    return tokens;
+  },
+
   forgotPassword: (email: string) =>
     apiFetch<{ message: string }>("/auth/forgot-password", {
       method: "POST",
@@ -342,8 +372,8 @@ export const authApi = {
       body: JSON.stringify({ email, code, password }),
     }),
 
-  confirmMfa: (email: string, code: string, session: string) =>
-    apiFetch<{
+  confirmMfa: async (email: string, code: string, session: string) => {
+    const tokens = await apiFetch<{
       accessToken: string;
       idToken: string;
       refreshToken: string;
@@ -351,7 +381,13 @@ export const authApi = {
     }>("/auth/confirm-mfa", {
       method: "POST",
       body: JSON.stringify({ email, code, session }),
-    }),
+    });
+
+    localStorage.setItem("cc_access_token", tokens.accessToken);
+    localStorage.setItem("cc_id_token", tokens.idToken);
+    localStorage.setItem("cc_refresh_token", tokens.refreshToken);
+    return tokens;
+  },
 
   deleteAccount: (userId: string, email: string) =>
     apiFetch<{ message: string }>("/auth/account", {
