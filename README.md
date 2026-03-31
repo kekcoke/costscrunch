@@ -52,6 +52,7 @@ costscrunch
 │   │   ├── lambdas/         # Service handlers (Groups, Expenses, Analytics, etc.)
 │   │   ├── logic/           # Domain logic & Repositories (DAL)
 │   │   ├── utils/           # Shared utilities (Structured Logger, Error Handler, etc.)
+│   │   ├── helpers/         # Domain helpers (Auth configuration, etc.)
 │   │   ├── _local/          # Local dev auth wrappers (mock authorizer)
 │   │   ├── shared/          # Domain models and common types
 │   │   └── server.ts        # Express-to-Lambda adapter for fast dev cycles
@@ -61,7 +62,7 @@ costscrunch
 │   ├── src/
 │   │   ├── components/      # UI Building blocks (Modals, Rows, Charts)
 │   │   ├── pages/           # Route containers and view logic
-│   │   ├── services/        # Type-safe API client (Amplify-integrated)
+│   │   ├── services/        # Type-safe API client (Cognito-proxy integrated)
 │   │   ├── stores/          # Zustand state management
 │   │   └── models/          # Frontend-specific type definitions
 │   └── vite.config.ts
@@ -354,6 +355,7 @@ Authentication (Public)
   POST   /auth/forgot-password        trigger reset email
   POST   /auth/confirm-password       complete reset
   POST   /auth/refresh                rotate access tokens
+  DELETE /auth/account                soft-delete (archive) account
 
 Authenticated (require Bearer JWT)
 
