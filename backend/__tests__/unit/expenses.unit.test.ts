@@ -403,7 +403,7 @@ describe("DELETE /expenses/{id}", () => {
     expect(JSON.parse(res.body)).toEqual({ deleted: true });
     expect(ddbMock).toHaveReceivedCommandWith(DeleteCommand, {
       Key: { pk: "USER#user-abc", sk: "EXPENSE#01HZ" },
-      ConditionExpression: "ownerId = :uid",
+      ConditionExpression: "attribute_exists(pk) AND ownerId = :uid",
     });
   });
 });
