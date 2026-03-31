@@ -52,6 +52,8 @@ costscrunch
 │   │   ├── lambdas/         # Service handlers (Groups, Expenses, Analytics, etc.)
 │   │   ├── logic/           # Domain logic & Repositories (DAL)
 │   │   ├── utils/           # Shared utilities (Structured Logger, Error Handler, etc.)
+│   │   ├── logic/           # Domain logic & Repositories (DAL)
+│   │   ├── utils/           # Shared utilities (Structured Logger, Error Handler, etc.)
 │   │   ├── helpers/         # Domain helpers (Auth configuration, etc.)
 │   │   ├── _local/          # Local dev auth wrappers (mock authorizer)
 │   │   ├── shared/          # Domain models and common types
@@ -61,7 +63,7 @@ costscrunch
 │   ├── __tests__/           # Component and Store unit tests (Vitest + RTL)
 │   ├── src/
 │   │   ├── components/      # UI Building blocks (Modals, Rows, Charts)
-│   │   ├── pages/           # Route containers and view logic
+│   │   ├── pages/           # Landing, Login, MFA, Password Reset containers
 │   │   ├── services/        # Type-safe API client (Cognito-proxy integrated)
 │   │   ├── stores/          # Zustand state management
 │   │   └── models/          # Frontend-specific type definitions
