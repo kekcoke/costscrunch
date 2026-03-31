@@ -29,7 +29,7 @@
      ├── ws-notifier/    Real-time WebSocket updates
      ├── analytics/      aggregations + trends (Decoupled DAL)
      ├── profile/        user account + settings management
-     ├── auth/           Custom Cognito Identity Flow (Login, MFA, Reset)
+     ├── auth/           Custom Cognito Identity Proxy (Registration, Login, MFA, Password Reset, Soft-Delete)
      ├── auth-trigger/   Post-confirmation DynamoDB profile automation
      ├── notifications/  SES + Pinpoint push/SMS
      └── health/         Monitoring + CI/CD smoke tests
@@ -63,8 +63,8 @@ costscrunch
 │   ├── __tests__/           # Component and Store unit tests (Vitest + RTL)
 │   ├── src/
 │   │   ├── components/      # UI Building blocks (Modals, Rows, Charts)
-│   │   ├── pages/           # Landing, Login, MFA, Password Reset containers
-│   │   ├── services/        # Type-safe API client (Cognito-proxy integrated)
+│   │   ├── pages/           # App Views (Landing, Login, Register, MFA, Password Reset, Dashboard)
+│   │   ├── services/        # Type-safe API client (Cognito-proxy & AWS SDK integrated)
 │   │   ├── stores/          # Zustand state management
 │   │   └── models/          # Frontend-specific type definitions
 │   └── vite.config.ts
