@@ -300,6 +300,9 @@ export const groupsApi = {
 
   delete: (id: string) =>
     apiFetch<{ deleted: boolean }>(`/groups/${id}`, { method: "DELETE" }),
+
+  join: (id: string) =>
+    apiFetch<{ joined: boolean; groupId: string }>(`/groups/${id}/join`, { method: "POST" }),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
