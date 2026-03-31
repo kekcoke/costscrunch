@@ -85,15 +85,19 @@ deploy_function() {
     "AWS_REGION": "us-east-1",
     "MOCK_AUTH": "true",
     "ENVIRONMENT": "dev",
+    "WS_CONNECTION_TABLE": "costscrunch-dev-connections",
     "TABLE_NAME_MAIN": "costscrunch-dev-main",
     "TABLE_NAME_CONNECTIONS": "costscrunch-dev-connections",
+    "WEBSOCKET_ENDPOINT": "http://localhost:4566/_aws/apigatewayv2/ws",
     "FROM_EMAIL": "noreply@costscrunch.dev",
     "BUCKET_UPLOADS_NAME": "costscrunch-dev-uploads-000000000000",
     "BUCKET_PROCESSED_NAME": "costscrunch-dev-processed-000000000000",
     "BUCKET_RECEIPTS_NAME": "costscrunch-dev-receipts-000000000000",
     "TEXTRACT_SNS_TOPIC_ARN": "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion",
     "TEXTRACT_ROLE_ARN": "arn:aws:iam::000000000000:role/test-role",
-    "EVENT_BUS_NAME": "costscrunch-dev-events"
+    "EVENT_BUS_NAME": "costscrunch-dev-events",
+    "WEBSOCKET_ENDPOINT": "http://localhost:4566/_aws/apigatewayv2/ws",
+    "TABLE_NAME_CONNECTIONS": "costscrunch-dev-connections"
   }
 }
 JSONEOF
@@ -114,7 +118,7 @@ JSONEOF
 
 # ── Lambda Functions ────────────────────────────────────────────────────────
 echo "📦 Deploying Lambda functions"
-for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "AuthTriggerFunction" "SnsWebhookFunction" "WsNotifierFunction" "HealthFunction"; do
+for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "AuthTriggerFunction" "SnsWebhookFunction" "WsNotifierFunction" "WsHandlerFunction" "HealthFunction"; do
   deploy_function "$FN" "index.handler"
   # Add global permission once per function to prevent redundant "updates" during route registration
   "${AWS_CMD[@]}" lambda add-permission --function-name "$FN" \
@@ -203,6 +207,7 @@ add_route /groups/{id}/balances GroupsFunction
 add_route /groups/{id}/members GroupsFunction
 add_route /groups/{id}/members/{userId} GroupsFunction
 add_route /groups/{id}/settle GroupsFunction
+add_route /groups/{id}/join GroupsFunction
 
 # Expenses (3 routes — sub-paths share one resource)
 add_route /expenses ExpensesFunction
