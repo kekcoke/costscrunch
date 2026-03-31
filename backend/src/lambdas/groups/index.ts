@@ -78,9 +78,11 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
 }
 
 function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
+  console.log(`[normalizeRoute] method=${method}, path=${path}, routeKey=${routeKey}`);
   const params: Record<string, string> = {};
   const cleanKey = routeKey?.replace(/^\$default\s+/, "") || "";
   const segments = path.split('/').filter(Boolean);
+  console.log(`[normalizeRoute] segments=${JSON.stringify(segments)}, cleanKey=${cleanKey}`);
 
   const gIdx = segments.findIndex(s => s.toLowerCase() === 'groups');
   const settleIdx = segments.findIndex(s => s.toLowerCase() === 'settle');
@@ -89,16 +91,19 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
   const membersIdx = segments.findIndex(s => s.toLowerCase() === 'members');
 
   if (gIdx !== -1) {
-    if (settleIdx > gIdx) params.id = segments[settleIdx - 1];
-    else if (joinIdx > gIdx) params.id = segments[joinIdx - 1];
-    else if (balancesIdx > gIdx) params.id = segments[balancesIdx - 1];
-    else if (membersIdx > gIdx) params.id = segments[membersIdx - 1];
-    else params.id = segments[gIdx + 1];
+    const nextSeg = segments[gIdx + 1];
+    if (nextSeg && !['settle', 'join', 'balances', 'members'].includes(nextSeg.toLowerCase())) {
+        params.id = nextSeg;
+    } else if (gIdx > 0 && segments[gIdx-1] !== 'restapis') {
+        // Fallback for cases where ID might be before 'groups' in some mangled paths
+        // but usually it's /groups/{id}/action
+    }
   }
 
   if (cleanKey.includes("/balances") || balancesIdx !== -1) return { route: "GET /groups/{id}/balances", params };
   if (cleanKey.includes("/settle") || settleIdx !== -1) return { route: "POST /groups/{id}/settle", params };
-  if (joinIdx !== -1) return { route: "POST /groups/{id}/join", params };
+  if (cleanKey.includes("/join") || joinIdx !== -1) return { route: "POST /groups/{id}/join", params };
+  
   if (membersIdx !== -1) {
     if (segments[membersIdx + 1]) {
       params.userId = segments[membersIdx + 1];
@@ -107,25 +112,38 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
     return { route: `${method} /groups/{id}/members`, params };
   }
 
-  if (params.id && params.id !== "groups") return { route: `${method} /groups/{id}`, params };
-  if (gIdx !== -1) return { route: `${method} /groups`, params: {} };
+  if (params.id && params.id !== "groups") return { route: `${method.toUpperCase()} /groups/{id}`, params };
+  if (gIdx !== -1 || cleanKey.includes("/groups")) {
+      // If we have a segment after /groups, it's an ID
+      if (segments[gIdx + 1]) {
+          params.id = segments[gIdx + 1];
+          return { route: `${method.toUpperCase()} /groups/{id}`, params };
+      }
+      return { route: `${method.toUpperCase()} /groups`, params: {} };
+  }
 
   return { route: routeKey || `${method} ${path}`, params };
 }
 
 export const rawHandler = async (event: ApiEvent) => {
-  const method = event.httpMethod || event.requestContext?.http?.method || "";
+  console.log(`[DEBUG] rawHandler called. routeKey: ${event.routeKey}, httpMethod: ${event.httpMethod}`);
+  const method = (event.httpMethod || event.requestContext?.http?.method || "").toUpperCase();
   const path = event.path || event.requestContext?.http?.path || "";
   const resourcePath = (event as any).requestContext?.resourcePath;
   const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey || resourcePath);
+  console.log(`[DEBUG] Parsed: method=${method}, path=${path}, route=${route}, params=${JSON.stringify(pathParams)}`);
   
+  if (process.env.VITEST || process.env.DEBUG_LOGS) {
+    console.log(`[DEBUG] Groups Route: "${route}", Params: ${JSON.stringify(pathParams)}, Method: ${method}, Path: ${path}`);
+  }
+
   let auth;
   try { auth = getAuth(event); } catch (e) { return err("Unauthorized", 401); }
 
   const mergedParams = { ...pathParams, ...event.pathParameters };
   const groupId = mergedParams.id;
 
-  if (route.includes("POST /groups") && (!groupId || groupId === "groups")) {
+  if (route === "POST /groups") {
     const bodyRaw = JSON.parse(event.body || "{}");
     const parsed = createGroupSchema.safeParse(bodyRaw);
     if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
@@ -147,7 +165,7 @@ export const rawHandler = async (event: ApiEvent) => {
     return ok(group, 201);
   }
 
-  if (route.includes("GET /groups") && (!groupId || groupId === "groups")) {
+  if (route === "GET /groups") {
     const result = await ddb.send(new QueryCommand({
       TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
       FilterExpression: "active <> :false", ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":prefix": "GROUP_MEMBER#", ":false": false }
@@ -155,23 +173,28 @@ export const rawHandler = async (event: ApiEvent) => {
     return ok({ items: result.Items || [] });
   }
 
-  if (route.includes("GET /groups/{id}") && groupId) {
+  if (route === "GET /groups/{id}") {
     const result = await ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } }));
     if (!result.Item) return err("Group not found", 404);
     return ok(result.Item);
   }
 
-  if (route.includes("/balances") && groupId) {
+  if (route === "GET /groups/{id}/balances") {
     const [groupRes, expRes] = await Promise.all([
       ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
       ddb.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)", ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" } }))
     ]);
-    if (!groupRes.Item) return err("Group not found", 404);
+    if (!groupRes.Item) {
+        console.error(`[BALANCES_ERROR] Group ${groupId} not found`);
+        return err("Group not found", 404);
+    }
     const balances = calculateBalances(expRes.Items || [], groupRes.Item.members || []);
-    return ok({ balances, settlements: minimizeTransactions(balances) });
+    const settlements = minimizeTransactions(balances);
+    console.log(`[DEBUG] Balances count: ${Object.keys(balances).length}, Settlements: ${settlements.length}`);
+    return ok({ balances, settlements });
   }
 
-  if (route.includes("/settle") && groupId) {
+  if (route === "POST /groups/{id}/settle") {
     const expRes = await ddb.send(new QueryCommand({
       TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
       ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" }
@@ -187,7 +210,77 @@ export const rawHandler = async (event: ApiEvent) => {
     return ok({ message: `Settled ${approved.length} expenses` });
   }
 
-  return err("Route not found", 404);
+  if (route === "POST /groups/{id}/join") {
+    const groupRes = await ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } }));
+    if (!groupRes.Item) return err("Group not found", 404);
+    const group = groupRes.Item as Group;
+    
+    if (group.members.some(m => m.userId === auth.userId)) {
+      return err("Already a member", 400);
+    }
+
+    const now = new Date().toISOString();
+    const newMember: GroupMember = {
+      userId: auth.userId,
+      name: auth.email.split('@')[0],
+      email: auth.email,
+      role: "member",
+      joinedAt: now,
+      totalSpend: 0,
+      balance: 0,
+    };
+
+    await transactWriteWithRetry(ddb, {
+      TransactItems: [
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+            UpdateExpression: "SET members = list_append(members, :m), memberCount = memberCount + :one, updatedAt = :now",
+            ExpressionAttributeValues: { ":m": [newMember], ":one": 1, ":now": now }
+          }
+        },
+        {
+          Put: {
+            TableName: TABLE,
+            Item: {
+              pk: `USER#${auth.userId}`,
+              sk: `GROUP_MEMBER#${groupId}`,
+              entityType: "GROUP_MEMBER",
+              groupId,
+              name: group.name,
+              userId: auth.userId,
+              role: "member",
+              joinedAt: now
+            }
+          }
+        }
+      ]
+    });
+    return ok({ joined: true, groupId });
+  }
+
+  if (route === "DELETE /groups/{id}") {
+    const [groupRes, expRes] = await Promise.all([
+      ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
+      ddb.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)", ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" } }))
+    ]);
+    if (!groupRes.Item) return err("Group not found", 404);
+    if (groupRes.Item.ownerId !== auth.userId) return err("Only owner can delete", 403);
+    const balances = calculateBalances(expRes.Items || [], groupRes.Item.members || []);
+    if (Object.values(balances).some(b => Math.abs(b) > 0.01)) return err("Outstanding balances", 400);
+    const now = new Date().toISOString();
+    await transactWriteWithRetry(ddb, {
+      TransactItems: [
+        { Update: { TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` }, UpdateExpression: "SET active = :false, deletedAt = :now", ExpressionAttributeValues: { ":false": false, ":now": now } } },
+        { Update: { TableName: TABLE, Key: { pk: `USER#${auth.userId}`, sk: `GROUP_MEMBER#${groupId}` }, UpdateExpression: "SET active = :false", ExpressionAttributeValues: { ":false": false } } }
+      ]
+    });
+    return ok({ deleted: true });
+  }
+
+  // Temporarily return the actual route to debug
+  return { statusCode: 500, body: JSON.stringify({ debug: true, route, groupId, path, routeKey: event.routeKey }), headers: { "Content-Type": "application/json" } };
 };
 
 export const handler = withLocalAuth(withErrorHandler(rawHandler));

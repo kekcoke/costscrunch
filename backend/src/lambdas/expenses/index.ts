@@ -444,13 +444,20 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
   // ── DELETE /expenses/:id ──────────────────────────────────────────────────
   if (route === "DELETE /expenses/{id}" && expenseId) {
-    await ddb.send(new DeleteCommand({
-      TableName: TABLE,
-      Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
-      ConditionExpression: "ownerId = :uid",
-      ExpressionAttributeValues: { ":uid": auth.userId }
-    }));
-    return ok({ deleted: true });
+    try {
+      await ddb.send(new DeleteCommand({
+        TableName: TABLE,
+        Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+        ConditionExpression: "attribute_exists(pk) AND ownerId = :uid",
+        ExpressionAttributeValues: { ":uid": auth.userId }
+      }));
+      return ok({ deleted: true });
+    } catch (e: any) {
+      if (e.name === "ConditionalCheckFailedException") {
+        return ok({ deleted: true, note: "not found or wrong owner" });
+      }
+      throw e;
+    }
   }
 
   return err("Route not found", 404);
