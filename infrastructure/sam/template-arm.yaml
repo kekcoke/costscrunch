@@ -73,6 +73,11 @@ Resources:
           Properties:
             Path: /groups/{id}/join
             Method: POST
+        DeleteGroup:
+          Type: Api
+          Properties:
+            Path: /groups/{id}
+            Method: DELETE
 
   ExpensesFunction:
     Type: AWS::Serverless::Function
