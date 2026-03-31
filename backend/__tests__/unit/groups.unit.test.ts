@@ -2,12 +2,10 @@ import { mockClient } from "aws-sdk-client-mock";
 import {
   DynamoDBDocumentClient,
   GetCommand,
-  PutCommand,
   QueryCommand,
   UpdateCommand,
-  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
@@ -15,8 +13,12 @@ import { rawHandler as handler } from "../../src/lambdas/groups/index.js";
 
 function makeEvent(overrides: Record<string, unknown> = {}) {
   const routeKey = (overrides.routeKey as string) || "GET /groups";
-  const path = (overrides.path as string) || routeKey.split(" ")[1] || "/groups";
+  let path = (overrides.path as string) || routeKey.split(" ")[1] || "/groups";
   
+  if (overrides.pathParameters && (overrides.pathParameters as any).id) {
+    path = path.replace("{id}", (overrides.pathParameters as any).id);
+  }
+
   return {
     version: "2.0",
     routeKey,
@@ -83,6 +85,7 @@ describe("Groups API Unit Tests", () => {
       
       const body = JSON.parse(res.body);
       expect(res.statusCode).toBe(200);
+      expect(body.balances).toBeDefined();
       expect(body.balances["user-owner"]).toBe(50);
       expect(body.balances["user-a"]).toBe(-50);
       expect(body.settlements[0]).toMatchObject({ from: "user-a", to: "user-owner", amount: 50 });

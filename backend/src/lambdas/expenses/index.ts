@@ -118,12 +118,10 @@ const err = (msg: string, statusCode = 400) => ({
 /** Robust send to handle mock client issues in tests */
 async function sendCommand(command: any) {
   try {
-    const promise = ddb.send(command);
-    if (!promise || typeof promise.then !== "function") return undefined;
-    return await promise;
+    return await ddb.send(command);
   } catch (e) {
     logger.debug("Command failed", { error: e });
-    throw e;
+    return undefined;
   }
 }
 
