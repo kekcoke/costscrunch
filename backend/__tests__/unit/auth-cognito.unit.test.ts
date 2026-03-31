@@ -3,6 +3,9 @@ import {
   SignUpCommand,
   ConfirmSignUpCommand,
   InitiateAuthCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
+  RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
 // vi.hoisted runs before vi.mock and imports — set env vars here
@@ -15,7 +18,14 @@ const { mockSend } = vi.hoisted(() => {
   };
 });
 
-const { MockSignUpCommand, MockConfirmSignUpCommand, MockInitiateAuthCommand } = vi.hoisted(() => {
+const { 
+  MockSignUpCommand, 
+  MockConfirmSignUpCommand, 
+  MockInitiateAuthCommand,
+  MockForgotPasswordCommand,
+  MockConfirmForgotPasswordCommand,
+  MockRespondToAuthChallengeCommand
+} = vi.hoisted(() => {
   function makeCmd(name: string) {
     const Cmd = function(this: any, input: any) { this.input = input; this._name = name; };
     Cmd.prototype.constructor = Cmd;
@@ -26,6 +36,9 @@ const { MockSignUpCommand, MockConfirmSignUpCommand, MockInitiateAuthCommand } =
     MockSignUpCommand: makeCmd("SignUpCommand") as any,
     MockConfirmSignUpCommand: makeCmd("ConfirmSignUpCommand") as any,
     MockInitiateAuthCommand: makeCmd("InitiateAuthCommand") as any,
+    MockForgotPasswordCommand: makeCmd("ForgotPasswordCommand") as any,
+    MockConfirmForgotPasswordCommand: makeCmd("ConfirmForgotPasswordCommand") as any,
+    MockRespondToAuthChallengeCommand: makeCmd("RespondToAuthChallengeCommand") as any,
   };
 });
 
@@ -34,6 +47,9 @@ vi.mock("@aws-sdk/client-cognito-identity-provider", () => ({
   SignUpCommand: MockSignUpCommand,
   ConfirmSignUpCommand: MockConfirmSignUpCommand,
   InitiateAuthCommand: MockInitiateAuthCommand,
+  ForgotPasswordCommand: MockForgotPasswordCommand,
+  ConfirmForgotPasswordCommand: MockConfirmForgotPasswordCommand,
+  RespondToAuthChallengeCommand: MockRespondToAuthChallengeCommand,
 }));
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
@@ -49,6 +65,9 @@ import {
   confirmUserSignUp,
   signInUser,
   refreshAuth,
+  forgotPassword,
+  confirmPasswordReset,
+  confirmMfa,
   AuthError,
 } from "../../src/logic/authService.js";
 
@@ -218,6 +237,16 @@ describe("Cognito auth service (PKCE — Lambda side)", () => {
       ).rejects.toThrow("Invalid credentials");
     });
 
+    it("throws AuthError on ResourceNotFoundException (user pool config error)", async () => {
+      const err = new Error("pool not found");
+      (err as any).name = "ResourceNotFoundException";
+      mockSend.mockRejectedValueOnce(err);
+
+      await expect(
+        signInUser({ email: "u@t.com", password: "P@ss1234!" }),
+      ).rejects.toThrow("pool not found");
+    });
+
     it("throws AuthError when no AccessToken returned (challenge pending)", async () => {
       mockSend.mockResolvedValueOnce({
         AuthenticationResult: {},
@@ -259,6 +288,56 @@ describe("Cognito auth service (PKCE — Lambda side)", () => {
       mockSend.mockRejectedValueOnce(err);
 
       await expect(refreshAuth("expired-token")).rejects.toThrow("Refresh token expired");
+    });
+  });
+
+  // ── Forgot Password ──────────────────────────────────────────────────────
+  describe("forgotPassword", () => {
+    it("calls ForgotPasswordCommand", async () => {
+      mockSend.mockResolvedValueOnce({});
+      await forgotPassword("user@t.com");
+      const cmd = mockSend.mock.calls[0][0];
+      expect(cmd.input.Username).toBe("user@t.com");
+    });
+
+    it("swallows UserNotFoundException to prevent enumeration", async () => {
+      const err = new Error("not found");
+      (err as any).name = "UserNotFoundException";
+      mockSend.mockRejectedValueOnce(err);
+      await expect(forgotPassword("ghost@t.com")).resolves.not.toThrow();
+    });
+  });
+
+  // ── Confirm Password Reset ───────────────────────────────────────────────
+  describe("confirmPasswordReset", () => {
+    it("calls ConfirmForgotPasswordCommand", async () => {
+      mockSend.mockResolvedValueOnce({});
+      await confirmPasswordReset("u@t.com", "123456", "NewPass123!");
+      const cmd = mockSend.mock.calls[0][0];
+      expect(cmd.input.Username).toBe("u@t.com");
+      expect(cmd.input.ConfirmationCode).toBe("123456");
+      expect(cmd.input.Password).toBe("NewPass123!");
+    });
+  });
+
+  // ── Confirm MFA ──────────────────────────────────────────────────────────
+  describe("confirmMfa", () => {
+    it("calls RespondToAuthChallengeCommand and returns tokens", async () => {
+      mockSend.mockResolvedValueOnce({
+        AuthenticationResult: {
+          AccessToken: "mfa-access",
+          IdToken: "mfa-id",
+          RefreshToken: "mfa-refresh",
+          ExpiresIn: 3600,
+        }
+      });
+
+      const res = await confirmMfa("u@t.com", "123456", "session-xyz");
+      expect(res.accessToken).toBe("mfa-access");
+      const cmd = mockSend.mock.calls[0][0];
+      expect(cmd.input.ChallengeName).toBe("SOFTWARE_TOKEN_MFA");
+      expect(cmd.input.ChallengeResponses.SOFTWARE_TOKEN_MFA_CODE).toBe("123456");
+      expect(cmd.input.Session).toBe("session-xyz");
     });
   });
 

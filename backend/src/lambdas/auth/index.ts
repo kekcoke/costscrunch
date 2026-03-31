@@ -155,7 +155,9 @@ export async function handler(event: LambdaEvent): Promise<LambdaResponse> {
       return error(err.statusCode, err.message);
     }
     logger.error("Unhandled auth error", { error: err });
-    return error(500, "Internal server error");
+    // In test environments, reveal the error message for easier troubleshooting
+    const msg = process.env.VITEST ? `Internal error: ${err.message}` : "Internal server error";
+    return error(500, msg);
   }
 }
 

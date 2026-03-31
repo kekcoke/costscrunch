@@ -25,8 +25,10 @@ import { Logger } from "@aws-lambda-powertools/logger";
 
 const logger = new Logger({ serviceName: "auth-service" });
 
-const USER_POOL_ID = process.env.USER_POOL_ID!;
-const CLIENT_ID = process.env.USER_POOL_CLIENT_ID!;
+const getPoolConfig = () => ({
+  UserPoolId: process.env.USER_POOL_ID!,
+  ClientId: process.env.USER_POOL_CLIENT_ID!,
+});
 
 /** Override endpoint for local cognito-local emulator */
 function createCognitoClient(): CognitoIdentityProviderClient {
@@ -55,8 +57,9 @@ export interface SignUpResult {
 }
 
 export async function signUpUser(input: SignUpInput): Promise<SignUpResult> {
+  const { ClientId } = getPoolConfig();
   const params: SignUpCommandInput = {
-    ClientId: CLIENT_ID,
+    ClientId,
     Username: input.email,
     Password: input.password,
     UserAttributes: [
@@ -88,8 +91,9 @@ export async function signUpUser(input: SignUpInput): Promise<SignUpResult> {
 // ─── Confirm Sign Up ──────────────────────────────────────────────────────────
 
 export async function confirmUserSignUp(email: string, code: string): Promise<void> {
+  const { ClientId } = getPoolConfig();
   const params: ConfirmSignUpCommandInput = {
-    ClientId: CLIENT_ID,
+    ClientId,
     Username: email,
     ConfirmationCode: code,
   };
@@ -125,9 +129,10 @@ export interface AuthTokens {
 }
 
 export async function signInUser(input: SignInInput): Promise<AuthTokens> {
+  const { ClientId } = getPoolConfig();
   const params: InitiateAuthCommandInput = {
     AuthFlow: "USER_PASSWORD_AUTH",
-    ClientId: CLIENT_ID,
+    ClientId,
     AuthParameters: {
       USERNAME: input.email,
       PASSWORD: input.password,
@@ -176,10 +181,10 @@ export async function signInUser(input: SignInInput): Promise<AuthTokens> {
 // ─── Refresh Token ────────────────────────────────────────────────────────────
 
 export async function refreshAuth(refreshToken: string): Promise<Omit<AuthTokens, "refreshToken">> {
-
+  const { ClientId } = getPoolConfig();
   const params: InitiateAuthCommandInput = {
     AuthFlow: "REFRESH_TOKEN_AUTH",
-    ClientId: CLIENT_ID,
+    ClientId,
     AuthParameters: {
       REFRESH_TOKEN: refreshToken,
     },
@@ -209,8 +214,9 @@ export async function refreshAuth(refreshToken: string): Promise<Omit<AuthTokens
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
 export async function forgotPassword(email: string): Promise<void> {
+  const { ClientId } = getPoolConfig();
   const params: ForgotPasswordCommandInput = {
-    ClientId: CLIENT_ID,
+    ClientId,
     Username: email,
   };
 
@@ -229,8 +235,9 @@ export async function forgotPassword(email: string): Promise<void> {
 }
 
 export async function confirmPasswordReset(email: string, code: string, newPassword: string): Promise<void> {
+  const { ClientId } = getPoolConfig();
   const params: ConfirmForgotPasswordCommandInput = {
-    ClientId: CLIENT_ID,
+    ClientId,
     Username: email,
     ConfirmationCode: code,
     Password: newPassword,
@@ -254,9 +261,10 @@ export async function confirmPasswordReset(email: string, code: string, newPassw
 // ─── MFA ──────────────────────────────────────────────────────────────────────
 
 export async function confirmMfa(email: string, code: string, session: string): Promise<AuthTokens> {
+  const { ClientId } = getPoolConfig();
   const params: RespondToAuthChallengeCommandInput = {
     ChallengeName: "SOFTWARE_TOKEN_MFA",
-    ClientId: CLIENT_ID,
+    ClientId,
     ChallengeResponses: {
       USERNAME: email,
       SOFTWARE_TOKEN_MFA_CODE: code,
