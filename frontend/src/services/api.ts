@@ -278,6 +278,9 @@ export const groupsApi = {
       settlements: Array<{ from: string; to: string; amount: number }>;
     }>(`/groups/${id}/balances`),
 
+  settle: (id: string) =>
+    apiFetch<{ message: string }>(`/groups/${id}/settle`, { method: "POST" }),
+
   addMember: (
     id: string,
     data: { email: string; name?: string; role?: string }

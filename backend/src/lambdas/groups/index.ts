@@ -334,6 +334,44 @@ export const rawHandler = async (event: ApiEvent) => {
     return ok({ balances, settlements, memberCount: group.memberCount });
   }
 
+  // ── POST /groups/:id/settle ───────────────────────────────────────────────
+  if (route === "POST /groups/{id}/settle" && groupId) {
+    // 1. Get all approved expenses for this group
+    const expensesRes = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      ExpressionAttributeValues: { 
+        ":pk": `GROUP#${groupId}`, 
+        ":prefix": "EXPENSE#" 
+      },
+    }));
+
+    const expenses = expensesRes.Items || [];
+    const approvedExpenses = expenses.filter(e => e.status === "approved");
+
+    if (approvedExpenses.length === 0) {
+      return err("No approved expenses to settle", 400);
+    }
+
+    // 2. Mark them as 'reimbursed' (settled)
+    // DynamoDB TransactWrite limited to 100 items, but for now we do them in batches or just update
+    const now = new Date().toISOString();
+    const updatePromises = approvedExpenses.map(exp => 
+      ddb.send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { pk: exp.pk, sk: exp.sk },
+        UpdateExpression: "SET #status = :s, updatedAt = :now",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":s": "reimbursed", ":now": now }
+      }))
+    );
+
+    await Promise.all(updatePromises);
+
+    metrics.addMetric("GroupSettled", MetricUnit.Count, 1);
+    return ok({ message: `Settled ${approvedExpenses.length} expenses` });
+  }
+
   // ── POST /groups/:id/members ──────────────────────────────────────────────
   if (route === "POST /groups/{id}/members" && groupId) {
     const bodyRaw = JSON.parse(event.body || "{}");

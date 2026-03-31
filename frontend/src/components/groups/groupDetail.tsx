@@ -9,6 +9,7 @@ import Modal from "../modal";
 export default function GroupDetail({ groupId, onBack }: { groupId: string, onBack: () => void }) {
   const { updateGroup: updateStoreGroup, deleteGroup: deleteStoreGroup } = useGroupStore();
   const [group, setGroup] = useState<Group | null>(null);
+  const [balances, setBalances] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
   // View State
@@ -27,16 +28,18 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   const [submitting, setSubmitting] = useState(false);
 
   const fetchGroup = () => {
-    groupsApi.get(groupId)
-      .then((data) => {
-        setGroup(data);
-        setEditForm({
-          name: data.name,
-          description: data.description || "",
-          color: data.color,
-        });
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      groupsApi.get(groupId),
+      groupsApi.getBalances(groupId)
+    ]).then(([groupData, balanceData]) => {
+      setGroup(groupData);
+      setBalances(balanceData);
+      setEditForm({
+        name: groupData.name,
+        description: groupData.description || "",
+        color: groupData.color,
+      });
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -97,6 +100,20 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
       }, 2000);
     } catch (err: any) {
       setStatus({ type: "error", msg: err.message || "Failed to delete group" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSettle = async () => {
+    if (!confirm("Are you sure? This will mark all currently approved expenses as settled/reimbursed.")) return;
+    setSubmitting(true);
+    try {
+      await groupsApi.settle(groupId);
+      setStatus({ type: "success", msg: "Group settled successfully!" });
+      fetchGroup();
+    } catch (err: any) {
+      setStatus({ type: "error", msg: err.message || "Settlement failed" });
     } finally {
       setSubmitting(false);
     }
@@ -223,6 +240,16 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
         
         <div style={{ display: "flex", gap: "10px" }}>
           <button 
+            onClick={handleSettle}
+            disabled={submitting}
+            style={{ 
+              background: "rgba(16, 185, 129, 0.1)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)", 
+              padding: "10px 18px", borderRadius: "10px", fontWeight: 600, cursor: "pointer"
+            }}
+          >
+            Settle Balances
+          </button>
+          <button 
             onClick={() => setIsEditing(true)}
             style={{ 
               background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)", 
@@ -254,7 +281,52 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
         </div>
       </div>
 
-      {/* Row 2: Members List */}
+      {/* Row 2: Balances & Settlements */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+        <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "18px", border: "1px solid var(--color-border-dim)" }}>
+          <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>📊</span> Current Balances
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {members.map(m => {
+              const bal = balances?.balances?.[m.userId] || 0;
+              return (
+                <div key={m.userId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{m.name}</span>
+                  <span style={{ 
+                    fontSize: "14px", 
+                    fontWeight: 700, 
+                    color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "var(--color-text-dim)" 
+                  }}>
+                    {bal > 0 ? "+" : ""}{bal.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "18px", border: "1px solid var(--color-border-dim)" }}>
+          <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🤝</span> Settlement Plan
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {balances?.settlements?.length === 0 ? (
+              <div style={{ fontSize: "13px", color: "var(--color-text-dim)", fontStyle: "italic" }}>All settled!</div>
+            ) : balances?.settlements?.map((s: any, i: number) => {
+              const fromName = members.find(m => m.userId === s.from)?.name || "Unknown";
+              const toName = members.find(m => m.userId === s.to)?.name || "Unknown";
+              return (
+                <div key={i} style={{ fontSize: "13px", background: "var(--color-surface-2)", padding: "10px", borderRadius: "8px" }}>
+                  <strong>{fromName}</strong> pays <strong>{toName}</strong> <span style={{ color: "#38bdf8", fontWeight: 700 }}>${s.amount.toFixed(2)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Row 3: Members List */}
       <div style={{ background: "var(--color-surface)", padding: "24px", borderRadius: "18px", border: "1px solid var(--color-border-dim)" }}>
         <h3 style={{ fontSize: "16px", marginBottom: "16px" }}>Group Members</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
