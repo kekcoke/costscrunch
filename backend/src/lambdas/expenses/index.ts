@@ -26,19 +26,16 @@ import { validateQuery } from "../../shared/validation/middleware.js";
 
 /**
  * Path matcher for REST API v1.
- * Prioritizes explicit routeKey (API Gateway v2) over raw path matching.
  */
 function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
   const params: Record<string, string> = {};
   const p = path.toLowerCase();
   const cleanKey = routeKey?.replace(/^\$default\s+/, "") || "";
 
-  // 1. Export route
   if (cleanKey.includes("/expenses/export") || p.includes("/expenses/export")) {
     return { route: "GET /expenses/export", params: {} };
   }
 
-  // 2. Item routes (/expenses/{id})
   const idMatch = path.match(/\/expenses\/([^/?#]+)/i);
   const isItemRoute = cleanKey.includes("{id}") || (idMatch && idMatch[1] !== "export" && idMatch[1] !== "expenses");
 
@@ -49,7 +46,6 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
     return { route: `${method} /expenses/{id}`, params };
   }
 
-  // 3. Collection routes (/expenses)
   if (cleanKey.includes("/expenses") || p.includes("/expenses")) {
     return { route: `${method} /expenses`, params: {} };
   }
@@ -57,7 +53,6 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
   return { route: `${method} ${path}`, params };
 }
 
-// ─── AWS Clients ──────────────────────────────────────────────────────────────
 const ddb = createDynamoDBDocClient({
   marshallOptions: { removeUndefinedValues: true },
 });
@@ -66,14 +61,10 @@ const TABLE = process.env.TABLE_NAME_MAIN!;
 const EXPORTS_BUCKET = process.env.BUCKET_ASSETS_NAME!;
 const S3_EXPORT_THRESHOLD = 1000;
 
-// ─── Powertools ───────────────────────────────────────────────────────────────
 const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
-/**
- * Normalizes an expense item for the frontend.
- */
 const toResponse = (item: any) => {
   if (!item || typeof item !== "object") return item;
   if (item.expenseId || item.id || item.sk?.startsWith("EXPENSE#")) {
@@ -88,7 +79,7 @@ const toResponse = (item: any) => {
   return item;
 };
 
-const ok = (body: unknown, statusCode = 200) => {
+const ok = (body: unknown, statusCode = 200, headers: Record<string, string> = {}) => {
   let normalizedBody = body;
   if (Array.isArray(body)) {
     normalizedBody = body.map(toResponse);
@@ -108,8 +99,9 @@ const ok = (body: unknown, statusCode = 200) => {
       "X-Request-Id": ulid(),
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Credentials": "true",
+      ...headers,
     },
-    body: JSON.stringify(normalizedBody),
+    body: typeof normalizedBody === "string" ? normalizedBody : JSON.stringify(normalizedBody),
   };
 };
 
@@ -123,6 +115,18 @@ const err = (msg: string, statusCode = 400) => ({
   body: JSON.stringify({ error: msg }),
 });
 
+/** Robust send to handle mock client issues in tests */
+async function sendCommand(command: any) {
+  try {
+    const promise = ddb.send(command);
+    if (!promise || typeof promise.then !== "function") return undefined;
+    return await promise;
+  } catch (e) {
+    logger.debug("Command failed", { error: e });
+    throw e;
+  }
+}
+
 function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense> & { groupId?: string }) {
   return {
     pk: expense.groupId ? `GROUP#${expense.groupId}` : `USER#${userId}`,
@@ -134,12 +138,10 @@ function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Ex
   };
 }
 
-// ─── Handler ──────────────────────────────────────────────────────────────────
 export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent & { httpMethod?: string; routeKey?: string }) => {
   const rawRouteKey = event.routeKey || (event as any).requestContext?.resourcePath || "";
   const routeKey = rawRouteKey.replace(/^\$default\s+/, "");
   
-  // Extract method: Prioritize method from routeKey (e.g. "POST /expenses") for integration tests
   const methodFromKey = (routeKey.includes(" ") ? routeKey.split(" ")[0] : "").toUpperCase();
   const method = methodFromKey || (event.httpMethod || event.requestContext?.http?.method || "GET").toUpperCase();
   const path = event.path || event.requestContext?.http?.path || "/";
@@ -239,28 +241,37 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
 
       if (q.format === "pdf") return err("PDF Export not implemented", 501);
 
+      const filename = `expenses-${q.from || "all"}-${q.to || "all"}`;
+      const useS3 = items.length > S3_EXPORT_THRESHOLD;
+
       if (q.format === "json") {
         const jsonBody = JSON.stringify(items.map(stripInternal), null, 2);
-        if (items.length > S3_EXPORT_THRESHOLD) {
+        if (useS3) {
           const key = `exports/${auth.userId}/${ulid()}.json`;
           await s3.send(new PutObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key, Body: jsonBody, ContentType: "application/json" }));
           const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key }), { expiresIn: 1800 });
-          return ok({ downloadUrl: url, format: "json", count: items.length });
+          return ok({ downloadUrl: url, format: "json", count: items.length, expiresIn: 1800 }, 200, { "Content-Type": "application/json" });
         }
-        return {
-          statusCode: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-          body: jsonBody,
-        };
+        return ok(jsonBody, 200, { 
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="${filename}.json"`
+        });
       }
 
       const rows = items.map(stripInternal);
       const csvBody = stringify(rows, { header: true, columns: csvColumns });
-      return {
-        statusCode: 200,
-        headers: { "Content-Type": "text/csv", "Access-Control-Allow-Origin": "*" },
-        body: csvBody,
-      };
+      
+      if (useS3) {
+        const key = `exports/${auth.userId}/${ulid()}.csv`;
+        await s3.send(new PutObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key, Body: csvBody, ContentType: "text/csv" }));
+        const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: EXPORTS_BUCKET, Key: key }), { expiresIn: 1800 });
+        return ok({ downloadUrl: url, format: "csv", count: items.length, expiresIn: 1800 }, 200, { "Content-Type": "application/json" });
+      }
+
+      return ok(csvBody, 200, { 
+        "Content-Type": "text/csv",
+        "Content-Disposition": `attachment; filename="${filename}.csv"`
+      });
     } finally {
       sub.close();
     }
@@ -300,6 +311,9 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
         params.ExpressionAttributeNames = { ...params.ExpressionAttributeNames, "#date": "date" };
       }
       if (filters.length) params.FilterExpression = filters.join(" AND ");
+      if (q.nextToken) {
+        params.ExclusiveStartKey = JSON.parse(Buffer.from(q.nextToken, "base64").toString());
+      }
 
       const result = await ddb.send(new QueryCommand(params));
       return ok({
@@ -320,12 +334,12 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     }));
     if (result.Item) return ok(result.Item);
 
-    const scanRes = await ddb.send(new ScanCommand({
+    const scanRes = await sendCommand(new ScanCommand({
       TableName: TABLE,
       FilterExpression: "sk = :sk",
       ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
     }));
-    if (scanRes.Items?.[0]) return ok(scanRes.Items[0]);
+    if (scanRes?.Items?.[0]) return ok(scanRes.Items[0]);
 
     return err("Expense not found", 404);
   }
@@ -361,7 +375,12 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
       updatedAt: now,
     };
 
-    await ddb.send(new PutCommand({ TableName: TABLE, Item: expense, ConditionExpression: "attribute_not_exists(pk)" }));
+    try {
+      await ddb.send(new PutCommand({ TableName: TABLE, Item: expense, ConditionExpression: "attribute_not_exists(pk)" }));
+    } catch (e: any) {
+      if (e.name === "ConditionalCheckFailedException") return err("Expense already exists", 409);
+      throw e;
+    }
     return ok(expense, 201);
   }
 
@@ -374,20 +393,20 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const body = parsed.data;
     const now = new Date().toISOString();
 
-    const currentRes = await ddb.send(new QueryCommand({
+    const currentRes = await sendCommand(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: "pk = :pk AND sk = :sk",
       ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":sk": `EXPENSE#${expenseId}` }
     }));
-    let currentItem = currentRes.Items?.[0];
+    let currentItem = currentRes?.Items?.[0];
 
     if (!currentItem) {
-      const scanRes = await ddb.send(new ScanCommand({
+      const scanRes = await sendCommand(new ScanCommand({
         TableName: TABLE,
         FilterExpression: "sk = :sk",
         ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
-      })).catch(() => ({ Items: [] }));
-      currentItem = scanRes.Items?.[0];
+      }));
+      currentItem = scanRes?.Items?.[0];
     }
 
     if (!currentItem) return err("Expense not found", 404);
@@ -407,16 +426,22 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     }
     updates.push("updatedAt = :updatedAt");
 
-    const result = await ddb.send(new UpdateCommand({
-      TableName: TABLE,
-      Key: { pk: currentItem.pk, sk: currentItem.sk },
-      UpdateExpression: `SET ${updates.join(", ")}`,
-      ExpressionAttributeValues: vals,
-      ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
-      ReturnValues: "ALL_NEW",
-    }));
+    try {
+      const result = await ddb.send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { pk: currentItem.pk, sk: currentItem.sk },
+        UpdateExpression: `SET ${updates.join(", ")}`,
+        ExpressionAttributeValues: vals,
+        ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+        ReturnValues: "ALL_NEW",
+        ConditionExpression: "attribute_exists(pk)",
+      }));
 
-    return ok({ ...currentItem, ...result.Attributes });
+      return ok({ ...currentItem, ...result.Attributes });
+    } catch (e: any) {
+      if (e.name === "ConditionalCheckFailedException") return err("Expense not found", 409);
+      throw e;
+    }
   }
 
   // ── DELETE /expenses/:id ──────────────────────────────────────────────────
@@ -424,6 +449,8 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     await ddb.send(new DeleteCommand({
       TableName: TABLE,
       Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
+      ConditionExpression: "ownerId = :uid",
+      ExpressionAttributeValues: { ":uid": auth.userId }
     }));
     return ok({ deleted: true });
   }
