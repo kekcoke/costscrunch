@@ -295,6 +295,38 @@ export const profileApi = {
     }),
 };
 
+// ─── Authentication ───────────────────────────────────────────────────────────
+export const authApi = {
+  forgotPassword: (email: string) =>
+    apiFetch<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  confirmPassword: (email: string, code: string, password: string) =>
+    apiFetch<{ message: string }>("/auth/confirm-password", {
+      method: "POST",
+      body: JSON.stringify({ email, code, password }),
+    }),
+
+  confirmMfa: (email: string, code: string, session: string) =>
+    apiFetch<{
+      accessToken: string;
+      idToken: string;
+      refreshToken: string;
+      expiresIn: number;
+    }>("/auth/confirm-mfa", {
+      method: "POST",
+      body: JSON.stringify({ email, code, session }),
+    }),
+
+  deleteAccount: (userId: string, email: string) =>
+    apiFetch<{ message: string }>("/auth/account", {
+      method: "DELETE",
+      body: JSON.stringify({ userId, email }),
+    }),
+};
+
 // ─── React Query hook patterns (wire up when ready) ───────────────────────────
 //
 // import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";

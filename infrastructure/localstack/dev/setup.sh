@@ -439,6 +439,17 @@ echo "  ↳ Mock client ID: $MOCK_CLIENT_ID"
 echo "  ↳ Test user sub:  $MOCK_USER_SUB"
 echo "✅ Cognito mock ready"
 
+# ── Cognito Emulator (cognito-local) ──────────────────────────────────────────
+# If COGNITO_ENDPOINT is set, attempt to provision real local pool/client
+if [ -n "${COGNITO_ENDPOINT:-}" ]; then
+  echo "📦 Provisioning real local Cognito via emulator: $COGNITO_ENDPOINT"
+  
+  # Note: This requires the provision-local-cognito.js script or similar 
+  # logic to be available in the seeding environment.
+  # For now, we rely on the host-side provisioning script to set 
+  # the .cognito_* files which the lambdas read.
+fi
+
 # ── SES ───────────────────────────────────────────────────────────────────────
 echo "📦 Verifying SES email identity: noreply@costscrunch.dev"
 $AWS ses verify-email-identity \
@@ -679,7 +690,7 @@ for SUB in "${!USERS[@]}"; do
       "plan":      {"S": "'"$PLAN"'"},
       "notificationPreferences": {"M": {
         "email":           {"BOOL": true},
-        "push":            {"BOOL": false},
+        "push":            {"BOOL": true},
         "sms":             {"BOOL": false},
         "digestFrequency": {"S": "weekly"}
       }},

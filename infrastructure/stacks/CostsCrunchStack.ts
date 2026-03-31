@@ -477,8 +477,8 @@ export class CostsCrunchStack extends Stack {
             BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
-            USER_POOL_ID: userPool.userPoolId,
-            USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+            // USER_POOL_ID and USER_POOL_CLIENT_ID are injected into specific lambdas 
+            // after the UserPool is defined to avoid cyclic dependencies during synthesis.
             POWERTOOLS_SERVICE_NAME: "costscrunch",
             LOG_LEVEL: isProd ? "INFO" : "DEBUG",
             ENVIRONMENT: environment,
@@ -610,6 +610,34 @@ export class CostsCrunchStack extends Stack {
             },
         });
 
+        // ── Auth Trigger Lambda (post-confirmation) ─────────────────────────────
+        // Triggered after user sign-up confirmation to create initial user profile in DynamoDB.
+        const authTriggerLambda = new NodejsFunction(this, "AuthTriggerLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/auth-trigger/post-confirmation.ts"),
+            functionName: `${prefix}-auth-trigger`,
+            environment: { ...sharedEnv },
+            logRetention: logs.RetentionDays.ONE_WEEK,
+        });
+
+        // ── Auth Lambda (Login, Register, MFA, Password Reset) ──────────────────
+        const authLambda = new NodejsFunction(this, "AuthLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/auth/index.ts"),
+            functionName: `${prefix}-auth`,
+            environment: { 
+                ...sharedEnv,
+                USER_POOL_ID: userPool.userPoolId,
+                USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+            },
+        });
+
+        // Wire the auth trigger into the already-deployed UserPool via L1 construct
+        const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
+        cfnUserPool.lambdaConfig = {
+            postConfirmation: authTriggerLambda.functionName,
+        };
+
         // ── IAM Permissions ──────────────────────────────────────────────────────
         // Main table
         table.grantReadWriteData(expensesLambda);
@@ -619,6 +647,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadData(analyticsLambda);
         table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
+        table.grantWriteData(authTriggerLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
         connTable.grantReadWriteData(wsNotifierLambda);
@@ -678,6 +707,7 @@ export class CostsCrunchStack extends Stack {
         kmsKey.grantEncryptDecrypt(groupsLambda);
         kmsKey.grantEncryptDecrypt(profileLambda);
         kmsKey.grantEncryptDecrypt(wsNotifierLambda);
+        kmsKey.grantEncryptDecrypt(authTriggerLambda);
 
         // SSM Parameter Store: Bedrock model ID
         bedrockModelIdParam.grantRead(snsWebhookLambda);
@@ -983,6 +1013,43 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/profile", profileLambda);
         addRoute(apigwv2.HttpMethod.PATCH, "/profile", profileLambda);
 
+        // Auth
+        api.addRoutes({
+            path: "/auth/register",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthRegIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/confirm",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthConfIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/login",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthLogIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/refresh",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthRefIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/forgot-password",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthForgIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/confirm-password",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthCPwdIntegration", authLambda),
+        });
+        api.addRoutes({
+            path: "/auth/confirm-mfa",
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthMfaIntegration", authLambda),
+        });
+
         // ── CloudFront Response Headers Policy (CORS for all /api/* responses) ──────
         // Adds CORS headers at the CDN layer — covers 4XX/5XX errors from API GW
         // that never reach Lambda, making per-handler CORS headers unnecessary.
@@ -1135,7 +1202,9 @@ export class CostsCrunchStack extends Stack {
             { fn: profileLambda, timeout: 29 },
             { fn: notificationsLambda, timeout: 29 },
             { fn: snsWebhookLambda, timeout: 29 },
-            { fn: wsNotifierLambda, timeout: 29 }
+            { fn: wsNotifierLambda, timeout: 29 },
+            { fn: authTriggerLambda, timeout: 29 },
+            { fn: authLambda, timeout: 29 }
         ];
 
         const errorRateThreshold = alarmThreshold.errorRate;

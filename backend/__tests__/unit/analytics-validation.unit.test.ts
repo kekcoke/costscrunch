@@ -76,8 +76,8 @@ describe("Analytics Edge Cases & Validation", () => {
     
     // Check first call (personal scope)
     const lastCall = ddbMock.commandCalls(QueryCommand)[0].args[0].input;
-    expect(lastCall.ExpressionAttributeValues[":startDate"]).toBe("2026-03-10");
-    expect(lastCall.ExpressionAttributeValues[":endDate"]).toBe("2026-03-20");
+    expect(lastCall.ExpressionAttributeValues?.[":startDate"]).toBe("2026-03-10");
+    expect(lastCall.ExpressionAttributeValues?.[":endDate"]).toBe("2026-03-20");
   });
 
   it("correctly implements data-layer filtering for multi-category string", async () => {
@@ -88,7 +88,7 @@ describe("Analytics Edge Cases & Validation", () => {
     
     const lastCall = ddbMock.commandCalls(QueryCommand)[0].args[0].input;
     expect(lastCall.FilterExpression).toContain("category IN (:cat0, :cat1)");
-    expect(lastCall.ExpressionAttributeValues[":cat0"]).toBe("Office");
-    expect(lastCall.ExpressionAttributeValues[":cat1"]).toBe("Travel");
+    expect(lastCall.ExpressionAttributeValues?.[":cat0"]).toBe("Office");
+    expect(lastCall.ExpressionAttributeValues?.[":cat1"]).toBe("Travel");
   });
 });

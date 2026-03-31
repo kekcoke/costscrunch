@@ -529,12 +529,12 @@ describe("DELETE /groups/{id}", () => {
     const transactItems = ddbMock.commandCalls(TransactWriteCommand)[0].args[0].input.TransactItems;
     
     // Check Profile update
-    const profileUpdate = transactItems.find((i: any) => i.Update?.Key.sk === `PROFILE#${groupId}`);
-    expect(profileUpdate.Update.UpdateExpression).toContain("active = :false");
+    const profileUpdate = transactItems?.find((i: any) => i.Update?.Key.sk === `PROFILE#${groupId}`);
+    expect(profileUpdate?.Update?.UpdateExpression).toContain("active = :false");
     
     // Check Member update
-    const memberUpdate = transactItems.find((i: any) => i.Update?.Key.sk === `GROUP_MEMBER#${groupId}`);
-    expect(memberUpdate.Update.UpdateExpression).toContain("active = :false");
+    const memberUpdate = transactItems?.find((i: any) => i.Update?.Key.sk === `GROUP_MEMBER#${groupId}`);
+    expect(memberUpdate?.Update?.UpdateExpression).toContain("active = :false");
   });
 
   it("fails if requester is not the owner", async () => {

@@ -1,4 +1,4 @@
-// ─── SpendLens — HorizontalBarChart ──────────────────────────────────────────
+// ─── CostsCrunch — HorizontalBarChart ──────────────────────────────────────────
 // Tests verify:
 //   - role="img" aria-label=/horizontal bar chart/i
 //   - X-axis label "Amount (USD)"

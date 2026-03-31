@@ -1,4 +1,4 @@
-// ─── SpendLens — StackedBarChart ─────────────────────────────────────────────
+// ─── CostsCrunch — StackedBarChart ─────────────────────────────────────────────
 import { useMemo, useState } from "react";
 import { fmt } from "../../helpers/utils.js";
 import { CATEGORIES, type Category } from "../../models/constants.js";

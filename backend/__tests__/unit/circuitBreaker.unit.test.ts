@@ -178,7 +178,7 @@ describe("OPEN → HALF_OPEN", () => {
     advance(30_000); // → HALF_OPEN
 
     // First call is the probe — use a pending promise to hold the slot
-    let resolveProbe: () => void;
+    let resolveProbe: (value: string | PromiseLike<string>) => void;
     const probePromise = new Promise<string>(r => { resolveProbe = r; });
     const probeCall = breaker.execute(() => probePromise);
 
@@ -187,7 +187,7 @@ describe("OPEN → HALF_OPEN", () => {
     await expect(breaker.execute(ok)).rejects.toThrow(/probe limit/);
 
     // Resolve the probe
-    resolveProbe!();
+    resolveProbe!("ok");
     await probeCall;
     expect(breaker._getState().state).toBe(CircuitState.CLOSED);
   });

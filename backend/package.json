@@ -30,6 +30,7 @@
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1004.0",
     "@aws-sdk/client-bedrock-runtime": "^3.635.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.1007.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1019.0",
     "@aws-sdk/client-dynamodb": "^3.635.0",
     "@aws-sdk/client-eventbridge": "^3.635.0",
     "@aws-sdk/client-iam": "^3.1007.0",

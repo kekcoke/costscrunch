@@ -1,4 +1,4 @@
-// ─── SpendLens — BubbleChart ─────────────────────────────────────────────────
+// ─── CostsCrunch — BubbleChart ─────────────────────────────────────────────────
 import { useMemo, useState } from "react";
 import { fmt, fmtDate } from "../../helpers/utils";
 import { CATEGORIES, type Category } from "../../models/constants";

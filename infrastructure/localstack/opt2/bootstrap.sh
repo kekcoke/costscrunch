@@ -114,7 +114,7 @@ JSONEOF
 
 # ── Lambda Functions ────────────────────────────────────────────────────────
 echo "📦 Deploying Lambda functions"
-for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "SnsWebhookFunction" "WsNotifierFunction" "HealthFunction"; do
+for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "AuthTriggerFunction" "SnsWebhookFunction" "WsNotifierFunction" "HealthFunction"; do
   deploy_function "$FN" "index.handler"
   # Add global permission once per function to prevent redundant "updates" during route registration
   "${AWS_CMD[@]}" lambda add-permission --function-name "$FN" \
