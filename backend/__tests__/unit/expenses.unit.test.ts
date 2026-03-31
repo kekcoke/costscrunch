@@ -504,6 +504,45 @@ describe("GET /expenses/export", () => {
     expect(call.args[0].input.FilterExpression).toContain("#date <=");
   });
 
+  it("filters by category and status in export", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    await handler(makeExportEvent({ category: "Travel", status: "approved" }));
+
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    const filter = call.args[0].input.FilterExpression;
+    expect(filter).toContain("category = :category");
+    expect(filter).toContain("#status = :status");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":category"]).toBe("Travel");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":status"]).toBe("approved");
+  });
+
+  it("filters by category and status in export", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    await handler(makeExportEvent({ category: "Travel", status: "approved" }));
+
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    const filter = call.args[0].input.FilterExpression;
+    expect(filter).toContain("category = :category");
+    expect(filter).toContain("#status = :status");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":category"]).toBe("Travel");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":status"]).toBe("approved");
+  });
+
+  it("filters by category and status in export", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
+
+    await handler(makeExportEvent({ category: "Travel", status: "approved" }));
+
+    const call = ddbMock.commandCalls(QueryCommand)[0];
+    const filter = call.args[0].input.FilterExpression;
+    expect(filter).toContain("category = :category");
+    expect(filter).toContain("#status = :status");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":category"]).toBe("Travel");
+    expect(call.args[0].input.ExpressionAttributeValues?.[":status"]).toBe("approved");
+  });
+
   it("switches to GROUP# partition when groupId is provided", async () => {
     ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
 
