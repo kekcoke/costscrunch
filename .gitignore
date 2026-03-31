@@ -194,6 +194,7 @@ layers/
 scripts/seed-output/
 *.dynamo-local/
 dynamodb-local-data/
+.cognito/db/
 
 
 # ─── Generated API clients ────────────────────────────────────────────────────
