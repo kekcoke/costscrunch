@@ -319,6 +319,12 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ email, code, session }),
     }),
+
+  deleteAccount: (userId: string, email: string) =>
+    apiFetch<{ message: string }>("/auth/account", {
+      method: "DELETE",
+      body: JSON.stringify({ userId, email }),
+    }),
 };
 
 // ─── React Query hook patterns (wire up when ready) ───────────────────────────

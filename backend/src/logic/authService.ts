@@ -14,6 +14,7 @@ import {
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
   RespondToAuthChallengeCommand,
+  AdminDisableUserCommand,
   type SignUpCommandInput,
   type ConfirmSignUpCommandInput,
   type InitiateAuthCommandInput,
@@ -21,6 +22,8 @@ import {
   type ConfirmForgotPasswordCommandInput,
   type RespondToAuthChallengeCommandInput,
 } from "@aws-sdk/client-cognito-identity-provider";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { createDynamoDBDocClient } from "../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 
 const logger = new Logger({ serviceName: "auth-service" });
@@ -41,6 +44,8 @@ function createCognitoClient(): CognitoIdentityProviderClient {
 }
 
 const cognito = createCognitoClient();
+const ddb = createDynamoDBDocClient();
+const TABLE = process.env.TABLE_NAME_MAIN!;
 
 // ─── Sign Up ──────────────────────────────────────────────────────────────────
 
@@ -294,6 +299,53 @@ export async function confirmMfa(email: string, code: string, session: string): 
     }
     if (error instanceof AuthError) throw error;
     logger.error("MFA verification failed", { error, email });
+    throw error;
+  }
+}
+
+// ─── Account Management ───────────────────────────────────────────────────────
+
+/**
+ * Soft-deletes a user account.
+ * 1. Updates DynamoDB profile status to ARCHIVED.
+ * 2. Disables the user in Cognito to prevent further logins.
+ */
+export async function deleteAccount(userId: string, email: string): Promise<void> {
+  const { UserPoolId } = getPoolConfig();
+  const now = new Date().toISOString();
+
+  try {
+    // 1. Soft-delete in DynamoDB
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: {
+        pk: `USER#${userId}`,
+        sk: `PROFILE#${userId}`,
+      },
+      UpdateExpression: "SET #status = :status, updatedAt = :now, deletedAt = :now",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":status": "ARCHIVED",
+        ":now": now,
+      },
+      // Ensure the user exists and isn't already archived
+      ConditionExpression: "attribute_exists(pk) AND #status <> :status",
+    }));
+
+    // 2. Disable in Cognito
+    await cognito.send(new AdminDisableUserCommand({
+      UserPoolId,
+      Username: email,
+    }));
+
+    logger.info("Account soft-deleted and disabled", { userId, email });
+  } catch (error: any) {
+    if (error.name === "ConditionalCheckFailedException") {
+      throw new AuthError("Account already deleted or not found", 404, "AccountNotFound");
+    }
+    logger.error("DeleteAccount failed", { error, userId });
     throw error;
   }
 }

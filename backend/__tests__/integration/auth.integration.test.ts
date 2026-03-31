@@ -210,4 +210,22 @@ describe("Auth Integration (End-to-End)", () => {
     // This is effectively covered by the unit tests.
     process.env.USER_POOL_ID = originalPoolId;
   });
+
+  it("Phase 4.9: Soft-delete account", async () => {
+    const res = await testHandler(makeEvent("DELETE /auth/account", {
+      userId: userSub,
+      email: testEmail
+    }));
+
+    expect(res.statusCode).toBe(200);
+
+    // Verify DDB status is ARCHIVED
+    const profile = await ddb.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { pk: `USER#${userSub}`, sk: `PROFILE#${userSub}` }
+    }));
+
+    expect(profile.Item?.status).toBe("ARCHIVED");
+    expect(profile.Item?.deletedAt).toBeDefined();
+  });
 });

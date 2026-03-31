@@ -13,6 +13,7 @@ import {
   forgotPassword,
   confirmPasswordReset,
   confirmMfa,
+  deleteAccount,
   AuthError,
 } from "../../logic/authService.js";
 
@@ -145,6 +146,23 @@ export async function handler(event: LambdaEvent): Promise<LambdaResponse> {
         }
         const tokens = await confirmMfa(body.email, body.code, body.session);
         return success(200, tokens);
+      }
+
+      case "DELETE /auth/account": {
+        // Authenticated route - userId and email should come from authorizer context
+        // In local development or manual test events, we can fallback to body for convenience
+        const body = parseBody(event);
+        const context = (event as any).requestContext?.authorizer?.jwt?.claims;
+        
+        const userId = context?.sub || body.userId;
+        const email = context?.email || body.email;
+
+        if (!userId || !email) {
+          return error(400, "Missing identity context: userId or email");
+        }
+
+        await deleteAccount(userId, email);
+        return success(200, { message: "Account archived successfully" });
       }
 
       default:

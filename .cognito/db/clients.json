@@ -15,6 +15,246 @@
         "RefreshToken": "days"
       },
       "UserPoolId": "local_4K0XD9CK"
+    },
+    "3vpseyog5inkn25aqoajnyx7s": {
+      "ClientId": "3vpseyog5inkn25aqoajnyx7s",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:18.812Z",
+      "LastModifiedDate": "2026-03-31T05:02:18.812Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_23UNxefi"
+    },
+    "5bhv6pwb9aw55yucgjwg32kre": {
+      "ClientId": "5bhv6pwb9aw55yucgjwg32kre",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:22.260Z",
+      "LastModifiedDate": "2026-03-31T05:02:22.260Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_7CXgAq5m"
+    },
+    "d4di306ah0b5gpr2hpcs34x8a": {
+      "ClientId": "d4di306ah0b5gpr2hpcs34x8a",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:34.346Z",
+      "LastModifiedDate": "2026-03-31T05:02:34.346Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_3hPXcbsj"
+    },
+    "3l1x3w3l8f00wd5bn408cezk8": {
+      "ClientId": "3l1x3w3l8f00wd5bn408cezk8",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:39.048Z",
+      "LastModifiedDate": "2026-03-31T05:02:39.048Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2WDrRAYv"
+    },
+    "456uz75p8mh8ewj5mx3k2ey9c": {
+      "ClientId": "456uz75p8mh8ewj5mx3k2ey9c",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:43.285Z",
+      "LastModifiedDate": "2026-03-31T05:02:43.285Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_6aojWRCb"
+    },
+    "5gy0engjzmvlhl0vf3xqeb8oq": {
+      "ClientId": "5gy0engjzmvlhl0vf3xqeb8oq",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:46.770Z",
+      "LastModifiedDate": "2026-03-31T05:02:46.770Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_1s37X4oN"
+    },
+    "c0t6dqnhukcqimf05sgstyf5g": {
+      "ClientId": "c0t6dqnhukcqimf05sgstyf5g",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:02:52.264Z",
+      "LastModifiedDate": "2026-03-31T05:02:52.264Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_6zTmcsYU"
+    },
+    "dg9hlgfa69f9iivjklj12rqd4": {
+      "ClientId": "dg9hlgfa69f9iivjklj12rqd4",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:03:06.909Z",
+      "LastModifiedDate": "2026-03-31T05:03:06.909Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_0L1Y7Xhl"
+    },
+    "8mc2idcm4k12ut4qlhmzqnnvm": {
+      "ClientId": "8mc2idcm4k12ut4qlhmzqnnvm",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:03:19.217Z",
+      "LastModifiedDate": "2026-03-31T05:03:19.217Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_5gj2lFS6"
+    },
+    "3g33v6eyehhcwytcz0u2thq0x": {
+      "ClientId": "3g33v6eyehhcwytcz0u2thq0x",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:03:23.987Z",
+      "LastModifiedDate": "2026-03-31T05:03:23.987Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_3NsHRpmf"
+    },
+    "399z720fjawuaih5rvbovot98": {
+      "ClientId": "399z720fjawuaih5rvbovot98",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:03:30.507Z",
+      "LastModifiedDate": "2026-03-31T05:03:30.507Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_6c3P4p8G"
+    },
+    "49q9d9eac1n69lfzwp27e107d": {
+      "ClientId": "49q9d9eac1n69lfzwp27e107d",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:03:34.243Z",
+      "LastModifiedDate": "2026-03-31T05:03:34.243Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2I1x3DYy"
+    },
+    "cmtxg52b8f3vo2zu3bdgum0dw": {
+      "ClientId": "cmtxg52b8f3vo2zu3bdgum0dw",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:04:00.586Z",
+      "LastModifiedDate": "2026-03-31T05:04:00.586Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_5tvQlUKv"
+    },
+    "93rgmsdzbjtpwtf9vgl8wa7zf": {
+      "ClientId": "93rgmsdzbjtpwtf9vgl8wa7zf",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:04:10.430Z",
+      "LastModifiedDate": "2026-03-31T05:04:10.430Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_0AlDOKgA"
+    },
+    "bozcc1m8dbz5j73vcq3t69ml2": {
+      "ClientId": "bozcc1m8dbz5j73vcq3t69ml2",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:04:17.320Z",
+      "LastModifiedDate": "2026-03-31T05:04:17.320Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_1Ym0mmMQ"
+    },
+    "6n5yw2jpdwz6pro15yl7mg2hb": {
+      "ClientId": "6n5yw2jpdwz6pro15yl7mg2hb",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:04:27.968Z",
+      "LastModifiedDate": "2026-03-31T05:04:27.968Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2FfqubJ2"
+    },
+    "31f2rgywjzer5tfntv7lym7si": {
+      "ClientId": "31f2rgywjzer5tfntv7lym7si",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:41:34.820Z",
+      "LastModifiedDate": "2026-03-31T05:41:34.820Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2RplVG5X"
+    },
+    "1g5z9tcrvkbzm3x1spsk8r788": {
+      "ClientId": "1g5z9tcrvkbzm3x1spsk8r788",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:41:40.567Z",
+      "LastModifiedDate": "2026-03-31T05:41:40.567Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2B114xtl"
+    },
+    "dxmns12ykgu2pats18jg2ri6j": {
+      "ClientId": "dxmns12ykgu2pats18jg2ri6j",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:42:49.772Z",
+      "LastModifiedDate": "2026-03-31T05:42:49.772Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_5KgVsIZ7"
+    },
+    "01kjm2osfa7ntzu9dpfotu8rv": {
+      "ClientId": "01kjm2osfa7ntzu9dpfotu8rv",
+      "ClientName": "local-client",
+      "CreationDate": "2026-03-31T05:42:57.651Z",
+      "LastModifiedDate": "2026-03-31T05:42:57.651Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2vTmcwxh"
     }
   }
 }
