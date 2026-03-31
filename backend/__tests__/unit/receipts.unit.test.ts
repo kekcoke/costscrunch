@@ -232,6 +232,28 @@ describe("Router — event-shape dispatch", () => {
     expectCorsHeaders(result);
   });
 
+  it("routes POST /receipts/guest-upload-url to handleUploadUrl with isGuest=true", async () => {
+    const event = makeApiEvent({
+      routeKey: "POST /receipts/guest-upload-url",
+      method: "POST",
+      path: "/receipts/guest-upload-url",
+      body: { contentType: "image/jpeg", filename: "guest.jpg", sessionId: "session-123" }
+    });
+    // Strip authorizer to simulate guest
+    (event.requestContext as any).authorizer = undefined;
+
+    const result = await handler(event);
+    expect(result).toMatchObject({ statusCode: 200 });
+    
+    expect(mockCreatePresignedPost).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        Key: expect.stringContaining("uploads/guest/session-123/"),
+        Fields: expect.objectContaining({ "x-amz-meta-userid": "GUEST" })
+      })
+    );
+  });
+
   it("routes REST v1 style events (no routeKey) correctly", async () => {
     const result = await handler(makeRestV1Event("POST", "/receipts/upload-url", {
       body: { contentType: "image/jpeg", filename: "test.jpg" }
@@ -438,6 +460,18 @@ describe("S3 handler — key validation", () => {
     const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
     expect(startArg?.JobTag).toBe("expense-001/scan-001");
   });
+
+  it("handles guest S3 keys by writing records to GUEST#SESSION partition", async () => {
+    const guestKey = "receipts/guest/session-999/exp-123/scan-456/file.jpg";
+    await handler(makeS3Event(guestKey));
+
+    const putArg = vi.mocked(PutCommand).mock.calls[0]?.[0] as any;
+    expect(putArg?.Item?.pk).toBe("GUEST#SESSION#session-999");
+    expect(putArg?.Item?.userId).toBe("GUEST");
+    
+    const startArg = vi.mocked(StartExpenseAnalysisCommand).mock.calls[0]?.[0] as any;
+    expect(startArg?.JobTag).toBe("exp-123/scan-456");
+  });
 });
 
 // ─── UNIT: handleGetScan ──────────────────────────────────────────────────────
@@ -478,6 +512,28 @@ describe("handleGetScan", () => {
     
     const queryArg = vi.mocked(QueryCommand).mock.calls[0]?.[0] as any;
     expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`RECEIPT#${expenseId}`);
+  });
+
+  it("returns guest scans when queried by sessionId", async () => {
+    const sessionId = "session-123";
+    const event = makeApiEvent({
+      routeKey: "GET /receipts/guest/scan",
+      method:   "GET",
+      path:     "/receipts/guest/scan",
+      queryStringParameters: { sessionId }
+    });
+    
+    const mockItems = [{ pk: `GUEST#SESSION#${sessionId}`, sk: "SCAN#1", status: "completed" }];
+    mockDynamoDbSend.mockResolvedValueOnce({ Items: mockItems });
+
+    const result = await handler(event);
+    const body = JSON.parse((result as any).body);
+
+    expect(result?.statusCode).toBe(200);
+    expect(body.items).toEqual(mockItems);
+    
+    const queryArg = vi.mocked(QueryCommand).mock.calls[0]?.[0] as any;
+    expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`GUEST#SESSION#${sessionId}`);
   });
 
   it("returns 404 if expenseId is missing and regex fails (route fallthrough)", async () => {

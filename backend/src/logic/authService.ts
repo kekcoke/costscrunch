@@ -15,6 +15,8 @@ import {
   ConfirmForgotPasswordCommand,
   RespondToAuthChallengeCommand,
   AdminDisableUserCommand,
+  AdminUserGlobalSignOutCommand,
+  GlobalSignOutCommand,
   type SignUpCommandInput,
   type ConfirmSignUpCommandInput,
   type InitiateAuthCommandInput,
@@ -22,7 +24,7 @@ import {
   type ConfirmForgotPasswordCommandInput,
   type RespondToAuthChallengeCommandInput,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand, QueryCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient } from "../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 
@@ -346,6 +348,75 @@ export async function deleteAccount(userId: string, email: string): Promise<void
       throw new AuthError("Account already deleted or not found", 404, "AccountNotFound");
     }
     logger.error("DeleteAccount failed", { error, userId });
+    throw error;
+  }
+}
+
+/**
+ * Invalidates all sessions for a user.
+ */
+export async function logoutUser(email: string): Promise<void> {
+  const { UserPoolId } = getPoolConfig();
+  try {
+    await cognito.send(new AdminUserGlobalSignOutCommand({
+      UserPoolId,
+      Username: email,
+    }));
+    logger.info("User logged out globally", { email });
+  } catch (error: any) {
+    logger.error("Logout failed", { error, email });
+    throw error;
+  }
+}
+
+/**
+ * Associates guest scans with a registered user.
+ */
+export async function claimGuestData(sessionId: string, userId: string): Promise<number> {
+  try {
+    // 1. Find all scans for this guest session
+    const result = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "pk = :pk",
+      ExpressionAttributeValues: {
+        ":pk": `GUEST#SESSION#${sessionId}`,
+      },
+    }));
+
+    const items = result.Items || [];
+    if (items.length === 0) return 0;
+
+    // 2. Migrate items to the user's partition
+    // In our design, authenticated scans use pk: RECEIPT#{expenseId}
+    const writeRequests = [];
+    const deleteRequests = [];
+
+    for (const item of items) {
+      const newItem = {
+        ...item,
+        pk: `RECEIPT#${item.expenseId}`,
+        userId: userId, // Link to real user
+      };
+      
+      writeRequests.push({ PutRequest: { Item: newItem } });
+      deleteRequests.push({ DeleteRequest: { Key: { pk: item.pk, sk: item.sk } } });
+    }
+
+    // Process in batches of 25 (DynamoDB limit)
+    const allRequests = [...writeRequests, ...deleteRequests];
+    for (let i = 0; i < allRequests.length; i += 25) {
+      const batch = allRequests.slice(i, i + 25);
+      await ddb.send(new BatchWriteCommand({
+        RequestItems: {
+          [TABLE]: batch
+        }
+      }));
+    }
+
+    logger.info("Guest data claimed", { sessionId, userId, count: items.length });
+    return items.length;
+  } catch (error: any) {
+    logger.error("ClaimGuestData failed", { error, sessionId, userId });
     throw error;
   }
 }
