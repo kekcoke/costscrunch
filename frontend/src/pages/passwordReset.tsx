@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { resetPassword, confirmResetPassword } from "aws-amplify/auth";
+import { authApi } from "../services/api";
 
 const INPUT_STYLE = {
   width: "100%",
@@ -37,7 +37,7 @@ const LABEL_STYLE = {
   marginBottom: "7px",
 };
 
-type Step = "request" | "sent" | "confirm";
+type Step = "request" | "sent";
 
 export default function PasswordResetPage() {
   const navigate = useNavigate();
@@ -52,7 +52,6 @@ export default function PasswordResetPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPw,   setConfirmPw]   = useState("");
 
-  // ── Step 1: Request reset ─────────────────────────────────────────────────
   const handleRequest = async () => {
     if (!email.trim()) {
       setErrors({ email: "Email is required" });
@@ -61,16 +60,15 @@ export default function PasswordResetPage() {
     setLoading(true);
     setErrors({});
     try {
-      await resetPassword({ username: email });
+      await authApi.forgotPassword(email);
       setStep("sent");
-    } catch (e) {
-      setErrors({ global: (e as Error).message });
+    } catch (e: any) {
+      setErrors({ global: e.message || "Failed to send reset code" });
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Step 2: Confirm with code ─────────────────────────────────────────────
   const handleConfirm = async () => {
     const errs: Record<string, string> = {};
     if (!code.trim())          errs.code = "Verification code is required";
@@ -81,14 +79,11 @@ export default function PasswordResetPage() {
     setLoading(true);
     setErrors({});
     try {
-      await confirmResetPassword({
-        username:         email,
-        confirmationCode: code,
-        newPassword,
-      });
+      await authApi.confirmPassword(email, code, newPassword);
+      alert("Password updated successfully. Please log in.");
       navigate("/login");
-    } catch (e) {
-      setErrors({ global: (e as Error).message });
+    } catch (e: any) {
+      setErrors({ global: e.message || "Failed to reset password" });
     } finally {
       setLoading(false);
     }
@@ -122,7 +117,6 @@ export default function PasswordResetPage() {
       />
 
       <div style={{ width: "100%", maxWidth: "420px", animation: "fadeUp 0.4s both" }}>
-        {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "36px" }}>
           <div
             style={{
@@ -138,9 +132,7 @@ export default function PasswordResetPage() {
             CostsCrunch
           </div>
           <p style={{ fontSize: "14px", color: "var(--color-text-dim)" }}>
-            {step === "request" ? "Reset your password" :
-             step === "sent"    ? "Check your email"    :
-                                  "Set new password"}
+            {step === "request" ? "Reset your password" : "Check your email"}
           </p>
         </div>
 
@@ -152,30 +144,25 @@ export default function PasswordResetPage() {
             padding: "36px",
           }}
         >
-          {/* ── Step 1: Request ─────────────────────────────────────────── */}
-          {step === "request" && (
+          {errors.global && (
+            <div
+              role="alert"
+              style={{
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: "9px",
+                padding: "11px 14px",
+                fontSize: "13px",
+                color: "#f87171",
+                marginBottom: "20px",
+              }}
+            >
+              {errors.global}
+            </div>
+          )}
+
+          {step === "request" ? (
             <>
-              <p style={{ fontSize: "13px", color: "var(--color-text-dim)", marginBottom: "24px", lineHeight: 1.65 }}>
-                Enter your email and we&apos;ll send a 6-digit code to reset your password.
-              </p>
-
-              {errors.global && (
-                <div
-                  role="alert"
-                  style={{
-                    background: "rgba(239,68,68,0.1)",
-                    border: "1px solid rgba(239,68,68,0.25)",
-                    borderRadius: "9px",
-                    padding: "11px 14px",
-                    fontSize: "13px",
-                    color: "#f87171",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {errors.global}
-                </div>
-              )}
-
               <div style={{ marginBottom: "24px" }}>
                 <label htmlFor="reset-email" style={LABEL_STYLE}>Email address</label>
                 <input
@@ -184,24 +171,16 @@ export default function PasswordResetPage() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setErrors({}); }}
                   placeholder="you@company.com"
-                  autoComplete="email"
-                  onKeyDown={(e) => e.key === "Enter" && handleRequest()}
                   style={{
                     ...INPUT_STYLE,
                     borderColor: errors.email ? "rgba(239,68,68,0.5)" : "var(--color-border)",
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#6366f1")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = errors.email ? "rgba(239,68,68,0.5)" : "var(--color-border)")}
                 />
                 {errors.email && (
-                  <p style={{ fontSize: "12px", color: "#f87171", marginTop: "5px" }}>
-                    {errors.email}
-                  </p>
+                  <p style={{ fontSize: "12px", color: "#f87171", marginTop: "5px" }}>{errors.email}</p>
                 )}
               </div>
-
               <button
-                type="button"
                 onClick={handleRequest}
                 disabled={loading}
                 style={{
@@ -209,139 +188,58 @@ export default function PasswordResetPage() {
                   padding: "13px",
                   borderRadius: "10px",
                   border: "none",
-                  background: loading
-                    ? "rgba(99,102,241,0.4)"
-                    : "linear-gradient(135deg, #0ea5e9, #6366f1)",
+                  background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
                   color: "#fff",
                   fontWeight: 700,
-                  fontSize: "14px",
                   cursor: loading ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
                 }}
               >
-                {loading ? "Sending…" : "Send reset code →"}
+                {loading ? "Sending..." : "Send reset code →"}
               </button>
             </>
-          )}
-
-          {/* ── Sent confirmation ───────────────────────────────────────── */}
-          {step === "sent" && (
+          ) : (
             <>
-              <div
-                style={{
-                  background: "rgba(14,165,233,0.08)",
-                  border: "1px solid rgba(14,165,233,0.2)",
-                  borderRadius: "10px",
-                  padding: "16px",
-                  fontSize: "13px",
-                  color: "#38bdf8",
-                  marginBottom: "24px",
-                  lineHeight: 1.6,
-                  textAlign: "center",
-                }}
-              >
-                ✉️ <strong>Reset code sent</strong>
-                <br />
-                Check your email at <strong>{email}</strong>
-              </div>
-
-              {/* Code + new password */}
-              {errors.global && (
-                <div
-                  role="alert"
-                  style={{
-                    background: "rgba(239,68,68,0.1)",
-                    border: "1px solid rgba(239,68,68,0.25)",
-                    borderRadius: "9px",
-                    padding: "11px 14px",
-                    fontSize: "13px",
-                    color: "#f87171",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {errors.global}
-                </div>
-              )}
-
               <div style={{ marginBottom: "16px" }}>
-                <label htmlFor="reset-code" style={LABEL_STYLE}>Verification code</label>
+                <label style={LABEL_STYLE}>Verification code</label>
                 <input
-                  id="reset-code"
                   type="text"
-                  inputMode="numeric"
                   maxLength={6}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   placeholder="000000"
                   style={{
                     ...INPUT_STYLE,
-                    fontSize: "22px",
-                    fontFamily: "var(--font-display)",
-                    letterSpacing: "6px",
-                    textAlign: "center",
                     borderColor: errors.code ? "rgba(239,68,68,0.5)" : "var(--color-border)",
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#6366f1")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = errors.code ? "rgba(239,68,68,0.5)" : "var(--color-border)")}
                 />
-                {errors.code && (
-                  <p style={{ fontSize: "12px", color: "#f87171", marginTop: "5px" }}>
-                    {errors.code}
-                  </p>
-                )}
               </div>
-
               <div style={{ marginBottom: "16px" }}>
-                <label htmlFor="reset-newpw" style={LABEL_STYLE}>New password</label>
+                <label style={LABEL_STYLE}>New password</label>
                 <input
-                  id="reset-newpw"
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Min 8 characters"
-                  autoComplete="new-password"
                   style={{
                     ...INPUT_STYLE,
                     borderColor: errors.newPassword ? "rgba(239,68,68,0.5)" : "var(--color-border)",
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#6366f1")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = errors.newPassword ? "rgba(239,68,68,0.5)" : "var(--color-border)")}
                 />
-                {errors.newPassword && (
-                  <p style={{ fontSize: "12px", color: "#f87171", marginTop: "5px" }}>
-                    {errors.newPassword}
-                  </p>
-                )}
               </div>
-
               <div style={{ marginBottom: "24px" }}>
-                <label htmlFor="reset-confirmpw" style={LABEL_STYLE}>Confirm new password</label>
+                <label style={LABEL_STYLE}>Confirm password</label>
                 <input
-                  id="reset-confirmpw"
                   type="password"
                   value={confirmPw}
                   onChange={(e) => setConfirmPw(e.target.value)}
-                  placeholder="Repeat new password"
-                  autoComplete="new-password"
+                  placeholder="Repeat password"
                   style={{
                     ...INPUT_STYLE,
                     borderColor: errors.confirmPw ? "rgba(239,68,68,0.5)" : "var(--color-border)",
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#6366f1")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = errors.confirmPw ? "rgba(239,68,68,0.5)" : "var(--color-border)")}
                 />
-                {errors.confirmPw && (
-                  <p style={{ fontSize: "12px", color: "#f87171", marginTop: "5px" }}>
-                    {errors.confirmPw}
-                  </p>
-                )}
               </div>
-
               <button
-                type="button"
                 onClick={handleConfirm}
                 disabled={loading}
                 style={{
@@ -349,16 +247,13 @@ export default function PasswordResetPage() {
                   padding: "13px",
                   borderRadius: "10px",
                   border: "none",
-                  background: loading
-                    ? "rgba(99,102,241,0.4)"
-                    : "linear-gradient(135deg, #0ea5e9, #6366f1)",
+                  background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
                   color: "#fff",
                   fontWeight: 700,
-                  fontSize: "14px",
                   cursor: loading ? "not-allowed" : "pointer",
                 }}
               >
-                {loading ? "Saving…" : "Set new password →"}
+                {loading ? "Saving..." : "Set new password →"}
               </button>
             </>
           )}

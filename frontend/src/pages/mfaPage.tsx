@@ -11,7 +11,7 @@
 //   - text matching /backup code|recovery code/i
 
 import { useState, useEffect } from "react";
-import { authApi } from "../helpers/auth-api";
+import { authApi } from "../services/api";
 
 interface Props {
   onNavigate: (page: any) => void;
