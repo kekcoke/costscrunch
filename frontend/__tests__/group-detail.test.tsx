@@ -10,6 +10,7 @@ vi.mock("../src/services/api", () => ({
     update: vi.fn(),
     deleteMember: vi.fn(),
     addMember: vi.fn(),
+    getBalances: vi.fn().mockResolvedValue([]),
   },
 }));
 

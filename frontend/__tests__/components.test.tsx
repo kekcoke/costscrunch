@@ -137,14 +137,15 @@ describe("Component Suite", () => {
           addMember: vi.fn(() => Promise.resolve({ added: true })),
           deleteMember: vi.fn(() => Promise.resolve({ success: true })),
           update: vi.fn(() => Promise.resolve({})),
+          getBalances: vi.fn(() => Promise.resolve([])),
         }
       }));
     });
 
     it("renders group details and members", async () => {
-      const { findByText, getByText } = render(<GroupDetail groupId="g1" onBack={onBack} />);
+      const { findByText, getAllByText } = render(<GroupDetail groupId="g1" onBack={onBack} />);
       expect(await findByText("Housemates")).toBeInTheDocument();
-      expect(getByText("Alex Rivera")).toBeInTheDocument();
+      expect(getAllByText("Alex Rivera").length).toBeGreaterThan(0);
     });
 
     it("opens add member modal and submits successfully", async () => {
