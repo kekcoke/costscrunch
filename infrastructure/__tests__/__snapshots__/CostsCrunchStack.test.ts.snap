@@ -172,7 +172,7 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "4ad5d7960709a285023b486dafb14253a8b67b6edbda2509681ed7d542203877.zip",
+          "S3Key": "fbcd37497b22298bcaee1ba4241a4d56a0d94ef2ccb486e78dc2fd2961fdf0ef.zip",
         },
         "Environment": {
           "Variables": {
@@ -221,12 +221,6 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -1459,6 +1453,75 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
+    "ApiGETprofile88F94288": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "GET /profile",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiGETprofileProfileLambdaGETIntegrationA7886DF6",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiGETprofileProfileLambdaGETIntegrationA7886DF6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ProfileLambda07E68A3E",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiGETprofileProfileLambdaGETIntegrationPermissionFE2D3984": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ProfileLambda07E68A3E",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/profile",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "ApiGETreceiptsexpenseIddownload7CCBE410": {
       "Properties": {
         "ApiId": {
@@ -1735,6 +1798,537 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
+    "ApiPATCHprofileBC3891B2": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "PATCH /profile",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPATCHprofileProfileLambdaPATCHIntegration4785F782",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPATCHprofileProfileLambdaPATCHIntegration4785F782": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ProfileLambda07E68A3E",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPATCHprofileProfileLambdaPATCHIntegrationPermission97C80585": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ProfileLambda07E68A3E",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/profile",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthconfirmAuthConfIntegration048BD7FD": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthconfirmAuthConfIntegrationPermission5BCF18E7": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/confirm",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthconfirmC16BA46D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/confirm",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthconfirmAuthConfIntegration048BD7FD",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthconfirmmfa36AD090F": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/confirm-mfa",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthconfirmmfaAuthMfaIntegrationD478DA35",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthconfirmmfaAuthMfaIntegrationD478DA35": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthconfirmmfaAuthMfaIntegrationPermissionBF0637D9": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/confirm-mfa",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthconfirmpassword1C188950": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/confirm-password",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthconfirmpasswordAuthCPwdIntegration0D5DB667",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthconfirmpasswordAuthCPwdIntegration0D5DB667": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthconfirmpasswordAuthCPwdIntegrationPermissionCB876525": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/confirm-password",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthforgotpassword1FE4A0EF": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/forgot-password",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthforgotpasswordAuthForgIntegrationF50ACE0D",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthforgotpasswordAuthForgIntegrationF50ACE0D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthforgotpasswordAuthForgIntegrationPermission0CABEDD0": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/forgot-password",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthlogin3D242FC7": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/login",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthloginAuthLogIntegrationA9D88731",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthloginAuthLogIntegrationA9D88731": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthloginAuthLogIntegrationPermissionF96FB496": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/login",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthrefreshAuthRefIntegrationE853A8E4": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthrefreshAuthRefIntegrationPermissionEBBCCCFE": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/refresh",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTauthrefreshB65A5F9B": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/refresh",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthrefreshAuthRefIntegrationE853A8E4",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthregister146A98A6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "POST /auth/register",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTauthregisterAuthRegIntegration42280B68",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTauthregisterAuthRegIntegration42280B68": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTauthregisterAuthRegIntegrationPermission7C31A46F": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AuthLambda6BB8C88C",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/auth/register",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "ApiPOSTexpensesDFD4B301": {
       "Properties": {
         "ApiId": {
@@ -1873,6 +2467,75 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
+    "ApiPOSTgroupsidjoin49A15CD6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "POST /groups/{id}/join",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTgroupsidjoinGroupsLambdaPOSTIntegrationAE04DD7E",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTgroupsidjoinGroupsLambdaPOSTIntegrationAE04DD7E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "GroupsLambdaD7E8272B",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTgroupsidjoinGroupsLambdaPOSTIntegrationPermission797675B5": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "GroupsLambdaD7E8272B",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/groups/{id}/join",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "ApiPOSTgroupsidmembers07E52F1F": {
       "Properties": {
         "ApiId": {
@@ -1936,6 +2599,75 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
                 "Ref": "ApiF70053CD",
               },
               "/*/*/groups/{id}/members",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ApiPOSTgroupsidsettle43AC6736": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiCognitoAuthorizer23B91BA2",
+        },
+        "RouteKey": "POST /groups/{id}/settle",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiPOSTgroupsidsettleGroupsLambdaPOSTIntegrationDBB58F8B",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "ApiPOSTgroupsidsettleGroupsLambdaPOSTIntegrationDBB58F8B": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiF70053CD",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "GroupsLambdaD7E8272B",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "ApiPOSTgroupsidsettleGroupsLambdaPOSTIntegrationPermissionFA1F317E": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "GroupsLambdaD7E8272B",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "ApiF70053CD",
+              },
+              "/*/*/groups/{id}/settle",
             ],
           ],
         },
@@ -2078,6 +2810,721 @@ exports[`CostsCrunchStack Alarms > matches snapshot 1`] = `
         },
       },
       "Type": "AWS::S3::BucketPolicy",
+    },
+    "AuthLambda6BB8C88C": {
+      "DependsOn": [
+        "AuthLambdaServiceRoleDefaultPolicy733D72E7",
+        "AuthLambdaServiceRole7D6ECDEC",
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
+          "S3Key": "3604b54f65ef91c0586483737825ea8d0a25547c108e0fd54c515e5f1192d823.zip",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
+            "BUCKET_PROCESSED_NAME": {
+              "Ref": "ProcessedBucketDE59930C",
+            },
+            "BUCKET_RECEIPTS_NAME": {
+              "Ref": "ReceiptsBucket913676D9",
+            },
+            "BUCKET_UPLOADS_NAME": {
+              "Ref": "UploadsBucket5E5E9B64",
+            },
+            "ENVIRONMENT": "staging",
+            "EVENT_BUS_NAME": {
+              "Ref": "EventBus7B8748AA",
+            },
+            "LOG_LEVEL": "DEBUG",
+            "POWERTOOLS_SERVICE_NAME": "costscrunch",
+            "REDIS_HOST": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Address",
+              ],
+            },
+            "REDIS_PORT": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Port",
+              ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
+            "TABLE_NAME_CONNECTIONS": {
+              "Ref": "ConnTable3E9543CC",
+            },
+            "TABLE_NAME_MAIN": {
+              "Ref": "MainTable74195DAB",
+            },
+            "USER_POOL_CLIENT_ID": {
+              "Ref": "UserPoolWebClient4C9370B0",
+            },
+            "USER_POOL_ID": {
+              "Ref": "UserPool6BA7E5F2",
+            },
+          },
+        },
+        "FunctionName": "costscrunch-staging-auth",
+        "Handler": "index.handler",
+        "Layers": [
+          "arn:aws:lambda:us-east-1:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22",
+        ],
+        "MemorySize": 1024,
+        "ReservedConcurrentExecutions": 50,
+        "Role": {
+          "Fn::GetAtt": [
+            "AuthLambdaServiceRole7D6ECDEC",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 29,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+        "VpcConfig": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "AuthLambdaSecurityGroupDA479DC2",
+                "GroupId",
+              ],
+            },
+          ],
+          "SubnetIds": [
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet1SubnetBFBE7861",
+            },
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet2Subnet3D82E025",
+            },
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "AuthLambdaDurationAlarmB6BA8B8A": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Duration for AuthLambda is > 20000ms P99",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "AuthLambda6BB8C88C",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 300,
+        "Threshold": 20000,
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AuthLambdaErrorRateAlarm345BA165": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Error rate for AuthLambda is > 3% over 5 minutes",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 3,
+        "EvaluationPeriods": 3,
+        "Metrics": [
+          {
+            "Expression": "100 * (errors / invocations)",
+            "Id": "expr_1",
+            "Label": "AuthLambda Error Rate",
+            "ReturnData": true,
+          },
+          {
+            "Id": "errors",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "AuthLambda6BB8C88C",
+                    },
+                  },
+                ],
+                "MetricName": "Errors",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "invocations",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "AuthLambda6BB8C88C",
+                    },
+                  },
+                ],
+                "MetricName": "Invocations",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 3,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AuthLambdaLogRetention3C91D089": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "AuthLambda6BB8C88C",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 7,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "AuthLambdaSecurityGroupDA479DC2": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "GroupDescription": "Automatic security group for Lambda Function TestStackAuthLambda6CDF2B9F",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "CostsCrunchVPCCC3A6036",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "AuthLambdaServiceRole7D6ECDEC": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "AuthLambdaServiceRoleDefaultPolicy733D72E7": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "AuthLambdaServiceRoleDefaultPolicy733D72E7",
+        "Roles": [
+          {
+            "Ref": "AuthLambdaServiceRole7D6ECDEC",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "AuthTriggerLambdaBCF94A6F": {
+      "DependsOn": [
+        "AuthTriggerLambdaServiceRoleDefaultPolicyF46064D9",
+        "AuthTriggerLambdaServiceRole841602E9",
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
+          "S3Key": "4c1e19e87d3cae11a6f417e481bf5e986150225093bd11d14069cd5d1b031c84.zip",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
+            "BUCKET_PROCESSED_NAME": {
+              "Ref": "ProcessedBucketDE59930C",
+            },
+            "BUCKET_RECEIPTS_NAME": {
+              "Ref": "ReceiptsBucket913676D9",
+            },
+            "BUCKET_UPLOADS_NAME": {
+              "Ref": "UploadsBucket5E5E9B64",
+            },
+            "ENVIRONMENT": "staging",
+            "EVENT_BUS_NAME": {
+              "Ref": "EventBus7B8748AA",
+            },
+            "LOG_LEVEL": "DEBUG",
+            "POWERTOOLS_SERVICE_NAME": "costscrunch",
+            "REDIS_HOST": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Address",
+              ],
+            },
+            "REDIS_PORT": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Port",
+              ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
+            "TABLE_NAME_CONNECTIONS": {
+              "Ref": "ConnTable3E9543CC",
+            },
+            "TABLE_NAME_MAIN": {
+              "Ref": "MainTable74195DAB",
+            },
+          },
+        },
+        "FunctionName": "costscrunch-staging-auth-trigger",
+        "Handler": "index.handler",
+        "Layers": [
+          "arn:aws:lambda:us-east-1:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22",
+        ],
+        "MemorySize": 1024,
+        "ReservedConcurrentExecutions": 50,
+        "Role": {
+          "Fn::GetAtt": [
+            "AuthTriggerLambdaServiceRole841602E9",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 29,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+        "VpcConfig": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "AuthTriggerLambdaSecurityGroup07CD1043",
+                "GroupId",
+              ],
+            },
+          ],
+          "SubnetIds": [
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet1SubnetBFBE7861",
+            },
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet2Subnet3D82E025",
+            },
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "AuthTriggerLambdaDurationAlarmF1A2131C": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Duration for AuthTriggerLambda is > 20000ms P99",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "AuthTriggerLambdaBCF94A6F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 300,
+        "Threshold": 20000,
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AuthTriggerLambdaErrorRateAlarm3E38FDF4": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Error rate for AuthTriggerLambda is > 3% over 5 minutes",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 3,
+        "EvaluationPeriods": 3,
+        "Metrics": [
+          {
+            "Expression": "100 * (errors / invocations)",
+            "Id": "expr_1",
+            "Label": "AuthTriggerLambda Error Rate",
+            "ReturnData": true,
+          },
+          {
+            "Id": "errors",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "AuthTriggerLambdaBCF94A6F",
+                    },
+                  },
+                ],
+                "MetricName": "Errors",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "invocations",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "AuthTriggerLambdaBCF94A6F",
+                    },
+                  },
+                ],
+                "MetricName": "Invocations",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 3,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AuthTriggerLambdaLogRetention4A7B5AF7": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "AuthTriggerLambdaBCF94A6F",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 7,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "AuthTriggerLambdaSecurityGroup07CD1043": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "GroupDescription": "Automatic security group for Lambda Function TestStackAuthTriggerLambdaE26B771C",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "CostsCrunchVPCCC3A6036",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "AuthTriggerLambdaServiceRole841602E9": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "AuthTriggerLambdaServiceRoleDefaultPolicyF46064D9": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "MainTable74195DAB",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "MainTable74195DAB",
+                          "Arn",
+                        ],
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "AuthTriggerLambdaServiceRoleDefaultPolicyF46064D9",
+        "Roles": [
+          {
+            "Ref": "AuthTriggerLambdaServiceRole841602E9",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "BedrockModelIdFA30AE87": {
       "Properties": {
@@ -3528,7 +4975,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "5d2309c64eb4c1fc612920d5a91397108a5941f61b35023aa960bc8648fd73b1.zip",
+          "S3Key": "046904d0a264758805be8339cd7b8a47d08379f3d8afa93d57dc69c8f716f0f0.zip",
         },
         "Environment": {
           "Variables": {
@@ -3577,12 +5024,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -3983,7 +5424,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "63e38d766e293c7585ef4b175d6d18c2d0334cf3638547603037b83317e8c613.zip",
+          "S3Key": "f20055fe07e8b39b7339de26b62ac6dea1264a62d4217d26070087e3152972a5.zip",
         },
         "Environment": {
           "Variables": {
@@ -4032,12 +5473,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -4409,7 +5844,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "c42b3c34148d0828aabba53cb30c49d9cd0fb7b759f1661295634962e556cbac.zip",
+          "S3Key": "c5f467a72f1e34dd309b8478fb48ecf2e8746cc31645f1735a460b85ee6536f8.zip",
         },
         "Environment": {
           "Variables": {
@@ -4458,12 +5893,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -4738,7 +6167,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "d9caa78090caa522daf9155ca67028990af46282d9d7d4caf84b3c89630d8d48.zip",
+          "S3Key": "c0061ff30ce69603c7c036cab4a22aea812501ebe74aa7be285eb14e48e4a0ae.zip",
         },
         "Environment": {
           "Variables": {
@@ -4787,12 +6216,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -5451,7 +6874,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "ecd3623c65d87a569714c7a0836a10768f551a150ddfba5bc4d0c1b23c285119.zip",
+          "S3Key": "e1a4e9ab2ab50b380a630c4edf00099eaf20c44e47deef98a6dc05e9d08eb3d1.zip",
         },
         "Environment": {
           "Variables": {
@@ -5500,12 +6923,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -6043,6 +7460,426 @@ def sort_filter_rules(json_obj):
       },
       "Type": "AWS::S3::BucketPolicy",
     },
+    "ProfileLambda07E68A3E": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+        "ProfileLambdaServiceRoleDefaultPolicyF2332296",
+        "ProfileLambdaServiceRole9E076BAE",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
+          "S3Key": "3492be03fa2e3ef87cc35dcbcf0e7ed86cd73b73bb4cf8fc3c5866e740aceb7e.zip",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
+            "BUCKET_PROCESSED_NAME": {
+              "Ref": "ProcessedBucketDE59930C",
+            },
+            "BUCKET_RECEIPTS_NAME": {
+              "Ref": "ReceiptsBucket913676D9",
+            },
+            "BUCKET_UPLOADS_NAME": {
+              "Ref": "UploadsBucket5E5E9B64",
+            },
+            "ENVIRONMENT": "staging",
+            "EVENT_BUS_NAME": {
+              "Ref": "EventBus7B8748AA",
+            },
+            "LOG_LEVEL": "DEBUG",
+            "POWERTOOLS_SERVICE_NAME": "costscrunch",
+            "REDIS_HOST": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Address",
+              ],
+            },
+            "REDIS_PORT": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Port",
+              ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
+            "TABLE_NAME_CONNECTIONS": {
+              "Ref": "ConnTable3E9543CC",
+            },
+            "TABLE_NAME_MAIN": {
+              "Ref": "MainTable74195DAB",
+            },
+          },
+        },
+        "FunctionName": "costscrunch-staging-profile",
+        "Handler": "index.handler",
+        "Layers": [
+          "arn:aws:lambda:us-east-1:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22",
+        ],
+        "MemorySize": 1024,
+        "ReservedConcurrentExecutions": 50,
+        "Role": {
+          "Fn::GetAtt": [
+            "ProfileLambdaServiceRole9E076BAE",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 29,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+        "VpcConfig": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "ProfileLambdaSecurityGroup0182E3E0",
+                "GroupId",
+              ],
+            },
+          ],
+          "SubnetIds": [
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet1SubnetBFBE7861",
+            },
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet2Subnet3D82E025",
+            },
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "ProfileLambdaDurationAlarm48A3C6BD": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Duration for ProfileLambda is > 20000ms P99",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "ProfileLambda07E68A3E",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 300,
+        "Threshold": 20000,
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ProfileLambdaErrorRateAlarm1BA35A38": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlarmsTopicABBEC356",
+          },
+        ],
+        "AlarmDescription": "Error rate for ProfileLambda is > 3% over 5 minutes",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 3,
+        "EvaluationPeriods": 3,
+        "Metrics": [
+          {
+            "Expression": "100 * (errors / invocations)",
+            "Id": "expr_1",
+            "Label": "ProfileLambda Error Rate",
+            "ReturnData": true,
+          },
+          {
+            "Id": "errors",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "ProfileLambda07E68A3E",
+                    },
+                  },
+                ],
+                "MetricName": "Errors",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "invocations",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "FunctionName",
+                    "Value": {
+                      "Ref": "ProfileLambda07E68A3E",
+                    },
+                  },
+                ],
+                "MetricName": "Invocations",
+                "Namespace": "AWS/Lambda",
+              },
+              "Period": 300,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 3,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ProfileLambdaLogRetention409279C8": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "ProfileLambda07E68A3E",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 7,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "ProfileLambdaSecurityGroup0182E3E0": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "GroupDescription": "Automatic security group for Lambda Function TestStackProfileLambda2CB22230",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "CostsCrunchVPCCC3A6036",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "ProfileLambdaServiceRole9E076BAE": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ProfileLambdaServiceRoleDefaultPolicyF2332296": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "MainTable74195DAB",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "MainTable74195DAB",
+                          "Arn",
+                        ],
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "MainTable74195DAB",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "MainTable74195DAB",
+                          "Arn",
+                        ],
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ProfileLambdaServiceRoleDefaultPolicyF2332296",
+        "Roles": [
+          {
+            "Ref": "ProfileLambdaServiceRole9E076BAE",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "ReceiptsBucket913676D9": {
       "DeletionPolicy": "Delete",
       "Properties": {
@@ -6165,7 +8002,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "b0afc0bfddda247a9471478d006d4517d6b31ac9d635c2a5f4055f6819f0f6ae.zip",
+          "S3Key": "9f14d3c42e95703e9d92513c98e4169c01945076103aea5688d2400d8e3167a8.zip",
         },
         "Environment": {
           "Variables": {
@@ -6223,12 +8060,6 @@ def sort_filter_rules(json_obj):
             },
             "TEXTRACT_SNS_TOPIC_ARN": {
               "Ref": "TextractTopic2578263B",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -7068,7 +8899,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "4e97d92e2dfdfb1273b34143e01ff50cb89a8115cb021c09fc951a9caae83a61.zip",
+          "S3Key": "71a4211e564383e0c65b6ee5a99d1d142d47d450faa441c5c858b0313030ca68.zip",
         },
         "Environment": {
           "Variables": {
@@ -7126,12 +8957,6 @@ def sort_filter_rules(json_obj):
             },
             "TEXTRACT_SNS_TOPIC_ARN": {
               "Ref": "TextractTopic2578263B",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
           },
         },
@@ -7840,6 +9665,11 @@ def sort_filter_rules(json_obj):
         ],
         "EmailVerificationMessage": "The verification code to your new account is {####}",
         "EmailVerificationSubject": "Verify your new account",
+        "LambdaConfig": {
+          "PostConfirmation": {
+            "Ref": "AuthTriggerLambdaBCF94A6F",
+          },
+        },
         "MfaConfiguration": "OFF",
         "Policies": {
           "PasswordPolicy": {
@@ -8152,6 +9982,445 @@ def sort_filter_rules(json_obj):
       },
       "Type": "AWS::ApiGatewayV2::Api",
     },
+    "WsApiconnectRoute3B404673": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "WsApi88D84716",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "$connect",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "WsApiconnectRouteWsConnectIntegration467D17BF",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "WsApiconnectRouteWsConnectIntegration467D17BF": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "WsApi88D84716",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":apigateway:us-east-1:lambda:path/2015-03-31/functions/",
+              {
+                "Fn::GetAtt": [
+                  "WsHandlerLambda93458D9D",
+                  "Arn",
+                ],
+              },
+              "/invocations",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "WsApiconnectRouteWsConnectIntegrationPermissionADC57492": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WsHandlerLambda93458D9D",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "WsApi88D84716",
+              },
+              "/*$connect",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "WsApidisconnectRoute52949C4E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "WsApi88D84716",
+        },
+        "AuthorizationType": "NONE",
+        "RouteKey": "$disconnect",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "WsApidisconnectRouteWsDisconnectIntegration9D9EBAE9",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "WsApidisconnectRouteWsDisconnectIntegration9D9EBAE9": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "WsApi88D84716",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":apigateway:us-east-1:lambda:path/2015-03-31/functions/",
+              {
+                "Fn::GetAtt": [
+                  "WsHandlerLambda93458D9D",
+                  "Arn",
+                ],
+              },
+              "/invocations",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "WsApidisconnectRouteWsDisconnectIntegrationPermission39495327": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WsHandlerLambda93458D9D",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:123456789012:",
+              {
+                "Ref": "WsApi88D84716",
+              },
+              "/*$disconnect",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "WsHandlerLambda93458D9D": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+        "WsHandlerLambdaServiceRoleDefaultPolicyDE2750D9",
+        "WsHandlerLambdaServiceRoleBD4E1622",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
+          "S3Key": "ce9c156f334ba377c444297ca8f00c561201f7b68aaab94ff07b6838dbe6d3be.zip",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_REGION_ID": "us-east-1",
+            "AWS_XRAY_SAMPLING_RATE": "0.01",
+            "AWS_XRAY_SDK_ENABLED": "true",
+            "AWS_XRAY_TRACING_NAME": "costscrunch-staging-receipt-pipeline",
+            "BUCKET_PROCESSED_NAME": {
+              "Ref": "ProcessedBucketDE59930C",
+            },
+            "BUCKET_RECEIPTS_NAME": {
+              "Ref": "ReceiptsBucket913676D9",
+            },
+            "BUCKET_UPLOADS_NAME": {
+              "Ref": "UploadsBucket5E5E9B64",
+            },
+            "ENVIRONMENT": "staging",
+            "EVENT_BUS_NAME": {
+              "Ref": "EventBus7B8748AA",
+            },
+            "LOG_LEVEL": "DEBUG",
+            "POWERTOOLS_SERVICE_NAME": "costscrunch",
+            "REDIS_HOST": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Address",
+              ],
+            },
+            "REDIS_PORT": {
+              "Fn::GetAtt": [
+                "Redis",
+                "PrimaryEndPoint.Port",
+              ],
+            },
+            "SECRET_NOTIFICATION_ARN": {
+              "Ref": "NotificationSecret49F46D4D",
+            },
+            "SSM_BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelIdFA30AE87",
+            },
+            "SSM_VITE_APP_URL": {
+              "Ref": "ViteAppUrl8757D260",
+            },
+            "TABLE_NAME_CONNECTIONS": {
+              "Ref": "ConnTable3E9543CC",
+            },
+            "TABLE_NAME_MAIN": {
+              "Ref": "MainTable74195DAB",
+            },
+          },
+        },
+        "FunctionName": "costscrunch-staging-ws-handler",
+        "Handler": "index.handler",
+        "Layers": [
+          "arn:aws:lambda:us-east-1:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22",
+        ],
+        "MemorySize": 1024,
+        "ReservedConcurrentExecutions": 50,
+        "Role": {
+          "Fn::GetAtt": [
+            "WsHandlerLambdaServiceRoleBD4E1622",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 29,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+        "VpcConfig": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "WsHandlerLambdaSecurityGroup0696C008",
+                "GroupId",
+              ],
+            },
+          ],
+          "SubnetIds": [
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet1SubnetBFBE7861",
+            },
+            {
+              "Ref": "CostsCrunchVPCprivateSubnet2Subnet3D82E025",
+            },
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "WsHandlerLambdaLogRetention815CD491": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "WsHandlerLambda93458D9D",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 7,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "WsHandlerLambdaSecurityGroup0696C008": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "GroupDescription": "Automatic security group for Lambda Function TestStackWsHandlerLambdaF8416295",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "CostsCrunchVPCCC3A6036",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "WsHandlerLambdaServiceRoleBD4E1622": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "WsHandlerLambdaServiceRoleDefaultPolicyDE2750D9": {
+      "DependsOn": [
+        "CostsCrunchVPCprivateSubnet1DefaultRouteBECCDD2D",
+        "CostsCrunchVPCprivateSubnet1RouteTableAssociationDA3367B2",
+        "CostsCrunchVPCprivateSubnet2DefaultRouteAA52B0C7",
+        "CostsCrunchVPCprivateSubnet2RouteTableAssociationEF3A9F84",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CostsCrunchKeyFB2571C5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ConnTable3E9543CC",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ConnTable3E9543CC",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "WsHandlerLambdaServiceRoleDefaultPolicyDE2750D9",
+        "Roles": [
+          {
+            "Ref": "WsHandlerLambdaServiceRoleBD4E1622",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "WsNotifierDlq8F8403FE": {
       "DeletionPolicy": "Delete",
       "Properties": {
@@ -8218,7 +10487,7 @@ def sort_filter_rules(json_obj):
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
-          "S3Key": "4b65a70a1a3b964c7d6a7116f270f044dfe5e3403e48b74a82183e8b69a5fe34.zip",
+          "S3Key": "67e611b4b2d5dc125aeb8f23aadb9db6b112990dad54b100ccb8ba912455b396.zip",
         },
         "Environment": {
           "Variables": {
@@ -8267,12 +10536,6 @@ def sort_filter_rules(json_obj):
             },
             "TABLE_NAME_MAIN": {
               "Ref": "MainTable74195DAB",
-            },
-            "USER_POOL_CLIENT_ID": {
-              "Ref": "UserPoolWebClient4C9370B0",
-            },
-            "USER_POOL_ID": {
-              "Ref": "UserPool6BA7E5F2",
             },
             "WEBSOCKET_ENDPOINT": {
               "Fn::Join": [
