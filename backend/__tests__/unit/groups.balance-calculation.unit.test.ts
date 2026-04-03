@@ -32,8 +32,8 @@ describe('Groups Lambda - Balance Calculation', () => {
 
       const balances = calculateBalances(expenses, members as any);
 
-      expect(balances['user-1']).toBe(25); // 50 (paid) - 75 (owed) = -25
-      expect(balances['user-2']).toBe(25); // 75 (paid) - 50 (owed) = 25
+      expect(balances['user-1']).toBe(25); // 50 (paid) - 25 (owed) = 25
+      expect(balances['user-2']).toBe(-25); // 50 (paid) - 75 (owed) = -25
     });
 
     it('should handle expenses without splits', () => {
@@ -117,8 +117,8 @@ describe('Groups Lambda - Balance Calculation', () => {
           ownerId: 'user-2',
           amount: 50,
           splits: [
-            { userId: 'user-1', amount: 25 },
-            { userId: 'user-2', amount: 25 },
+            { userId: 'user-1', amount: 50 },
+            { userId: 'user-2', amount: 0 },
           ],
         },
       ];
@@ -139,11 +139,11 @@ describe('Groups Lambda - Balance Calculation', () => {
         {
           status: 'approved',
           ownerId: 'user-1',
-          amount: 100.55,
+          amount: 100.00,
           splits: [
-            { userId: 'user-1', amount: 33.52 },
-            { userId: 'user-2', amount: 33.53 },
-            { userId: 'user-3', amount: 33.50 },
+            { userId: 'user-2', amount: 33.33 },
+            { userId: 'user-3', amount: 33.33 },
+            { userId: 'user-1', amount: 33.34 },
           ],
         },
       ];
@@ -156,12 +156,12 @@ describe('Groups Lambda - Balance Calculation', () => {
 
       const balances = calculateBalances(expenses, members as any);
 
-      // user-1 paid 33.52, owed 33.52 => balance 0
-      // user-2 paid 33.53, owed 33.53 => balance 0
-      // user-3 paid 33.50, owed 33.53 => balance -0.03
-      expect(balances['user-1']).toBeCloseTo(0, 2);
-      expect(balances['user-2']).toBeCloseTo(0, 2);
-      expect(balances['user-3']).toBeCloseTo(-0.03, 2);
+      // user-1 paid 100, owed 33.34 => balance 66.66
+      // user-2 paid 0, owed 33.33 => balance -33.33
+      // user-3 paid 0, owed 33.33 => balance -33.33
+      expect(balances['user-1']).toBeCloseTo(66.66, 2);
+      expect(balances['user-2']).toBeCloseTo(-33.33, 2);
+      expect(balances['user-3']).toBeCloseTo(-33.33, 2);
     });
   });
 
