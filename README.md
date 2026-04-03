@@ -26,7 +26,8 @@
      ├── receipts/       S3 → Textract async triggering
      ├── image-preprocess/ Lossless image compression (Sharp)
      ├── sns-webhook/    Textract completion → circuit breaker → Claude AI → DB
-     ├── ws-notifier/    Real-time WebSocket updates
+     ├── ws-notifier/    Real-time WebSocket updates (Push scan results)
+     ├── ws-handler/     WebSocket lifecycle management ($connect/$disconnect)
      ├── analytics/      aggregations + trends (Decoupled DAL)
      ├── profile/        user account + settings management
      ├── auth/           Custom Cognito Identity Proxy (Registration, Login, MFA, Password Reset, Soft-Delete)
@@ -377,6 +378,7 @@ Groups
   GET    /groups/:id/balances         balances + settlement plan
   POST   /groups/:id/members          invite member
   DELETE /groups/:id/members/:userId  remove member
+  POST   /groups/:id/join             accept invitation and join
 
 Receipts
   POST   /receipts/upload-url         get S3 pre-signed URL
@@ -875,6 +877,9 @@ npm run deploy:prod
 - [x] Interactive Chart Tooltips (Bubble & Stacked Bar)
 - [x] User Profile & Settings Management (Name, Currency, Timezone, Notifications)
 - [x] Vertical Auth Integration (Custom Backend + Cognito + MFA + Reset)
+- [x] Join Group acceptance flow with atomic membership sync
+- [x] Real-time WebSocket updates for receipt scan completion
+- [x] Group Deletion with business rule validation (pending expenses/balances)
 - [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 

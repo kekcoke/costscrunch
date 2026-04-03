@@ -165,15 +165,27 @@ export const expensesApi = {
 
 // ─── Receipts / Scanning ──────────────────────────────────────────────────────
 export const receiptsApi = {
-  // 1. Get pre-signed S3 upload URL
+  // 1. Get pre-signed S3 upload URL (Authenticated)
   getUploadUrl: (file: File, expenseId?: string) =>
     apiFetch<InitiateUploadResponse>("/receipts/upload-url", {
       method: "POST",
       body: JSON.stringify({
         filename: file.name,
-        mimeType: file.type,
+        contentType: file.type,
         fileSizeBytes: file.size,
         expenseId,
+      }),
+    }),
+
+  // 1b. Get pre-signed S3 upload URL (Guest)
+  getGuestUploadUrl: (file: File, sessionId: string) =>
+    apiFetch<InitiateUploadResponse>("/receipts/guest-upload-url", {
+      method: "POST",
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type,
+        fileSizeBytes: file.size,
+        sessionId,
       }),
     }),
 
@@ -224,6 +236,27 @@ export const receiptsApi = {
     throw new Error("Scan timed out after maximum polling attempts");
   },
 
+  // 4. Poll guest scan result
+  pollGuestScanResult: async (
+    sessionId: string,
+    maxAttempts = 10
+  ): Promise<ScanResult> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise<void>((r) =>
+        setTimeout(r, Math.min(1000 * 2 ** attempt, 8000))
+      );
+      const result = await apiFetch<ScanResult>(
+        `/receipts/guest/scan?sessionId=${sessionId}`
+      );
+      // Guest API returns { items: ScanResult[], count: number }
+      const item = (result as any).items?.[0];
+      if (item?.status === "completed" || item?.status === "failed") {
+        return item;
+      }
+    }
+    throw new Error("Scan timed out after maximum polling attempts");
+  },
+
   getDownloadUrl: (expenseId: string) =>
     apiFetch<{ downloadUrl: string }>(`/receipts/${expenseId}/download`),
 };
@@ -245,6 +278,9 @@ export const groupsApi = {
       settlements: Array<{ from: string; to: string; amount: number }>;
     }>(`/groups/${id}/balances`),
 
+  settle: (id: string) =>
+    apiFetch<{ message: string }>(`/groups/${id}/settle`, { method: "POST" }),
+
   addMember: (
     id: string,
     data: { email: string; name?: string; role?: string }
@@ -264,6 +300,9 @@ export const groupsApi = {
 
   delete: (id: string) =>
     apiFetch<{ deleted: boolean }>(`/groups/${id}`, { method: "DELETE" }),
+
+  join: (id: string) =>
+    apiFetch<{ joined: boolean; groupId: string }>(`/groups/${id}/join`, { method: "POST" }),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -297,6 +336,36 @@ export const profileApi = {
 
 // ─── Authentication ───────────────────────────────────────────────────────────
 export const authApi = {
+  register: (email: string, password: string, name: string) =>
+    apiFetch<{ message: string; email: string; userSub: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+
+  confirm: (email: string, code: string) =>
+    apiFetch<{ message: string }>("/auth/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  login: async (email: string, password: string) => {
+    const tokens = await apiFetch<{
+      accessToken: string;
+      idToken: string;
+      refreshToken: string;
+      expiresIn: number;
+    }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    
+    // Store tokens for persistence
+    localStorage.setItem("cc_access_token", tokens.accessToken);
+    localStorage.setItem("cc_id_token", tokens.idToken);
+    localStorage.setItem("cc_refresh_token", tokens.refreshToken);
+    return tokens;
+  },
+
   forgotPassword: (email: string) =>
     apiFetch<{ message: string }>("/auth/forgot-password", {
       method: "POST",
@@ -309,8 +378,8 @@ export const authApi = {
       body: JSON.stringify({ email, code, password }),
     }),
 
-  confirmMfa: (email: string, code: string, session: string) =>
-    apiFetch<{
+  confirmMfa: async (email: string, code: string, session: string) => {
+    const tokens = await apiFetch<{
       accessToken: string;
       idToken: string;
       refreshToken: string;
@@ -318,12 +387,27 @@ export const authApi = {
     }>("/auth/confirm-mfa", {
       method: "POST",
       body: JSON.stringify({ email, code, session }),
-    }),
+    });
+
+    localStorage.setItem("cc_access_token", tokens.accessToken);
+    localStorage.setItem("cc_id_token", tokens.idToken);
+    localStorage.setItem("cc_refresh_token", tokens.refreshToken);
+    return tokens;
+  },
 
   deleteAccount: (userId: string, email: string) =>
     apiFetch<{ message: string }>("/auth/account", {
       method: "DELETE",
       body: JSON.stringify({ userId, email }),
+    }),
+
+  logout: () =>
+    apiFetch<{ message: string }>("/auth/logout", { method: "POST" }),
+
+  claimData: (sessionId: string) =>
+    apiFetch<{ message: string; count: number }>("/auth/claim-data", {
+      method: "POST",
+      body: JSON.stringify({ sessionId }),
     }),
 };
 

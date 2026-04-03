@@ -75,6 +75,11 @@ Resources:
           Properties:
             Path: /groups/{proxy+}
             Method: ANY
+        JoinGroup:
+          Type: Api
+          Properties:
+            Path: /groups/{id}/join
+            Method: POST
 
   ExpensesFunction:
     Type: AWS::Serverless::Function
@@ -222,6 +227,47 @@ Resources:
           Properties:
             Path: /health
             Method: GET
+
+  WsHandlerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/web-socket-handler/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+
+  WsNotifierFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/web-socket-notifier/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          WEBSOCKET_ENDPOINT: http://costscrunch-localstack:4566/_aws/apigatewayv2/ws
+      Events:
+        ScanCompletedRule:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: costscrunch-dev-events
+            Pattern:
+              source:
+                - costscrunch.receipts
+              detail-type:
+                - ReceiptScanCompleted
 
   SnsWebhookFunction:
     Type: AWS::Serverless::Function

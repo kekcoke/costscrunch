@@ -37,9 +37,12 @@ export function ExpensesPage() {
   const handleExport = async (format: "csv" | "json" | "pdf") => {
     try {
       setIsExporting(true);
+      // Pass all active filters to the export API
       await expensesApi.export({ 
         format,
-        status: filter !== "all" ? filter : undefined 
+        status: filter !== "all" ? filter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+        // from/to could be added if we had a date range picker in UI
       });
       console.log(`${format.toUpperCase()} export request successful`);
     } catch (err) {

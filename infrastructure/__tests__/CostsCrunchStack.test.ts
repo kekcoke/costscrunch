@@ -24,8 +24,8 @@ describe("CostsCrunchStack Alarms", () => {
   });
 
   it("creates Lambda Error Rate Alarms for all functions", () => {
-    // We have 9 functions defined in the stack
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 21); // (9 functions * 2 alarms) + DynamoDB + Pipeline + DLQ
+    // We have 12 functions defined in the stack
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 27); // (12 functions * 2 alarms) + DynamoDB + Pipeline + DLQ
     
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       ComparisonOperator: "GreaterThanOrEqualToThreshold",

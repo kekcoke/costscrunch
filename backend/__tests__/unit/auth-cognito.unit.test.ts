@@ -26,7 +26,9 @@ const {
   MockForgotPasswordCommand,
   MockConfirmForgotPasswordCommand,
   MockRespondToAuthChallengeCommand,
-  MockAdminDisableUserCommand
+  MockAdminDisableUserCommand,
+  MockAdminUserGlobalSignOutCommand,
+  MockGlobalSignOutCommand
 } = vi.hoisted(() => {
   function makeCmd(name: string) {
     const Cmd = function(this: any, input: any) { this.input = input; this._name = name; };
@@ -42,6 +44,8 @@ const {
     MockConfirmForgotPasswordCommand: makeCmd("ConfirmForgotPasswordCommand") as any,
     MockRespondToAuthChallengeCommand: makeCmd("RespondToAuthChallengeCommand") as any,
     MockAdminDisableUserCommand: makeCmd("AdminDisableUserCommand") as any,
+    MockAdminUserGlobalSignOutCommand: makeCmd("AdminUserGlobalSignOutCommand") as any,
+    MockGlobalSignOutCommand: makeCmd("GlobalSignOutCommand") as any,
   };
 });
 
@@ -54,12 +58,19 @@ vi.mock("@aws-sdk/client-cognito-identity-provider", () => ({
   ConfirmForgotPasswordCommand: MockConfirmForgotPasswordCommand,
   RespondToAuthChallengeCommand: MockRespondToAuthChallengeCommand,
   AdminDisableUserCommand: MockAdminDisableUserCommand,
+  AdminUserGlobalSignOutCommand: MockAdminUserGlobalSignOutCommand,
+  GlobalSignOutCommand: MockGlobalSignOutCommand,
+}));
+
+const { mockDdbSend } = vi.hoisted(() => ({
+  mockDdbSend: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../src/utils/awsClients.js", () => ({
   createDynamoDBDocClient: () => ({
-    send: vi.fn().mockResolvedValue({}),
+    send: mockDdbSend,
   }),
+  createCognitoClient: vi.fn(), // Already handled by SDK mock but kept for safety
 }));
 
 vi.mock("@aws-lambda-powertools/logger", () => ({
@@ -79,6 +90,8 @@ import {
   confirmPasswordReset,
   confirmMfa,
   deleteAccount,
+  logoutUser,
+  claimGuestData,
   AuthError,
 } from "../../src/logic/authService.js";
 
@@ -364,6 +377,42 @@ describe("Cognito auth service (PKCE — Lambda side)", () => {
       const cmd = mockSend.mock.calls[0][0];
       expect(cmd.input.Username).toBe("test@test.com");
       expect(cmd.input.UserPoolId).toBe("us-east-1_testpool");
+    });
+  });
+
+  // ── Global Logout ────────────────────────────────────────────────────────
+  describe("logoutUser", () => {
+    it("calls AdminUserGlobalSignOutCommand", async () => {
+      mockSend.mockResolvedValueOnce({});
+      await logoutUser("user@test.com");
+      
+      const cmd = mockSend.mock.calls[0][0];
+      expect(cmd.input.Username).toBe("user@test.com");
+      expect(cmd.input.UserPoolId).toBe("us-east-1_testpool");
+    });
+  });
+
+  // ── Claim Data ───────────────────────────────────────────────────────────
+  describe("claimGuestData", () => {
+    it("migrates items from GUEST partition to RECEIPT partition", async () => {
+      const mockItems = [
+        { pk: "GUEST#SESSION#s1", sk: "SCAN#1", expenseId: "e1", userId: "GUEST" }
+      ];
+      
+      mockDdbSend
+        .mockResolvedValueOnce({ Items: mockItems }) // Query
+        .mockResolvedValueOnce({}); // BatchWrite
+
+      const count = await claimGuestData("s1", "real-user-123");
+      
+      expect(count).toBe(1);
+      expect(mockDdbSend).toHaveBeenCalledTimes(2);
+      
+      const batchArg = mockDdbSend.mock.calls[1][0].input;
+      const tableName = process.env.TABLE_NAME_MAIN || "costscrunch-dev-main";
+      const writeReq = batchArg.RequestItems[tableName][0].PutRequest.Item;
+      expect(writeReq.pk).toBe("RECEIPT#e1");
+      expect(writeReq.userId).toBe("real-user-123");
     });
   });
 

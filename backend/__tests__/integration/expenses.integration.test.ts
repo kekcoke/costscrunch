@@ -218,3 +218,96 @@ describe("DELETE /expenses/{id}", () => {
     expect(delRes.statusCode).toBe(200);
   });
 });
+
+// ── Export ────────────────────────────────────────────────────────────────────
+describe("GET /expenses/export", () => {
+  const UID = TEST_USER_ID;
+
+  beforeEach(async () => {
+    // Seed items with specific categories/status
+    const items = [
+      { pk: `USER#${UID}`, sk: "EXPENSE#E1", expenseId: "E1", ownerId: UID, merchant: "M1", amount: 10, currency: "USD", category: "Meals", date: "2026-03-01", status: "approved", entityType: "EXPENSE", createdAt: new Date().toISOString() },
+      { pk: `USER#${UID}`, sk: "EXPENSE#E2", expenseId: "E2", ownerId: UID, merchant: "M2", amount: 20, currency: "USD", category: "Travel", date: "2026-03-02", status: "pending", entityType: "EXPENSE", createdAt: new Date().toISOString() },
+    ];
+    for (const item of items) {
+      await ddbDoc.send(new PutCommand({ TableName: TABLE_NAME_MAIN, Item: item }));
+    }
+  });
+
+  it("exports filtered expenses (status=approved)", async () => {
+    const res = await handler(
+      makeApiEvent({
+        routeKey: "GET /expenses/export",
+        queryStringParameters: { format: "json", status: "approved" },
+        userId: UID,
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveLength(1);
+    expect(body[0].merchant).toBe("M1");
+  });
+
+  it("exports filtered expenses (category=Travel)", async () => {
+    const res = await handler(
+      makeApiEvent({
+        routeKey: "GET /expenses/export",
+        queryStringParameters: { format: "json", category: "Travel" },
+        userId: UID,
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveLength(1);
+    expect(body[0].merchant).toBe("M2");
+  });
+});
+
+// ── Export ────────────────────────────────────────────────────────────────────
+describe("GET /expenses/export", () => {
+  const UID = TEST_USER_ID;
+  const AUTH_HEADERS = { Authorization: "Bearer mock", "x-mock-user-id": UID };
+
+  beforeEach(async () => {
+    // Seed items with specific categories/status
+    const items = [
+      { pk: `USER#${UID}`, sk: "EXPENSE#E1", expenseId: "E1", ownerId: UID, merchant: "M1", amount: 10, currency: "USD", category: "Meals", date: "2026-03-01", status: "approved", entityType: "EXPENSE", createdAt: new Date().toISOString() },
+      { pk: `USER#${UID}`, sk: "EXPENSE#E2", expenseId: "E2", ownerId: UID, merchant: "M2", amount: 20, currency: "USD", category: "Travel", date: "2026-03-02", status: "pending", entityType: "EXPENSE", createdAt: new Date().toISOString() },
+    ];
+    for (const item of items) {
+      await ddbDoc.send(new PutCommand({ TableName: TABLE_NAME_MAIN, Item: item }));
+    }
+  });
+
+  it("exports filtered expenses (status=approved)", async () => {
+    const res = await handler(
+      makeApiEvent({
+        routeKey: "GET /expenses/export",
+        queryStringParameters: { format: "json", status: "approved" },
+        userId: UID,
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveLength(1);
+    expect(body[0].merchant).toBe("M1");
+  });
+
+  it("exports filtered expenses (category=Travel)", async () => {
+    const res = await handler(
+      makeApiEvent({
+        routeKey: "GET /expenses/export",
+        queryStringParameters: { format: "json", category: "Travel" },
+        userId: UID,
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveLength(1);
+    expect(body[0].merchant).toBe("M2");
+  });
+});

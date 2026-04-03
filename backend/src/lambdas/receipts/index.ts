@@ -86,19 +86,23 @@ const err = (msg: string, code = 400) => ({
   body: JSON.stringify({ error: msg }) 
 });
 
-async function handleUploadUrl(event: APIGatewayProxyEventV2) {
+async function handleUploadUrl(event: APIGatewayProxyEventV2, isGuest = false) {
   const userId = (event.requestContext as any)?.authorizer?.jwt?.claims?.sub as string | undefined;
-  if (!userId) return err("Unauthorized", 401);
-
+  
   const bodyRaw = JSON.parse(event.body || "{}");
   const parsed = initiateUploadSchema.safeParse(bodyRaw);
   if (!parsed.success) return err(parsed.error.errors.map(e => e.message).join('; '));
 
-  const { filename, contentType, fileSizeBytes, expenseId: existingExpenseId } = parsed.data;
+  if (!isGuest && !userId) return err("Unauthorized", 401);
+  if (isGuest && !parsed.data.sessionId) return err("sessionId is required for guest uploads", 400);
+
+  const { filename, contentType, fileSizeBytes, expenseId: existingExpenseId, sessionId } = parsed.data;
   const expenseId = existingExpenseId || ulid();
   const scanId = ulid();
-  // Upload to uploads bucket with uploads/ prefix — preprocessing Lambda will move to processed bucket
-  const key = `uploads/${userId}/${expenseId}/${scanId}/${filename}`;
+  
+  // Use GUEST prefix or userId
+  const partitionKey = isGuest ? `guest/${sessionId}` : userId;
+  const key = `uploads/${partitionKey}/${expenseId}/${scanId}/${filename}`;
 
   const { url, fields } = await createPresignedPost(s3, {
     Bucket: process.env.BUCKET_UPLOADS_NAME!,
@@ -109,8 +113,9 @@ async function handleUploadUrl(event: APIGatewayProxyEventV2) {
     ],
     Fields: {
       "Content-Type": contentType,
-      "x-amz-meta-userid": userId,
+      "x-amz-meta-userid": isGuest ? "GUEST" : (userId as string),
       "x-amz-meta-expenseid": expenseId,
+      ...(isGuest ? { "x-amz-meta-sessionid": sessionId! } : {}),
     },
     Expires: 900, // 15 mins
   });
@@ -134,6 +139,14 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
   // ─── Route by event shape ──────────────────────────────────────────────────
   if (isApiGatewayEvent(event)) {
     const route = resolveRoute(event);
+
+    if (route.includes("/guest-upload-url")) {
+      try {
+        return await handleUploadUrl(event, true);
+      } catch {
+        return err("Failed to generate guest upload URL", 500);
+      }
+    }
 
     if (route.includes("/upload-url")) {
       try {
@@ -181,6 +194,24 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
       return ok({ downloadUrl: url });
     }
 
+    // GET /receipts/guest/scan — poll guest scan result
+    if (route.includes("/guest/scan")) {
+      const sessionId = (event.queryStringParameters as any)?.sessionId;
+      if (!sessionId) return err("sessionId is required", 400);
+
+      const result = await ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: {
+          ":pk": `GUEST#SESSION#${sessionId}`,
+          ":prefix": "SCAN#",
+        },
+      }));
+
+      const scans = result.Items || [];
+      return ok({ items: scans, count: scans.length });
+    }
+
     // GET /receipts/{expenseId}/scan — poll scan result
     if (route.includes("/scan")) {
       const expenseId = (event.pathParameters as any)?.expenseId
@@ -213,26 +244,32 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
     const bucket = record.s3.bucket.name;
     const key    = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
-    // ── 1. Validate key shape: receipts/{userId}/{expenseId}/{scanId}/{filename}
+    // ── 1. Validate key shape: 
+    // Auth:  receipts/{userId}/{expenseId}/{scanId}/{filename}
+    // Guest: receipts/guest/{sessionId}/{expenseId}/{scanId}/{filename}
     const parts = key.split("/");
     if (parts[0] !== "receipts" || parts.length < 5) {
       logger.warn("Unexpected S3 key format — skipping", { key });
       continue;
     }
 
-    const [, userId, expenseId, scanId] = parts;
+    const isGuest = parts[1] === "guest";
+    const userIdOrSession = isGuest ? parts[2] : parts[1];
+    const expenseId = isGuest ? parts[3] : parts[2];
+    const scanId = isGuest ? parts[4] : parts[3];
+
     const mimeType = key.endsWith(".pdf") ? "application/pdf" : "image/jpeg";
-    logger.appendKeys({ userId, expenseId, scanId, bucket, key });
+    logger.appendKeys({ userId: isGuest ? "GUEST" : userIdOrSession, expenseId, scanId, bucket, key });
 
     // ── 2. Persist initial scan record so the frontend can observe 'processing'
     const now        = new Date().toISOString();
     const scanRecord: ScanResult = {
-      pk:            `RECEIPT#${expenseId}`,
-      sk:            `SCAN#${scanId}`,
+      pk:            isGuest ? `GUEST#SESSION#${userIdOrSession}` : `RECEIPT#${expenseId}`,
+      sk:            isGuest ? `SCAN#${scanId}` : `SCAN#${scanId}`,
       entityType:    "SCAN",
       scanId,
       expenseId,
-      userId,
+      userId:        isGuest ? "GUEST" : userIdOrSession,
       s3Key:         key,
       s3Bucket:      bucket,
       mimeType,

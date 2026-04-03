@@ -35,6 +35,10 @@ const functions = [
     name: "WsNotifierFunction",
     entry: "src/lambdas/web-socket-notifier/index.ts",
   },
+  {
+    name: "WsHandlerFunction",
+    entry: "src/lambdas/web-socket-handler/index.ts",
+  },
   { name: "HealthFunction", entry: "src/lambdas/health/index.ts" },
 ];
 

@@ -95,26 +95,60 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* User */}
-      <div style={{ padding: "16px 20px", borderTop: "1px solid var(--color-border-dim)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
-            aria-hidden
-            style={{
-              width: "32px", height: "32px", borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366f1, #0ea5e9)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "13px", fontWeight: 700, flexShrink: 0,
-            }}
-          >
-            AJ
-          </div>
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-muted)" }}>
-              Alex Johnson
+      {/* User & Logout */}
+      <div style={{ padding: "16px 20px", borderTop: "1px solid var(--color-border-dim)", marginTop: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              aria-hidden
+              style={{
+                width: "32px", height: "32px", borderRadius: "50%",
+                background: "linear-gradient(135deg, #6366f1, #0ea5e9)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "13px", fontWeight: 700, flexShrink: 0,
+              }}
+            >
+              AJ
             </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-dimmer)" }}>Pro Plan</div>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-muted)" }}>
+                Alex Johnson
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--color-text-dimmer)" }}>Pro Plan</div>
+            </div>
           </div>
+          
+          <button
+            onClick={async () => {
+              const { authApi } = await import("../services/api");
+              try {
+                await authApi.logout();
+              } catch (e) {
+                console.error("Logout error:", e);
+              }
+              localStorage.removeItem("cc_access_token");
+              localStorage.removeItem("cc_id_token");
+              localStorage.removeItem("cc_refresh_token");
+              window.location.href = "/";
+            }}
+            title="Log out"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--color-text-dim)",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "6px",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            🚪
+          </button>
         </div>
       </div>
     </>

@@ -12,6 +12,8 @@
 #   SQS queues (scan-dlq, notif-dlq, notifications.fifo, ws-notifier-dlq),
 #   SNS topics (textract-completion, alarms), EventBridge bus + rules + archive,
 #   SSM parameters (including WS endpoint + Textract topic ARN), seed test data
+#   New: Added Join Group route and WebSocket lifecycle management
+#   New: Added Join Group route and WebSocket lifecycle management
 #
 # ── LocalStack free tier limitations relevant to this stack ──────────────────
 # The following services used in CostsCrunchStack.ts are NOT available on the

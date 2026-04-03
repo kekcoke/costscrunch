@@ -745,13 +745,24 @@ export class CostsCrunchStack extends Stack {
             filters: [{ prefix: "receipts/" }],
         }));
 
+        // ── WebSocket Lambda ─────────────────────────────────────────────────────
+        const wsHandlerLambda = new NodejsFunction(this, "WsHandlerLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/web-socket-handler/index.ts"),
+            functionName: `${prefix}-ws-handler`,
+            environment: { ...sharedEnv },
+        });
+        connTable.grantReadWriteData(wsHandlerLambda);
+
         // ── WebSocket API (API Gateway v2) ────────────────────────────────────────
-        // Browsers connect to wss://ws.costscrunch.com; ws-notifier.ts pushes results.
         const wsApi = new apigwv2.WebSocketApi(this, "WsApi", {
             apiName: `${prefix}-ws`,
-            // $connect: write connectionId to connTable (requires a small connect Lambda)
-            // $disconnect: delete connectionId from connTable
-            // $default: no-op (all real messages are server-push only)
+            connectRouteOptions: {
+                integration: new apigwv2Integrations.WebSocketLambdaIntegration("WsConnectIntegration", wsHandlerLambda),
+            },
+            disconnectRouteOptions: {
+                integration: new apigwv2Integrations.WebSocketLambdaIntegration("WsDisconnectIntegration", wsHandlerLambda),
+            },
         });
 
         const wsStage = new apigwv2.WebSocketStage(this, "WsStage", {
@@ -995,6 +1006,8 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/groups/{id}", groupsLambda);
         addRoute(apigwv2.HttpMethod.PATCH, "/groups/{id}", groupsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/groups/{id}/balances", groupsLambda);
+        addRoute(apigwv2.HttpMethod.POST, "/groups/{id}/settle", groupsLambda);
+        addRoute(apigwv2.HttpMethod.POST, "/groups/{id}/join", groupsLambda);
         addRoute(apigwv2.HttpMethod.POST, "/groups/{id}/members", groupsLambda);
         addRoute(apigwv2.HttpMethod.DELETE, "/groups/{id}/members/{userId}", groupsLambda);
 

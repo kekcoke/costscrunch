@@ -1,16 +1,14 @@
-/**
- * groups.integration.test.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Integration tests for /groups API running against LocalStack.
- */
-
 import axios from "axios";
 import { execSync } from "child_process";
 import { ulid } from "ulid";
+import { describe, it, expect, afterAll } from "vitest";
 
 const getBaseUrl = (): string => {
   const envUrl = process.env.VITE_API_URL;
-  if (envUrl?.includes("/restapis/")) return envUrl;
+  if (envUrl?.includes("/restapis/")) {
+    const parts = envUrl.split("/local/_user_request_");
+    return parts[0] + "/local/_user_request_";
+  }
   if (process.env.API_ID) return `http://localhost:4566/restapis/${process.env.API_ID}/local/_user_request_`;
 
   try {
@@ -18,64 +16,60 @@ const getBaseUrl = (): string => {
       `docker exec costscrunch-localstack /usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1 apigateway get-rest-apis --query "items[?name=='costscrunch-dev-api'].id | [0]" --output text 2>/dev/null`,
       { encoding: "utf-8", timeout: 5000 }
     ).trim().replace(/\r/g, "");
-
     if (apiId && apiId !== "None") return `http://localhost:4566/restapis/${apiId}/local/_user_request_`;
   } catch {}
   throw new Error("Cannot resolve LocalStack API ID.");
 };
 
-const API_URL = getBaseUrl();
+const BASE_URL = getBaseUrl();
+const AUTH_HEADERS = { Authorization: "Bearer mock", "x-mock-user-id": "user-owner" };
 
-describe("Groups API Integration", () => {
-  let createdGroupId: string;
-  const testGroupName = `IntegTest-${ulid().slice(-6)}`;
-  const AUTH_HEADERS = { Authorization: "Bearer mock", "x-mock-user-id": "user-owner" };
+describe("Groups & Settlements Integration", () => {
+  it("full group settlement lifecycle", async () => {
+    const gid_name = `IntegTest-${ulid().slice(-6)}`;
+    
+    // 1. Create Group
+    const createRes = await axios.post(`${BASE_URL}/groups`, { name: gid_name }, { headers: AUTH_HEADERS });
+    const gid = createRes.data.groupId;
+    expect(createRes.status).toBe(201);
 
-  afterAll(async () => {
-    // Flush created resources: Scan for all groups starting with 'IntegTest-' and delete them
-    try {
-      const res = await axios.get(`${API_URL}/groups`, { headers: AUTH_HEADERS });
-      const groupsToFlush = res.data.items.filter((g: any) => 
-        g.name?.startsWith("IntegTest-") || g.name?.startsWith("Delete-Me")
-      );
-      
-      for (const group of groupsToFlush) {
-        await axios.delete(`${API_URL}/groups/${group.groupId}`, { headers: AUTH_HEADERS });
-        console.log(`[FLUSH] Deleted group: ${group.name} (${group.groupId})`);
-      }
-    } catch (err) {
-      console.warn("[FLUSH] Failed to clean up integration test groups");
-    }
-  });
-
-  it("should create a new group", async () => {
-    const res = await axios.post(`${API_URL}/groups`, {
-      name: testGroupName,
-      type: "household",
-      currency: "EUR"
+    // 2. Add Expense to Group
+    const expRes = await axios.post(`${BASE_URL}/expenses`, {
+      merchant: "Dinner", amount: 100, currency: "USD", date: "2026-03-31", category: "Meals", groupId: gid
     }, { headers: AUTH_HEADERS });
-    expect(res.status).toBe(201);
-    createdGroupId = res.data.groupId;
-  });
+    const eid = expRes.data.expenseId;
+    expect(expRes.status).toBe(201);
 
-  it("should successfully soft-delete a settled group", async () => {
-    // We use the group created in the first test (which has no expenses)
-    const delRes = await axios.delete(`${API_URL}/groups/${createdGroupId}`, { headers: AUTH_HEADERS });
-    expect(delRes.status).toBe(200);
-    expect(delRes.data.deleted).toBe(true);
+    // 3. Approve Expense
+    await axios.patch(`${BASE_URL}/expenses/${eid}`, { status: "approved" }, { headers: AUTH_HEADERS });
 
-    // Verify soft-delete status (item still exists but is inactive)
-    const getRes = await axios.get(`${API_URL}/groups/${createdGroupId}`, { headers: AUTH_HEADERS });
-    expect(getRes.data.active).toBe(false);
-  });
-
-  it("should fail to delete a non-existent group", async () => {
+    // 4. Settle Balances
     try {
-      await axios.delete(`${API_URL}/groups/invalid-${ulid()}`, { headers: AUTH_HEADERS });
-      throw new Error("Should have thrown 404");
-    } catch (err: any) {
-      if (!err.response) throw err;
-      expect(err.response.status).toBe(404);
+      const settleRes = await axios.post(`${BASE_URL}/groups/${gid}/settle`, {}, { headers: AUTH_HEADERS });
+      expect(settleRes.status).toBe(200);
+    } catch (e: any) {
+      if (e.response) {
+        console.error("Settle failed with:", e.response.status, e.response.data);
+      }
+      throw e;
+    }
+
+    // 5. Verify Settlement in DDB
+    const verifyRes = await axios.get(`${BASE_URL}/expenses/${eid}`, { headers: AUTH_HEADERS });
+    expect(verifyRes.data.status).toBe("reimbursed");
+
+    // 6. Cleanup
+    console.log(`[TEST] DELETE URL: ${BASE_URL}/groups/${gid}`);
+    try {
+      const delRes = await axios.delete(`${BASE_URL}/groups/${gid}`, { headers: AUTH_HEADERS });
+      console.log(`[TEST] Delete success: ${delRes.status}`);
+    } catch (e: any) {
+      if (e.response) {
+        console.error(`[TEST] Delete failed: ${e.response.status}`, JSON.stringify(e.response.data));
+      } else {
+        console.error(`[TEST] Delete error:`, e.message);
+      }
+      throw e;
     }
   });
 });

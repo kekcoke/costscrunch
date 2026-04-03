@@ -14,6 +14,8 @@ import {
   confirmPasswordReset,
   confirmMfa,
   deleteAccount,
+  logoutUser,
+  claimGuestData,
   AuthError,
 } from "../../logic/authService.js";
 
@@ -163,6 +165,29 @@ export async function handler(event: LambdaEvent): Promise<LambdaResponse> {
 
         await deleteAccount(userId, email);
         return success(200, { message: "Account archived successfully" });
+      }
+
+      case "POST /auth/logout": {
+        const context = (event as any).requestContext?.authorizer?.jwt?.claims;
+        const email = context?.email;
+        if (!email) return error(401, "Unauthorized");
+
+        await logoutUser(email);
+        return success(200, { message: "Logged out successfully" });
+      }
+
+      case "POST /auth/claim-data": {
+        const body = parseBody(event);
+        const { sessionId } = body;
+        const context = (event as any).requestContext?.authorizer?.jwt?.claims;
+        const userId = context?.sub;
+
+        if (!sessionId || !userId) {
+          return error(400, "Missing sessionId or identity context");
+        }
+
+        const count = await claimGuestData(sessionId, userId);
+        return success(200, { message: `Claimed ${count} items`, count });
       }
 
       default:

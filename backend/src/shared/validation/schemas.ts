@@ -163,6 +163,7 @@ export const initiateUploadSchema = z.object({
   contentType: z.string().regex(/^(image\/(jpeg|png|heic|webp)|application\/pdf)$/, 'Unsupported file type'),
   fileSizeBytes: z.number().int().positive().max(10 * 1024 * 1024, 'File exceeds 10MB limit').optional(),
   expenseId: ulidSchema.optional(),
+  sessionId: z.string().max(64).optional(), // Used for guest sessions
 }).strict();
 
 // ── Analytics Schemas ────────────────────────────────────────────────────────

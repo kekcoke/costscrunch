@@ -1,6 +1,8 @@
 // ─── CostsCrunch — LandingPage ──────────────────────────────────────────────────
 // Public marketing / home page. No auth required.
 
+import GuestScanWidget from "../components/guestScanWidget";
+
 interface Props {
   onNavigate: (page: any) => void;
 }
@@ -196,7 +198,7 @@ export default function LandingPage({ onNavigate }: Props) {
             From solo freelancer to enterprise teams — one platform, zero spreadsheets.
           </p>
 
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginBottom: "64px" }}>
             <button
               onClick={() => onNavigate("register")}
               aria-label="Get started free"
@@ -239,6 +241,10 @@ export default function LandingPage({ onNavigate }: Props) {
             >
               See how it works
             </a>
+          </div>
+
+          <div style={{ animation: "fadeUp 0.6s 0.2s both" }}>
+            <GuestScanWidget onConversion={() => onNavigate("register")} />
           </div>
         </section>
 

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
 import { useThemeStore, initSystemThemeListener, selectMode } from "./stores/useThemeStore";
 import { Sidebar, TopBar, ScanModal } from "./components";
+import { useWebSocket } from "./hooks/useWebSocket";
 import {
   DashboardPage,
   ExpensesPage,
@@ -48,6 +49,17 @@ export default function App() {
   const addExpense = useExpenseStore((s) => s.addExpense);
   const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
   const expenses   = useExpenseStore((s) => s.expenses);
+
+  // WebSocket Integration for real-time updates
+  const wsUrl = import.meta.env.VITE_WS_URL;
+  const { lastMessage } = useWebSocket(wsUrl);
+
+  useEffect(() => {
+    if (lastMessage?.type === "RECEIPT_SCAN_COMPLETED") {
+      console.log("Real-time update: Scan completed", lastMessage);
+      fetchExpenses();
+    }
+  }, [lastMessage, fetchExpenses]);
 
   const mode = useThemeStore(selectMode);
   const resolvedTheme = mode === "system"
