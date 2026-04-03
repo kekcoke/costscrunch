@@ -879,6 +879,7 @@ npm run deploy:prod
 - [x] Vertical Auth Integration (Custom Backend + Cognito + MFA + Reset)
 - [x] Join Group acceptance flow with atomic membership sync
 - [x] Real-time WebSocket updates for receipt scan completion
+- [x] Group Deletion with business rule validation (pending expenses/balances)
 - [ ] Role-Based Access Control (RBAC) for group management
 - [ ] Scheduled reports
 
