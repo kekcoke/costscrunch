@@ -43,7 +43,7 @@ const err = (msg: string, statusCode = 400) => ({
   },
 });
 
-function calculateBalances(expenses: any[], members: GroupMember[]): Record<string, number> {
+export function calculateBalances(expenses: any[], members: GroupMember[]): Record<string, number> {
   const balances: Record<string, number> = {};
   for (const m of members) { balances[m.userId] = 0; }
   
@@ -58,7 +58,7 @@ function calculateBalances(expenses: any[], members: GroupMember[]): Record<stri
   return balances;
 }
 
-function minimizeTransactions(balances: Record<string, number>): Array<{ from: string; to: string; amount: number }> {
+export function minimizeTransactions(balances: Record<string, number>): Array<{ from: string; to: string; amount: number }> {
   const creditors: { id: string; amount: number }[] = [];
   const debtors: { id: string; amount: number }[] = [];
   for (const [id, balance] of Object.entries(balances)) {
@@ -80,6 +80,11 @@ function minimizeTransactions(balances: Record<string, number>): Array<{ from: s
 function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
   console.log(`[normalizeRoute] method=${method}, path=${path}, routeKey=${routeKey}`);
   const params: Record<string, string> = {};
+  // Extract method from routeKey if method is empty
+  if (!method && routeKey) {
+    const match = routeKey.match(/^\$default\s+(\w+)/i);
+    if (match) method = match[1].toUpperCase();
+  }
   const cleanKey = routeKey?.replace(/^\$default\s+/, "") || "";
   const segments = path.split('/').filter(Boolean);
   console.log(`[normalizeRoute] segments=${JSON.stringify(segments)}, cleanKey=${cleanKey}`);
@@ -122,12 +127,20 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
       return { route: `${method.toUpperCase()} /groups`, params: {} };
   }
 
-  return { route: routeKey || `${method} ${path}`, params };
+  return { route: `${method} ${path}`.trim() || cleanKey || '/', params };
 }
+
+export { normalizeRoute };
 
 export const rawHandler = async (event: ApiEvent) => {
   console.log(`[DEBUG] rawHandler called. routeKey: ${event.routeKey}, httpMethod: ${event.httpMethod}`);
-  const method = (event.httpMethod || event.requestContext?.http?.method || "").toUpperCase();
+  let method = (event.httpMethod || event.requestContext?.http?.method || "").toUpperCase();
+
+  if (!method && event.routeKey) {
+    const match = event.routeKey.match(/^\$default\s+(\w+)/i);
+    if (match) method = match[1].toUpperCase();
+  }
+
   const path = event.path || event.requestContext?.http?.path || "";
   const resourcePath = (event as any).requestContext?.resourcePath;
   const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey || resourcePath);

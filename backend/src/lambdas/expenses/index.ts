@@ -65,7 +65,7 @@ const logger = new Logger({ serviceName: "expenses" });
 const tracer = new Tracer({ serviceName: "expenses" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "expenses" });
 
-const toResponse = (item: any) => {
+export const toResponse = (item: any) => {
   if (!item || typeof item !== "object") return item;
   if (item.expenseId || item.id || item.sk?.startsWith("EXPENSE#")) {
     const id = item.id || item.expenseId || item.sk?.split("#")[1];
@@ -125,7 +125,7 @@ async function sendCommand(command: any) {
   }
 }
 
-function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense> & { groupId?: string }) {
+export function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense> & { groupId?: string }) {
   return {
     pk: expense.groupId ? `GROUP#${expense.groupId}` : `USER#${userId}`,
     sk: `EXPENSE#${expenseId}`,

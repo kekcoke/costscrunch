@@ -4,8 +4,6 @@ import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import { getAuth } from "../../utils/auth.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 
-const ddb = createDynamoDBDocClient();
-const CONN_TABLE = process.env.TABLE_NAME_CONNECTIONS!;
 const logger = new Logger({ serviceName: "ws-handler" });
 
 export const rawHandler = async (event: any) => {
@@ -30,8 +28,9 @@ export const rawHandler = async (event: any) => {
     const userId = auth.userId;
     logger.info("WS Connected", { userId, connectionId });
 
+    const ddb = createDynamoDBDocClient();
     await ddb.send(new PutCommand({
-      TableName: CONN_TABLE,
+      TableName: process.env.TABLE_NAME_CONNECTIONS!,
       Item: {
         pk: `WS_CONN#${userId}`,
         sk: `CONN#${connectionId}`,
