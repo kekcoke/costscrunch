@@ -157,16 +157,32 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-      - name: Run LocalStack
+      - name: Run LocalStack & Cognito
         run: |
+          # Start LocalStack
           cd infrastructure
           docker compose -f docker-compose.localstack.yml up -d
-      - name: Wait & Provision (Option 2)
+          
+          # Start Cognito Local Emulator
+          docker run -d -p 9229:9229 --name cognito-local \
+            -v $(pwd)/../.cognito:/app/.cognito \
+            jagregory/cognito-local:latest
+      - name: Wait & Provision
         run: |
-          # Wait for LS health
+          # Wait for LocalStack health
+          echo "⏳ Waiting for LocalStack..."
           for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
           
-          # Run Bootstrap (Compute Layer)
+          # Wait for Cognito health
+          echo "⏳ Waiting for Cognito Local..."
+          for i in {1..20}; do nc -z localhost 9229 && break || sleep 5; done
+
+          # Provision Cognito
+          echo "📦 Provisioning Cognito..."
+          node scripts/provision-local-cognito.js
+
+          # Run LocalStack Bootstrap (Compute Layer)
+          echo "📦 Bootstrapping LocalStack..."
           docker exec costscrunch-localstack mkdir -p /opt/bootstrap /opt/lambda-build
           docker cp infrastructure/localstack/opt2/bootstrap.sh costscrunch-localstack:/opt/bootstrap/bootstrap.sh
           docker cp infrastructure/localstack/opt2/enable-cors.sh costscrunch-localstack:/opt/bootstrap/enable-cors.sh
@@ -176,5 +192,15 @@ jobs:
         run: |
           # Fetch dynamic API_ID for REST v1
           API_ID=$(docker exec costscrunch-localstack /usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1 apigateway get-rest-apis --query "items[?name=='costscrunch-dev-api'].id | [-1]" --output text)
+          
+          # Load Cognito IDs from provisioning artifacts
+          COGNITO_USER_POOL_ID=$(jq -r '.UserPool.Id' .cognito_pool_info.json)
+          COGNITO_CLIENT_ID=$(jq -r '.UserPoolClient.ClientId' .cognito_client_info.json)
+          
           echo "Running against API: $API_ID"
-          API_ID=$API_ID npm run test:ig -w backend
+          echo "Cognito Pool: $COGNITO_USER_POOL_ID"
+          
+          API_ID=$API_ID \
+          COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
+          COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID \
+          npm run test:ig -w backend
