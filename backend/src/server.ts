@@ -5,6 +5,7 @@ import { rawHandler as expensesHandler } from './lambdas/expenses/index.js';
 import { handler as groupsHandler } from './lambdas/groups/index.js';
 import { handler as analyticsHandler } from './lambdas/analytics/index.js';
 import { handler as receiptsHandler } from './lambdas/receipts/index.js';
+import { handler as authHandler } from './lambdas/auth/index.js';
 import { ulid } from 'ulid';
 
 export const app = express();
@@ -142,6 +143,17 @@ app.post('/groups/:id/settle', lambdaAdapter(groupsHandler, '/groups/{id}/settle
 app.post('/receipts/upload-url', lambdaAdapter(receiptsHandler, '/receipts/upload-url'));
 app.get('/receipts/:expenseId/scan', lambdaAdapter(receiptsHandler, '/receipts/{expenseId}/scan'));
 app.get('/receipts/:expenseId/download', lambdaAdapter(receiptsHandler, '/receipts/{expenseId}/download'));
+
+// Routes - Auth
+app.post('/auth/register', lambdaAdapter(authHandler, 'POST /auth/register'));
+app.post('/auth/confirm', lambdaAdapter(authHandler, 'POST /auth/confirm'));
+app.post('/auth/login', lambdaAdapter(authHandler, 'POST /auth/login'));
+app.post('/auth/refresh', lambdaAdapter(authHandler, 'POST /auth/refresh'));
+app.post('/auth/forgot-password', lambdaAdapter(authHandler, 'POST /auth/forgot-password'));
+app.post('/auth/confirm-password', lambdaAdapter(authHandler, 'POST /auth/confirm-password'));
+app.post('/auth/confirm-mfa', lambdaAdapter(authHandler, 'POST /auth/confirm-mfa'));
+app.post('/auth/logout', lambdaAdapter(authHandler, 'POST /auth/logout'));
+app.delete('/auth/account', lambdaAdapter(authHandler, 'DELETE /auth/account'));
 
 // Startup
 app.listen(PORT, () => {
