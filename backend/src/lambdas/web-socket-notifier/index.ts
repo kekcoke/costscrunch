@@ -49,6 +49,16 @@ interface ReceiptScanCompletedDetail {
   category:     string;
   confidence:   number;
   processingMs: number;
+  isMultiPage?: boolean;
+}
+
+// ─── Quarantine event detail ───────────────────────────────────────────────────
+interface QuarantineEventDetail {
+  userId:     string;
+  expenseId:  string;
+  scanId:     string;
+  reason:     string;
+  message:    string;
 }
 
 // ─── Section 1: Connection lookup ────────────────────────────────────────────
@@ -109,28 +119,24 @@ async function pushToConnection(
   }
 }
 
-// ─── Main Handler ─────────────────────────────────────────────────────────────
-export const handler = withErrorHandler(async (
+// ─── Handler: ReceiptScanCompleted ─────────────────────────────────────────────
+async function handleReceiptScanCompleted(
   event: EventBridgeEvent<"ReceiptScanCompleted", ReceiptScanCompletedDetail>
-): Promise<void> => {
+): Promise<void> {
   const detail = event.detail;
   const { userId, expenseId, scanId } = detail;
 
   logger.appendKeys({ userId, expenseId, scanId });
   logger.info("Pushing scan result to WebSocket connections");
 
-  // ── Step 1: Find all active connections for this user ─────────────────────
   const connectionIds = await getConnectionIds(userId);
 
   if (connectionIds.length === 0) {
-    // User has no open WebSocket — not an error (they may have navigated away).
-    // The frontend can fall back to reading DynamoDB on next page load.
     logger.info("No active WebSocket connections for user");
     metrics.addMetric("WsNoConnection", MetricUnit.Count, 1);
     return;
   }
 
-  // ── Step 2: Fan-out push to every open tab ────────────────────────────────
   const wsPayload = {
     type:         "RECEIPT_SCAN_COMPLETED",
     expenseId,
@@ -140,6 +146,7 @@ export const handler = withErrorHandler(async (
     category:     detail.category,
     confidence:   detail.confidence,
     processingMs: detail.processingMs,
+    isMultiPage:  detail.isMultiPage ?? false,
   };
 
   const results = await Promise.allSettled(
@@ -157,15 +164,75 @@ export const handler = withErrorHandler(async (
   }
 
   logger.info("WebSocket push complete", { sent, stale, errors });
-  metrics.addMetric("WsMessagesSent",   MetricUnit.Count, sent);
-  metrics.addMetric("WsStaleConns",     MetricUnit.Count, stale);
-
-  // Partial errors are non-fatal — at least some tabs received the message.
-  // Full failure (errors === connectionIds.length) will re-throw on the next
-  // settled rejection, caught implicitly by Lambda retry / DLQ.
+  metrics.addMetric("WsMessagesSent", MetricUnit.Count, sent);
+  metrics.addMetric("WsStaleConns",   MetricUnit.Count, stale);
 
   if (errors > 0 && errors === connectionIds.length) {
     const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
     throw firstRejection.reason;
   }
+}
+
+// ─── Handler: Quarantine (from image-preprocess) ───────────────────────────────
+async function handleQuarantineEvent(
+  event: EventBridgeEvent<"Quarantine", QuarantineEventDetail>
+): Promise<void> {
+  const { userId, expenseId, scanId, reason, message } = event.detail;
+
+  logger.appendKeys({ userId, expenseId, scanId });
+  logger.info("Pushing quarantine notification to WebSocket connections");
+
+  const connectionIds = await getConnectionIds(userId);
+
+  if (connectionIds.length === 0) {
+    logger.info("No active WebSocket connections for user");
+    metrics.addMetric("WsNoConnection", MetricUnit.Count, 1);
+    return;
+  }
+
+  const wsPayload = {
+    type:     "QUARANTINE",
+    expenseId,
+    scanId,
+    reason,
+    message,
+    action:   "Please upload a valid image or PDF receipt",
+  };
+
+  const results = await Promise.allSettled(
+    connectionIds.map(id => pushToConnection(userId, id, wsPayload))
+  );
+
+  let sent = 0, stale = 0, errors = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      r.value === "sent" ? sent++ : stale++;
+    } else {
+      errors++;
+      logger.error("Failed to push quarantine to connection", { reason: r.reason });
+    }
+  }
+
+  logger.info("Quarantine WebSocket push complete", { sent, stale, errors });
+  metrics.addMetric("WsQuarantineSent", MetricUnit.Count, sent);
+
+  if (errors > 0 && errors === connectionIds.length) {
+    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
+    throw firstRejection.reason;
+  }
+}
+
+// ─── Main Handler ─────────────────────────────────────────────────────────────
+export const handler = withErrorHandler(async (event: any): Promise<void> => {
+  const detailType = event["detail-type"] as string;
+
+  if (detailType === "ReceiptScanCompleted") {
+    return handleReceiptScanCompleted(event as EventBridgeEvent<"ReceiptScanCompleted", ReceiptScanCompletedDetail>);
+  }
+
+  if (detailType === "Quarantine") {
+    return handleQuarantineEvent(event as EventBridgeEvent<"Quarantine", QuarantineEventDetail>);
+  }
+
+  logger.warn("Unknown event type", { detailType });
 });
