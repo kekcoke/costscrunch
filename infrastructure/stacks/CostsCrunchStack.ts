@@ -300,6 +300,23 @@ export class CostsCrunchStack extends Stack {
             removalPolicy,
         });
 
+        // ── Quarantine Bucket ────────────────────────────────────────────────────
+        // Stores unreadable/corrupt/invalid files from image-preprocess Lambda.
+        // Files expire after 5 hours (18000 seconds) to minimize storage costs.
+        const quarantineBucket = new s3.Bucket(this, "QuarantineBucket", {
+            bucketName: `${prefix}-quarantine-${accountId}`,
+            encryption: s3.BucketEncryption.KMS,
+            encryptionKey: kmsKey,
+            versioned: false,
+            enforceSSL: true,
+            removalPolicy,
+            lifecycleRules: [
+                {
+                    expiration: Duration.hours(5),
+                },
+            ],
+        });
+
         // ── Cognito User Pool ────────────────────────────────────────────────
         const userPool = new cognito.UserPool(this, "UserPool", {
             userPoolName: `${prefix}-users`,
@@ -475,6 +492,8 @@ export class CostsCrunchStack extends Stack {
             BUCKET_UPLOADS_NAME: uploadsBucket.bucketName,
             BUCKET_PROCESSED_NAME: processedBucket.bucketName,
             BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
+            BUCKET_QUARANTINE_NAME: quarantineBucket.bucketName,
+            // WEBSOCKET_ENDPOINT is injected after wsStage is created (see line ~801)
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
             // USER_POOL_ID and USER_POOL_CLIENT_ID are injected into specific lambdas 
@@ -653,14 +672,21 @@ export class CostsCrunchStack extends Stack {
         connTable.grantReadWriteData(wsNotifierLambda);
 
         // S3
-        // Image preprocessing: read from uploads, write to processed
+        // Image preprocessing: read from uploads, write to processed or quarantine
         uploadsBucket.grantRead(imagePreprocessLambda);
         processedBucket.grantPut(imagePreprocessLambda);
+        quarantineBucket.grantPut(imagePreprocessLambda); // Move invalid files to quarantine
         
         // Receipts: presigned POST generation for processed bucket
         processedBucket.grantPut(receiptsLambda);       // presigned POST generation
         receiptsBucket.grantRead(snsWebhookLambda);    // Textract reads from here (via IAM role)
         receiptsBucket.grantRead(receiptsLambda);      // Receipt download from expense
+
+        // WebSocket: ws-notifier needs to send quarantine notifications
+        wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions: ["execute-api:ManageConnections"],
+            resources: [`arn:aws:execute-api:${regionId}:${accountId}:*/prod/POST/@connections/*`],
+        }));
 
         // EventBridge
         eventBus.grantPutEventsTo(snsWebhookLambda);  // emits ReceiptScanCompleted

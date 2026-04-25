@@ -50,6 +50,7 @@ TABLE_NAME_DYNAMO_CONNECTIONS="costscrunch-dev-connections"
 BUCKET_UPLOADS_NAME="costscrunch-dev-uploads-000000000000"
 BUCKET_PROCESSED_NAME="costscrunch-dev-processed-000000000000"
 BUCKET_RECEIPTS_NAME="costscrunch-dev-receipts-000000000000"
+BUCKET_QUARANTINE_NAME="costscrunch-dev-quarantine-000000000000"
 BUCKET_ASSETS="costscrunch-dev-assets-000000000000"
 EVENT_BUS_NAME="costscrunch-dev-events"
 PREFIX="costscrunch-dev"
@@ -338,6 +339,42 @@ $AWS s3api put-bucket-encryption \
   --no-cli-pager 2>/dev/null || true
 
 echo "✅ Assets bucket ready"
+
+# ── S3 — Quarantine Bucket (invalid/unreadable files) ──────────────────────────
+echo "📦 Creating S3 quarantine bucket: $BUCKET_QUARANTINE_NAME"
+$AWS s3api create-bucket \
+  --bucket "$BUCKET_QUARANTINE_NAME" \
+  --no-cli-pager 2>/dev/null || echo "  ↳ Quarantine bucket already exists, skipping"
+
+# Enable bucket encryption with KMS (matches CDK BucketEncryption.KMS_MANAGED)
+$AWS s3api put-bucket-encryption \
+  --bucket "$BUCKET_QUARANTINE_NAME" \
+  --server-side-encryption-configuration '{
+    "Rules": [{
+      "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "aws:kms"
+      }
+    }]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+# Lifecycle: expire after 5 hours (18000 seconds = matches CDK Duration.hours(5))
+$AWS s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET_QUARANTINE_NAME" \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "auto-expire",
+        "Status": "Enabled",
+        "Filter": {"Prefix": ""},
+        "Expiration": {"Days": 0, "ExpiredObjectDeleteMarker": false},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 0}
+      }
+    ]
+  }' \
+  --no-cli-pager 2>/dev/null || true
+
+echo "✅ Quarantine bucket ready"
 
 # ── Cognito setup ─────────────────────────────────────────────────────────────
 # Cognito is provided by cognito-local container (real Cognito emulation).
@@ -650,6 +687,7 @@ $AWS ssm put-parameter --name "/costscrunch/dev/table-name"      --value "$TABLE
 $AWS ssm put-parameter --name "/costscrunch/dev/uploads-bucket"  --value "$BUCKET_UPLOADS_NAME"   --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/processed-bucket" --value "$BUCKET_PROCESSED_NAME" --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS_NAME"  --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/quarantine-bucket" --value "$BUCKET_QUARANTINE_NAME" --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS_NAME"        --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Cognito mock IDs in place of real pool/client IDs
 $AWS ssm put-parameter --name "/costscrunch/dev/user-pool-id"    --value "$COGNITO_POOL_ID"     --type String --overwrite --no-cli-pager 2>/dev/null || true
@@ -844,6 +882,7 @@ echo "  DynamoDB conn table:  $TABLE_NAME_DYNAMO_CONNECTIONS"
 echo "  Uploads bucket:       $BUCKET_UPLOADS_NAME"
 echo "  Processed bucket:     $BUCKET_PROCESSED_NAME"
 echo "  Receipts bucket:      $BUCKET_RECEIPTS_NAME"
+echo "  Quarantine bucket:    $BUCKET_QUARANTINE_NAME"
 echo "  Assets bucket:        $BUCKET_ASSETS"
 echo "  EventBridge bus:      $EVENT_BUS_NAME"
 echo "  Textract SNS topic:   $TEXTRACT_TOPIC_ARN"
