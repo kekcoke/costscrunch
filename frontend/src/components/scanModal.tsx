@@ -235,19 +235,36 @@ export default function ScanModal({ onClose, onAdd, userId = "user1", userName =
           {(stage === "result" || stage === "manual") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {stage === "result" && (
-                <div
-                  style={{
-                    background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
-                    borderRadius: "10px", padding: "12px 16px", fontSize: "12px", color: "#34d399",
-                    display: "flex", alignItems: "center", gap: "8px",
-                  }}
-                >
-                  <span aria-hidden>✓</span>
-                  AI extracted {Object.values(form).filter(Boolean).length} fields — review before saving
-                  {selectedFile && (
-                    <span style={{ marginLeft: "auto", fontSize: "10px", color: "#64748b" }}>
-                      {selectedFile.name}
-                    </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {/* Primary success banner */}
+                  <div
+                    style={{
+                      background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
+                      borderRadius: "10px", padding: "12px 16px", fontSize: "12px", color: "#34d399",
+                      display: "flex", alignItems: "center", gap: "8px",
+                    }}
+                  >
+                    <span aria-hidden>✓</span>
+                    AI extracted {Object.values(form).filter(Boolean).length} fields — review before saving
+                    {selectedFile && (
+                      <span style={{ marginLeft: "auto", fontSize: "10px", color: "#64748b" }}>
+                        {selectedFile.name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Multi-page flag badge */}
+                  {'multiPage' in (scannedData ?? {}) && (scannedData as Record<string, unknown>).multiPage && (
+                    <div
+                      style={{
+                        background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                        borderRadius: "8px", padding: "8px 12px", fontSize: "11px", color: "#4ade80",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}
+                    >
+                      <span aria-hidden>📄</span>
+                      <span>Multi-page document — all pages scanned</span>
+                    </div>
                   )}
                 </div>
               )}

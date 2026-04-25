@@ -19,7 +19,9 @@ const { mockS3Send, mockSharpInstance } = vi.hoisted(() => {
   const mockS3Send = vi.fn();
   
   // Create a single sharp instance that tracks all method calls
+  // Chain methods: sharp().metadata() returns metadata, then jpeg/png/heif().toBuffer()
   const mockSharpInstance = {
+    metadata: vi.fn().mockResolvedValue({ width: 100, height: 100 }),
     jpeg: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
     heif: vi.fn().mockReturnThis(),
@@ -43,6 +45,12 @@ vi.mock("@aws-sdk/client-s3", () => ({
   HeadObjectCommand: vi.fn().mockImplementation(function (args) {
     return args;
   }),
+  CopyObjectCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
+  DeleteObjectCommand: vi.fn().mockImplementation(function (args) {
+    return args;
+  }),
 }));
 
 // Sharp mock - return the same instance for all calls
@@ -56,14 +64,21 @@ import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { Readable } from "stream";
 
+// ─── Set env vars BEFORE handler import (handler reads at module level) ─────────
+process.env.BUCKET_UPLOADS_NAME    = process.env.BUCKET_UPLOADS_NAME    ?? "costscrunch-dev-uploads-000000000000";
+process.env.BUCKET_PROCESSED_NAME  = process.env.BUCKET_PROCESSED_NAME  ?? "costscrunch-dev-processed-000000000000";
+process.env.BUCKET_QUARANTINE_NAME = process.env.BUCKET_QUARANTINE_NAME ?? "costscrunch-dev-quarantine-000000000000";
+process.env.AWS_ENDPOINT_URL       = "http://localhost:4566";
+
 // ─── Subject under test ───────────────────────────────────────────────────────
 import { handler } from "../../src/lambdas/image-preprocess/index.js";
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 import { TEST_USER_ID } from "../__helpers__/localstack-client.js";
 
-const BUCKET_UPLOADS_NAME = process.env.BUCKET_UPLOADS_NAME ?? "costscrunch-dev-uploads-000000000000";
-const BUCKET_PROCESSED_NAME = process.env.BUCKET_PROCESSED_NAME ?? "costscrunch-dev-processed-000000000000";
+const BUCKET_UPLOADS_NAME = process.env.BUCKET_UPLOADS_NAME;
+const BUCKET_PROCESSED_NAME = process.env.BUCKET_PROCESSED_NAME;
+const BUCKET_QUARANTINE_NAME = process.env.BUCKET_QUARANTINE_NAME;
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -71,13 +86,12 @@ afterEach(() => {
 
 // Helper to reset S3 mock for each test
 function resetS3Mock(contentType: string = "image/jpeg") {
-  // Create a Readable stream from the buffer (matching S3 GetObject behavior)
-  const bodyStream = Readable.from(Buffer.from("fake-image-data"));
-  
   mockS3Send.mockReset()
     .mockResolvedValueOnce({ ContentType: contentType }) // HeadObject
-    .mockResolvedValueOnce({ Body: bodyStream }) // GetObject
-    .mockResolvedValueOnce({}); // PutObject
+    .mockResolvedValueOnce({ Body: Readable.from(Buffer.from("fake-image-data")) }) // GetObject
+    .mockResolvedValueOnce({}) // PutObject (processed bucket)
+    .mockResolvedValueOnce({}) // CopyObject (quarantine - only if needed)
+    .mockResolvedValueOnce({}); // DeleteObject (uploads bucket cleanup)
 }
 
 // ─── Event factories ──────────────────────────────────────────────────────────
@@ -174,12 +188,14 @@ describe("MIME type detection", () => {
 
   it("skips unsupported file types", async () => {
     mockS3Send.mockReset()
-      .mockResolvedValueOnce({ ContentType: "image/gif" });
+      .mockResolvedValueOnce({ ContentType: "image/gif" })  // HeadObject
+      .mockResolvedValueOnce({})                            // CopyObject (quarantine)
+      .mockResolvedValueOnce({});                           // DeleteObject (cleanup)
 
     await handler(makeS3Event(`uploads/${TEST_USER_ID}/exp-001/scan-001/image.gif`));
     
-    // Only HeadObject called, not GetObject or PutObject
-    expect(mockS3Send).toHaveBeenCalledTimes(1);
+    // HeadObject + quarantine (CopyObject + DeleteObject)
+    expect(mockS3Send).toHaveBeenCalledTimes(3);
   });
 });
 

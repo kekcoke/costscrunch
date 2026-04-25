@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { receiptsApi } from "../services/api";
 import { guestSession } from "../helpers/guestSession";
+import { useWebSocket } from "../hooks/useWebSocket";
+import UploadAlertToast from "./uploadAlerts";
 import type { ScanResult } from "../models/types";
 
 interface Props {
@@ -16,6 +18,13 @@ export default function GuestScanWidget({ onConversion }: Props) {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Guest-specific WebSocket for real-time upload alerts
+  const wsUrl = import.meta.env.VITE_WS_URL;
+  const { quarantineAlert, multiPageAlert, clearQuarantineAlert, clearMultiPageAlert } = useWebSocket(wsUrl);
+
+  const activeAlert = quarantineAlert ?? multiPageAlert;
+  const clearAlert: (() => void) = quarantineAlert ? clearQuarantineAlert : clearMultiPageAlert;
+
   const handleFile = async (file: File) => {
     if (!file.type.match(/image.*|application\/pdf/)) {
       setError("Please use JPG, PNG or PDF");
@@ -28,7 +37,7 @@ export default function GuestScanWidget({ onConversion }: Props) {
 
     try {
       // 1. Get Guest Upload URL
-      const { url, fields, expenseId } = await receiptsApi.getGuestUploadUrl(file, sessionId);
+      const { url, fields } = await receiptsApi.getGuestUploadUrl(file, sessionId);
       
       // 2. Upload to S3
       const formData = new FormData();
@@ -44,7 +53,8 @@ export default function GuestScanWidget({ onConversion }: Props) {
       const scanResult = await receiptsApi.pollGuestScanResult(sessionId);
       setResult(scanResult);
       setStage("teaser");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      console.error(e);
       console.error(e);
       setError("Scanning failed. Try again?");
       setStage("idle");
@@ -193,6 +203,9 @@ export default function GuestScanWidget({ onConversion }: Props) {
           </button>
         </div>
       )}
+
+      {/* Upload alerts for guest users */}
+      <UploadAlertToast alert={activeAlert} onDismiss={clearAlert} />
     </div>
   );
 }

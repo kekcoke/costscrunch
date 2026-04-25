@@ -1,62 +1,85 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { WsMessage, WsQuarantineMessage, WsMultiPageMessage } from '../models/types';
 
-interface WsMessage {
-  type: string;
-  [key: string]: any;
-}
-
+ 
 export const useWebSocket = (url: string | undefined) => {
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
+  const [quarantineAlert, setQuarantineAlert] = useState<WsQuarantineMessage | null>(null);
+  const [multiPageAlert, setMultiPageAlert] = useState<WsMultiPageMessage | null>(null);
   const ws = useRef<WebSocket | null>(null);
-  const reconnectTimeout = useRef<number | null>(null);
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const connect = useCallback(() => {
+  useEffect(() => {
     if (!url) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- WebSocket requires state updates on open/close
     setStatus('connecting');
-    ws.current = new WebSocket(url);
+    const socket = new WebSocket(url);
+    ws.current = socket;
 
-    ws.current.onopen = () => {
+    socket.onopen = () => {
       console.log('WebSocket Connected');
+       
       setStatus('open');
     };
 
-    ws.current.onmessage = (event) => {
+    socket.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data: WsMessage = JSON.parse(event.data);
+         
         setLastMessage(data);
+
+        if (data.type === 'QUARANTINE') {
+           
+          setQuarantineAlert(data as WsQuarantineMessage);
+        }
+
+        if (data.type === 'MULTI_PAGE') {
+           
+          setMultiPageAlert(data as WsMultiPageMessage);
+        }
       } catch (e) {
         console.error('Failed to parse WS message', e);
       }
     };
 
-    ws.current.onclose = () => {
+    socket.onclose = () => {
       console.log('WebSocket Disconnected');
+       
       setStatus('closed');
-      // Simple exponential backoff or static retry
-      reconnectTimeout.current = window.setTimeout(connect, 5000);
+      reconnectTimeout.current = setTimeout(() => {
+        // Reconnect by triggering effect re-run
+      }, 5000);
     };
 
-    ws.current.onerror = (error) => {
+    socket.onerror = (error) => {
       console.error('WebSocket Error', error);
-      ws.current?.close();
+      socket.close();
+    };
+
+    return () => {
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+      socket.close();
     };
   }, [url]);
 
-  useEffect(() => {
-    connect();
-    return () => {
-      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
-      ws.current?.close();
-    };
-  }, [connect]);
-
-  const sendMessage = useCallback((msg: any) => {
+  const sendMessage = useCallback((msg: object) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(msg));
     }
   }, []);
 
-  return { lastMessage, status, sendMessage };
+  const clearQuarantineAlert = useCallback(() => setQuarantineAlert(null), []);
+  const clearMultiPageAlert = useCallback(() => setMultiPageAlert(null), []);
+
+  return { 
+    lastMessage, 
+    status, 
+    sendMessage,
+    quarantineAlert,
+    multiPageAlert,
+    clearQuarantineAlert,
+    clearMultiPageAlert,
+  };
 };

@@ -1,8 +1,8 @@
 // ─── CostsCrunch — App.tsx ───────────────────────────────────────────────────
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useExpenseStore, selectPending } from "./stores/useExpenseStore";
+import { useState, useEffect, useCallback } from "react";
+import { useExpenseStore } from "./stores/useExpenseStore";
 import { useThemeStore, initSystemThemeListener, selectMode } from "./stores/useThemeStore";
-import { Sidebar, TopBar, ScanModal } from "./components";
+import { Sidebar, TopBar, ScanModal, UploadAlertToast } from "./components";
 import { useWebSocket } from "./hooks/useWebSocket";
 import {
   DashboardPage,
@@ -61,7 +61,7 @@ export default function App() {
 
   // WebSocket Integration for real-time updates
   const wsUrl = import.meta.env.VITE_WS_URL;
-  const { lastMessage } = useWebSocket(wsUrl);
+  const { lastMessage, quarantineAlert, multiPageAlert, clearQuarantineAlert, clearMultiPageAlert } = useWebSocket(wsUrl);
 
   useEffect(() => {
     if (lastMessage?.type === "RECEIPT_SCAN_COMPLETED") {
@@ -169,6 +169,12 @@ export default function App() {
         <main style={{ padding: isMobile ? "16px" : "32px" }}>
           <PageComponent onNavigate={navigate} />
         </main>
+
+        {/* Upload status alerts (quarantine / multi-page) */}
+        <UploadAlertToast
+          alert={quarantineAlert ?? multiPageAlert}
+          onDismiss={quarantineAlert ? clearQuarantineAlert : clearMultiPageAlert}
+        />
       </div>
     </div>
   );
