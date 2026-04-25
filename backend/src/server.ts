@@ -6,6 +6,8 @@ import { handler as groupsHandler } from './lambdas/groups/index.js';
 import { handler as analyticsHandler } from './lambdas/analytics/index.js';
 import { handler as receiptsHandler } from './lambdas/receipts/index.js';
 import { handler as authHandler } from './lambdas/auth/index.js';
+import { handler as profileHandler } from './lambdas/profile/index.js';
+import { handler as expenseExportHandler } from './lambdas/expense-export/index.js';
 import { ulid } from 'ulid';
 
 export const app = express();
@@ -154,6 +156,13 @@ app.post('/auth/confirm-password', lambdaAdapter(authHandler, 'POST /auth/confir
 app.post('/auth/confirm-mfa', lambdaAdapter(authHandler, 'POST /auth/confirm-mfa'));
 app.post('/auth/logout', lambdaAdapter(authHandler, 'POST /auth/logout'));
 app.delete('/auth/account', lambdaAdapter(authHandler, 'DELETE /auth/account'));
+
+// Routes - Profile
+app.get('/profile', lambdaAdapter(profileHandler, 'GET /profile'));
+app.patch('/profile', lambdaAdapter(profileHandler, 'PATCH /profile'));
+
+// Routes - Expense Export
+app.get('/expense-export', lambdaAdapter(expenseExportHandler, 'GET /expense-export'));
 
 // Startup
 app.listen(PORT, () => {

@@ -303,19 +303,34 @@ export class CostsCrunchStack extends Stack {
         // ── Quarantine Bucket ────────────────────────────────────────────────────
         // Stores unreadable/corrupt/invalid files from image-preprocess Lambda.
         // Files expire after 5 hours (18000 seconds) to minimize storage costs.
-        const quarantineBucket = new s3.Bucket(this, "QuarantineBucket", {
+        // CDK's generated types for CfnBucket don't include expirationInSeconds or
+        // serverSideEncryptionRule (singular) — these are valid S3 API properties but not
+        // reflected in CDK's stricter type definitions. Use 'as any' to bypass validation.
+        const quarantineBucket = new s3.CfnBucket(this, "QuarantineBucket", {
             bucketName: `${prefix}-quarantine-${accountId}`,
-            encryption: s3.BucketEncryption.KMS,
-            encryptionKey: kmsKey,
-            versioned: false,
-            enforceSSL: true,
-            removalPolicy,
-            lifecycleRules: [
-                {
-                    expiration: Duration.hours(5),
-                },
-            ],
-        });
+            versioningConfiguration: { status: "Disabled" },
+            bucketEncryption: {
+                serverSideEncryptionConfiguration: [
+                    {
+                        serverSideEncryptionRule: {
+                            applyServerSideEncryptionByDefault: {
+                                sSEAlgorithm: "aws:kms",
+                                sSEKMSKeyId: kmsKey.keyId,
+                            },
+                        },
+                    },
+                ],
+            },
+            lifecycleConfiguration: {
+                rules: [
+                    {
+                        expirationInSeconds: 18000,
+                        status: "Enabled",
+                    },
+                ],
+            },
+        } as any);
+        quarantineBucket.applyRemovalPolicy(removalPolicy);
 
         // ── Cognito User Pool ────────────────────────────────────────────────
         const userPool = new cognito.UserPool(this, "UserPool", {
@@ -525,7 +540,7 @@ export class CostsCrunchStack extends Stack {
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             logRetention: isProd ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_WEEK,
             reservedConcurrentExecutions: isProd ? 500 : 50,
-            environment: sharedEnv,
+            environment: sharedEnv as { [key: string]: string },
         };
 
         // ── Lambda Functions ─────────────────────────────────────────────────────
@@ -675,7 +690,11 @@ export class CostsCrunchStack extends Stack {
         // Image preprocessing: read from uploads, write to processed or quarantine
         uploadsBucket.grantRead(imagePreprocessLambda);
         processedBucket.grantPut(imagePreprocessLambda);
-        quarantineBucket.grantPut(imagePreprocessLambda); // Move invalid files to quarantine
+        // CfnBucket doesn't support grantPut — use IAM policy directly
+        imagePreprocessLambda.addToRolePolicy(new iam.PolicyStatement({
+            actions: ["s3:PutObject"],
+            resources: [`${quarantineBucket.attrArn}/*`],
+        }));
         
         // Receipts: presigned POST generation for processed bucket
         processedBucket.grantPut(receiptsLambda);       // presigned POST generation

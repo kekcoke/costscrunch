@@ -116,15 +116,16 @@ export const expensesApi = {
     from?: string;
     to?: string;
     limit?: number;
-  }): Promise<{ downloadUrl?: string; format: string; count?: number; expiresIn?: number }> => {
+  }): Promise<{ downloadUrl?: string; data?: string; format: string; count?: number; expiresIn?: number }> => {
     let token: string | undefined;
     try {
       const { tokens } = await fetchAuthSession();
       token = tokens?.accessToken?.toString();
     } catch { /* local dev — no token */ }
 
+    // Call dedicated expense-export Lambda
     const response = await fetch(
-      `${API_BASE}/expenses/export${toQueryString(params)}`,
+      `${API_BASE}/expense-export${toQueryString(params)}`,
       {
         headers: {
           "Content-Type": "application/json",
@@ -138,18 +139,18 @@ export const expensesApi = {
       throw new ApiError(body.error ?? "Export failed", response.status);
     }
 
-    // Large dataset → JSON with presigned URL
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json")) {
-      return response.json();
+    const result = await response.json();
+
+    // Large dataset → presigned S3 URL
+    if (result.downloadUrl) {
+      return result;
     }
 
-    // Small dataset → raw CSV/JSON file — trigger browser download
-    const blob = await response.blob();
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const match = disposition.match(/filename="?([^";\n]+)"?/);
-    const filename = match?.[1] ?? `expenses-export.${params?.format ?? "csv"}`;
-
+    // Small dataset → inline CSV/JSON — trigger browser download
+    const blob = new Blob([result.data], {
+      type: result.format === "json" ? "application/json" : "text/csv",
+    });
+    const filename = `expenses-export.${result.format}`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -158,6 +159,7 @@ export const expensesApi = {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    return result;
 
     return { format: params?.format ?? "csv" };
   },
