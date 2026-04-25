@@ -18,6 +18,12 @@ Parameters:
   FromEmail:
     Type: String
     Default: noreply@costscrunch.dev
+  UserPoolId:
+    Type: String
+    Default: LocalPool
+  UserPoolClientId:
+    Type: String
+    Default: LocalClient
 
 Globals:
   Function:
