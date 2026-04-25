@@ -106,6 +106,17 @@ export function GroupsPage() {
     );
   }
 
+  const confirmAllAsReimbursed = async (groupId: string) => {
+    if (confirm(`Settle all approved expenses in this group? This will mark them as reimbursed.`)) {
+      try { 
+        await groupsApi.settle(groupId);
+        alert("Balance settled successfully!");
+      } catch (err: any) {
+        alert("Failed to settle: " + (err.message || err.response?.data?.error || "Unknown error"));
+      }
+    }
+  }
+
   return (
     <div className="groups-container">
       {/* Page Header */}
@@ -190,12 +201,20 @@ export function GroupsPage() {
                   </div>
                 ))}
               </div>
-              <button 
-                onClick={() => setSelectedGroupId(g.groupId)}
-                style={{ width: "100%", marginTop: "12px", background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
-              >
-                View Group →
-              </button>
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                <button 
+                  onClick={async () => confirmAllAsReimbursed(g.groupId)}
+                  style={{ flex: 1, background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "8px", padding: "8px", color: "#10b981", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+                >
+                  Settle Balance
+                </button>
+                <button 
+                  onClick={() => setSelectedGroupId(g.groupId)}
+                  style={{ flex: 1, background: g.color + "12", border: `1px solid ${g.color}25`, borderRadius: "8px", padding: "8px", color: g.color, fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+                >
+                  View Group →
+                </button>
+              </div>
             </div>
           </div>
         ))}

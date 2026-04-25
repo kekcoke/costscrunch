@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { GroupsPage } from "../src/pages/groups";
 import { useGroupStore } from "../src/stores/useGroupStore";
 import { useExpenseStore } from "../src/stores/useExpenseStore";
+import { groupsApi } from "../src/services/api";
 
 // Mock the stores
 vi.mock("../src/stores/useGroupStore", () => ({
@@ -12,6 +13,14 @@ vi.mock("../src/stores/useGroupStore", () => ({
 vi.mock("../src/stores/useExpenseStore", () => ({
   useExpenseStore: vi.fn(),
   selectExpenses: vi.fn(),
+}));
+
+// Mock groupsApi
+vi.mock("../src/services/api", () => ({
+  groupsApi: {
+    create: vi.fn(),
+    settle: vi.fn(),
+  },
 }));
 
 const MOCK_GROUPS = [
@@ -61,5 +70,48 @@ describe("GroupsPage - Filtering & Sorting", () => {
     fireEvent.change(searchInput, { target: { value: "NonExistent" } });
     
     expect(screen.getByText(/No groups found matching/i)).toBeInTheDocument();
+  });
+});
+
+describe("GroupsPage - Settle Balance Button", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useGroupStore as any).mockReturnValue({
+      groups: MOCK_GROUPS,
+      loading: false,
+      fetchGroups: vi.fn(),
+    });
+    (useExpenseStore as any).mockReturnValue([]);
+    vi.mocked(groupsApi.settle).mockResolvedValue({ message: "Settled 2 expenses" });
+  });
+
+  it("renders settle button for each group card", () => {
+    render(<GroupsPage />);
+    const settleButtons = screen.getAllByText("Settle Balance");
+    expect(settleButtons).toHaveLength(2);
+  });
+
+  it("calls groupsApi.settle with correct groupId on button click", () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    
+    render(<GroupsPage />);
+    
+    // First settle button (Alpha Group comes first alphabetically)
+    const settleButton = screen.getAllByText("Settle Balance")[0];
+    fireEvent.click(settleButton);
+    
+    expect(global.confirm).toHaveBeenCalled();
+    expect(groupsApi.settle).toHaveBeenCalledWith("g2"); // Alpha Group's ID
+  });
+
+  it("does not call settle when user cancels confirmation", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => false));
+    
+    render(<GroupsPage />);
+    
+    const settleButton = screen.getAllByText("Settle Balance")[0];
+    fireEvent.click(settleButton);
+    
+    expect(groupsApi.settle).not.toHaveBeenCalled();
   });
 });
