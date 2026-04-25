@@ -158,6 +158,7 @@ app.post('/auth/logout', lambdaAdapter(authHandler, 'POST /auth/logout'));
 app.delete('/auth/account', lambdaAdapter(authHandler, 'DELETE /auth/account'));
 
 // Routes - Profile
+app.get('/profile', lambdaAdapter(profileHandler, 'GET /profile'));
 app.patch('/profile', lambdaAdapter(profileHandler, 'PATCH /profile'));
 
 // Routes - Expense Export
