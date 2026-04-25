@@ -1,20 +1,105 @@
 # CostsCrunch Deployment Guide
 
 ## Architecture Overview
-CostsCrunch uses a Serverless architecture deployed via AWS CDK. 
+CostsCrunch uses a Serverless architecture deployed via AWS CDK.
 - **Frontend:** React application hosted on S3 and distributed via CloudFront.
 - **Backend:** Node.js 20 Lambda functions behind an HTTP API Gateway.
 - **Database:** DynamoDB (Single Table Design) with on-demand capacity.
 - **Security:** AWS WAF, Cognito User Pools, and KMS Encryption at rest.
 
 ## Environments
-We maintain three primary deployment contexts:
 
-| Environment | Purpose | Configuration Differences |
-|-------------|---------|---------------------------|
-| **Dev**     | Local development & feature testing. | Uses LocalStack. `MOCK_AUTH` allowed. |
-| **Staging** | Pre-production testing & QA. | On-demand Lambda, scaled-down DB capacity, lower alarm thresholds. |
-| **Prod**    | Live user traffic. | Provisioned Concurrency, WAF attached, Multi-AZ Redis, strict `DISABLE_AUTH` guards. |
+We maintain three primary deployment contexts, configured via CDK context variables:
+
+| Environment | Purpose | DynamoDB Billing | Provisioned Concurrency | Error Rate Alarm | Duration P99 Alarm |
+|-------------|---------|-----------------|------------------------|------------------|-------------------|
+| **Dev**     | Local development & feature testing | On-Demand | ❌ Off | 5% | 30,000ms |
+| **Staging** | Pre-production testing & QA | On-Demand | ❌ Off | 3% | 20,000ms |
+| **Prod**    | Live user traffic | Provisioned | ✅ On (500 reserved) | 1% | 10,000ms |
+
+### Environment-Specific Configurations
+
+#### Dev
+- **Removal Policy:** `destroy` (all resources deleted on stack delete)
+- **CORS:** Allows `*` (all origins)
+- **MOCK_AUTH:** Permitted (blocked in staging/prod)
+- **Reserved Concurrency:** 50
+- **Log Retention:** 1 week
+
+#### Staging
+- **Removal Policy:** `destroy`
+- **CORS:** Allows `*` (all origins)
+- **MOCK_AUTH:** Blocked during synthesis
+- **Reserved Concurrency:** 50
+- **DynamoDB Replicas:** None (single region)
+- **Log Retention:** 1 week
+- **Identical to Prod EXCEPT:**
+  - DynamoDB: On-Demand (not Provisioned)
+  - Provisioned Concurrency: Disabled
+  - Lower alarm thresholds (3% error, 20s duration)
+
+#### Prod
+- **Removal Policy:** `retain` (resources preserved on stack delete)
+- **CORS:** Restricted to `https://app.costscrunch.io`
+- **MOCK_AUTH:** Blocked during synthesis
+- **Reserved Concurrency:** 500
+- **DynamoDB Replicas:** `us-west-2` (global table)
+- **DynamoDB Deletion Protection:** Enabled
+- **Multi-AZ Redis:** Enabled (automatic failover)
+- **Log Retention:** 3 months
+- **WAF:** Attached to CloudFront distribution
+
+---
+
+## Manual Deployment (CLI)
+
+### Prerequisites
+1. AWS CLI configured with appropriate credentials
+2. Node.js 20+ and npm
+3. CDK CLI: `npm install -g aws-cdk`
+
+### Deploy with `deploy.sh`
+
+```bash
+# Synthesize (generate CloudFormation template)
+./scripts/deploy.sh staging synth
+
+# Deploy to staging
+./scripts/deploy.sh staging deploy
+
+# Deploy to production
+./scripts/deploy.sh prod deploy
+
+# View differences from deployed stack
+./scripts/deploy.sh prod diff
+
+# Destroy a stack
+./scripts/deploy.sh dev destroy
+```
+
+### Direct CDK Commands
+
+```bash
+cd infrastructure
+
+# Deploy specific stage via context
+cdk deploy --all \
+  -c stage=staging \
+  -c capacityMode=on-demand \
+  -c provisionedConcurrency=false \
+  -c alarmThreshold.errorRate=3 \
+  -c alarmThreshold.durationP99=20000
+```
+
+### CDK Context Variables
+
+| Variable | Type | Description | Dev | Staging | Prod |
+|----------|------|-------------|-----|---------|------|
+| `stage` | string | Environment name | `dev` | `staging` | `prod` |
+| `capacityMode` | string | DynamoDB/Lambda billing | `on-demand` | `on-demand` | `provisioned` |
+| `provisionedConcurrency` | boolean | Lambda reserved concurrency | `false` | `false` | `true` |
+| `alarmThreshold.errorRate` | number | Error rate % threshold | 5 | 3 | 1 |
+| `alarmThreshold.durationP99` | number | Duration P99 threshold (ms) | 30000 | 20000 | 10000 |
 
 ---
 
