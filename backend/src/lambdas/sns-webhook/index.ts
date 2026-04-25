@@ -217,8 +217,9 @@ async function writeScanCompleted(opts: {
   aiEnrichment: AiEnrichment;
   processingMs: number;
   now:          string;
+  isMultiPage?: boolean;
 }): Promise<void> {
-  const { expenseId, scanId, userId, jobId, extracted, s3Key, lineItems, aiEnrichment, processingMs, now } = opts;
+  const { expenseId, scanId, userId, jobId, extracted, s3Key, lineItems, aiEnrichment, processingMs, now, isMultiPage } = opts;
 
   // Atomically update scan record and back-fill parent expense in one transaction.
   // Condition: scan must still be "processing" — prevents duplicate completion
@@ -235,6 +236,7 @@ async function writeScanCompleted(opts: {
                                    aiEnrichment   = :ai,
                                    textractJobId  = :jobId,
                                    processingMs   = :ms,
+                                   isMultiPage    = :multiPage,
                                    updatedAt      = :now`,
           ConditionExpression: `#status = :processing`,
           ExpressionAttributeNames:  { "#status": "status" },
@@ -245,6 +247,7 @@ async function writeScanCompleted(opts: {
             ":ai":         aiEnrichment,
             ":jobId":      jobId,
             ":ms":         processingMs,
+            ":multiPage":   isMultiPage ?? false,
             ":now":        now,
           },
         },
@@ -388,8 +391,9 @@ async function emitScanCompleted(opts: {
   extracted:    Extracted;
   aiEnrichment: AiEnrichment;
   processingMs: number;
+  isMultiPage?: boolean;
 }): Promise<void> {
-  const { userId, expenseId, scanId, extracted, aiEnrichment, processingMs } = opts;
+  const { userId, expenseId, scanId, extracted, aiEnrichment, processingMs, isMultiPage } = opts;
 
   await eb.send(
     new PutEventsCommand({
@@ -406,6 +410,7 @@ async function emitScanCompleted(opts: {
           category:     aiEnrichment.category,
           confidence:   aiEnrichment.confidence,
           processingMs,
+          isMultiPage:  isMultiPage ?? false,
         }),
       }],
     })
@@ -497,9 +502,26 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       textractSub.close();
 
       const { extracted, lineItems } = parseExpenseDocuments(docs);
+
+      // ── Multi-page detection ──────────────────────────────────────────────────
+      // Textract StartExpenseAnalysis processes only the first page of multi-page PDFs.
+      // We detect this and flag it so the user is aware.
+      const documentPageCount = docs.length;
+      const isMultiPage = documentPageCount > 1;
+      
+      if (isMultiPage) {
+        logger.warn("Multi-page document detected — only first page was processed", {
+          documentPageCount,
+          expenseId,
+        });
+        metrics.addMetric("MultiPageDocument", MetricUnit.Count, 1);
+      }
+
       logger.info("Textract results parsed", {
         merchant:      extracted.merchant,
         lineItemCount: lineItems.length,
+        documentPageCount,
+        isMultiPage,
       });
 
       // ── Step 2: AI enrichment — Claude with keyword fallback ───────────────
@@ -564,6 +586,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
           expenseId, scanId, userId, jobId,
           extracted, s3Key, lineItems, aiEnrichment,
           processingMs, now,
+          isMultiPage,
         });
         logger.info("DynamoDB updated", { status: "completed", processingMs });
       } catch (e: any) {
@@ -587,6 +610,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
       await emitScanCompleted({
         userId, expenseId, scanId,
         extracted, aiEnrichment, processingMs,
+        isMultiPage,
       });
 
       metrics.addMetric("ScanCompleted",      MetricUnit.Count,        1);
