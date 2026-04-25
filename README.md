@@ -36,7 +36,7 @@
      └── health/         Monitoring + CI/CD smoke tests
         ↓
 🗄️ DynamoDB (Global Tables us-east-1 / us-west-2)
-📦 S3 (uploads + processed + receipts + assets, KMS encrypted)
+📦 S3 (uploads + processed + receipts + quarantine + assets, KMS encrypted)
 🔍 EventBridge (async event bus)
 📡 CloudWatch + X-Ray (observability)
 ```
