@@ -7,3 +7,4 @@ export { default as ScanModal   } from "./scanModal";
 export { default as StatCard    } from "./statCard";
 export { default as TopBar      } from "./topBar";
 export { default as ThemeSlider } from "./themeSlider";
+export { default as UploadAlertToast } from "./uploadAlerts";
