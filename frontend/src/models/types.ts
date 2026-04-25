@@ -213,7 +213,25 @@ export interface WsScanCompletedMessage {
   category:     string;
   confidence:   number;
   processingMs: number;
+  multiPage?:   boolean;
 }
+
+export interface WsQuarantineMessage {
+  type:       "QUARANTINE";
+  reason:     "unreadable" | "oversized" | "corrupt" | "unsupported_format";
+  fileName:   string;
+  message:    string;
+  scannedAt:  string;
+}
+
+export interface WsMultiPageMessage {
+  type:       "MULTI_PAGE";
+  fileName:   string;
+  pageCount:  number;
+  message:    string;
+}
+
+export type WsMessage = WsScanCompletedMessage | WsQuarantineMessage | WsMultiPageMessage;
 
 export interface ModalProps {
   isOpen: boolean;
