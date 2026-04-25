@@ -1,7 +1,16 @@
 /**
  * Auth Lambda Handler
  *
- * Routes: POST /auth/register, POST /auth/confirm, POST /auth/login, POST /auth/refresh
+ * Routes: 
+ * POST /auth/register, 
+ * POST /auth/confirm,
+ * POST /auth/login,
+ * POST /auth/refresh,
+ * POST /auth/forgot-password, 
+ * POST /auth/confirm-password,
+ * POST /auth/confirm-mfa,
+ * POST /auth/logout,
+ * DELETE /auth/account
  */
 
 import { Logger } from "@aws-lambda-powertools/logger";

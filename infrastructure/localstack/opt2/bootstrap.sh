@@ -232,7 +232,7 @@ add_route /profile ProfileFunction
 # Health (1 route)
 add_route /health HealthFunction
 
-# Auth (7 routes)
+# Auth (9 routes)
 add_route /auth/login AuthFunction
 add_route /auth/register AuthFunction
 add_route /auth/confirm AuthFunction
@@ -240,6 +240,8 @@ add_route /auth/refresh AuthFunction
 add_route /auth/forgot-password AuthFunction
 add_route /auth/confirm-password AuthFunction
 add_route /auth/confirm-mfa AuthFunction
+add_route /auth/logout AuthFunction
+add_route /auth/account AuthFunction
 
 # ── CORS ────────────────────────────────────────────────────────────────────
 echo "📦 Configuring CORS via Enforcer"

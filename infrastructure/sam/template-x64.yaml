@@ -18,6 +18,12 @@ Parameters:
   FromEmail:
     Type: String
     Default: noreply@costscrunch.dev
+  UserPoolId:
+    Type: String
+    Default: LocalPool
+  UserPoolClientId:
+    Type: String
+    Default: LocalClient
 
 Globals:
   Function:
@@ -190,6 +196,71 @@ Resources:
           Properties:
             Path: /profile
             Method: ANY
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/auth/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+          USER_POOL_ID: !Ref UserPoolId
+          USER_POOL_CLIENT_ID: !Ref UserPoolClientId
+      Events:
+        AuthRegister:
+          Type: Api
+          Properties:
+            Path: /auth/register
+            Method: POST
+        AuthConfirm:
+          Type: Api
+          Properties:
+            Path: /auth/confirm
+            Method: POST
+        AuthLogin:
+          Type: Api
+          Properties:
+            Path: /auth/login
+            Method: POST
+        AuthRefresh:
+          Type: Api
+          Properties:
+            Path: /auth/refresh
+            Method: POST
+        AuthForgotPassword:
+          Type: Api
+          Properties:
+            Path: /auth/forgot-password
+            Method: POST
+        AuthConfirmPassword:
+          Type: Api
+          Properties:
+            Path: /auth/confirm-password
+            Method: POST
+        AuthConfirmMfa:
+          Type: Api
+          Properties:
+            Path: /auth/confirm-mfa
+            Method: POST
+        AuthLogout:
+          Type: Api
+          Properties:
+            Path: /auth/logout
+            Method: POST
+        AuthDeleteAccount:
+          Type: Api
+          Properties:
+            Path: /auth/account
+            Method: DELETE
 
   AuthTriggerFunction:
     Type: AWS::Serverless::Function

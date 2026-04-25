@@ -48,6 +48,15 @@ export default function App() {
 
   const addExpense = useExpenseStore((s) => s.addExpense);
   const fetchExpenses = useExpenseStore((s) => s.fetchExpenses);
+
+  const handleLogout = useCallback(async () => {
+    const { authApi } = await import("./services/api");
+    try { await authApi.logout(); } catch (e) { console.error(e); }
+    localStorage.removeItem("cc_access_token");
+    localStorage.removeItem("cc_id_token");
+    localStorage.removeItem("cc_refresh_token");
+    setActiveTab("landing");
+  }, []);
   const expenses   = useExpenseStore((s) => s.expenses);
 
   // WebSocket Integration for real-time updates
@@ -121,6 +130,7 @@ export default function App() {
              <button onClick={() => setActiveTab('dashboard')}>Skip to App</button>
              <button onClick={() => setActiveTab('login')}>Login</button>
              <button onClick={() => setActiveTab('register')}>Sign up</button>
+             <button onClick={handleLogout}>Sign Out</button>
           </div>
           <PageComponent onNavigate={navigate} />
         </main>

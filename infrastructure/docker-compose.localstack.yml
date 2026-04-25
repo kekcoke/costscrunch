@@ -1,14 +1,22 @@
 # ─── Costscrunch — LocalStack dev/test environment ─────────────────────────────
 # Services mocked: DynamoDB, S3, SES, SQS, SNS, EventBridge, Lambda, Textract,
-#                  SSM, CloudFront, Cognito, ElastiCache, KMS, IAM, Logs, WAF
+#                  SSM, CloudFront, ElastiCache, KMS, IAM, Logs, WAF
+#
+# Cognito is provided by cognito-local (separate container on port 9229).
 #
 # Usage (Option 2 — full LocalStack):
+#   docker compose -f infrastructure/docker-compose.localstack.yml up -d
+#   # Cognito auto-provisions on first run via localstack-cognito container
 #   sam build --template infrastructure/sam/template.yaml
-#   docker compose -f docker-compose.localstack.yml \
-#     -f infrastructure/localstack/opt2/docker-compose.opt2.yml up -d
+#   sam local start-api \
+#     --template infrastructure/sam/template.yaml \
+#     --env-vars infrastructure/sam/env.json \
+#     --docker-network costscrunch-local \
+#     --port 4000
+#   # Then: VITE_API_URL=http://localhost:4000
 #
 # Usage (Option 3 — SAM CLI + LocalStack data only):
-#   docker compose -f docker-compose.localstack.yml up -d
+#   docker compose -f infrastructure/docker-compose.localstack.yml up -d
 #   sam local start-api \
 #     --template infrastructure/sam/template.yaml \
 #     --env-vars infrastructure/sam/env.json \
@@ -17,9 +25,9 @@
 #   # Then: VITE_API_URL=http://localhost:4000
 #
 # General:
-#   Stop:   docker compose -f docker-compose.localstack.yml down
-#   Logs:   docker compose -f docker-compose.localstack.yml logs -f localstack
-#   Reset:  docker compose -f docker-compose.localstack.yml down -v
+#   Stop:   docker compose -f infrastructure/docker-compose.localstack.yml down
+#   Logs:   docker compose -f infrastructure/docker-compose.localstack.yml logs -f localstack
+#   Reset:  docker compose -f infrastructure/docker-compose.localstack.yml down -v
 
 services:
   localstack:
@@ -30,8 +38,9 @@ services:
     ports:
       - "4566:4566"  # Main LocalStack edge port/gateway
     environment:
-      # Free tier services only — paid-tier services (cognito, elasticache,
-      # textract, bedrock) are excluded; attempting to start them errors out.
+      # Free tier services only — paid-tier services (elasticache, textract,
+      # bedrock) are excluded; attempting to start them errors out.
+      # Cognito is provided by cognito-local container instead.
       # apigateway (for WebSocket API testing), cloudfront (basic CRUD)
       - SERVICES=dynamodb,eventbridge,kms,lambda,logs,iam,s3,ses,sqs,sns,secretsmanager,ssm,events,apigateway,cloudfront
       - DEBUG=0
@@ -41,7 +50,8 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - ENVIRONMENT=${ENVIRONMENT:-dev}
-      - MOCK_AUTH=${MOCK_AUTH:-true}
+      - MOCK_AUTH=${MOCK_AUTH:-false}
+      - COGNITO_ENDPOINT=http://cognito-local:9229
       - HOSTNAME_EXTERNAL=localhost
       - EAGER_SERVICE_LOADING=1
       - DATA_DIR=/var/lib/localstack
@@ -55,15 +65,7 @@ services:
       - localstack-data:/var/lib/localstack
       - localstack-tmp:/tmp  # Lambda zip files survive container restarts
       - /var/run/docker.sock:/var/run/docker.sock
-      # # Map all potential env files for runtime sourcing
-      # - ../.env:/etc/localstack/.env
-      # - ../.env.dev:/etc/localstack/.env.dev
-      # - ../.env.staging:/etc/localstack/.env.staging
-      # - ../.env.production:/etc/localstack/.env.production
-      # - ../.env.local:/etc/localstack/.env.local
-      # - ./localstack/init:/etc/localstack/init/ready.d  # Auto-run init scripts
-      # - ./localstack/scripts:/etc/localstack/scripts  # Custom scripts for service setup
-      # - ./localstack/config:/etc/localstack/config  # Custom config files for services
+      - ..:/workspace  # Mount project root for script access
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
       interval: 10s
@@ -71,25 +73,71 @@ services:
       retries: 10
       start_period: 20s
 
+  # ── Cognito Local (real Cognito emulation) ───────────────────────────────────
+  cognito-local:
+    image: jagregory/cognito-local:latest
+    container_name: costscrunch-cognito-local
+    ports:
+      - "9229:9229"
+    environment:
+      - DEBUG=0
+    volumes:
+      - cognito-data:/app/.cognito
+    networks:
+      - costscrunch-local
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9229/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── LocalStack Cognito provisioning (one-shot) ────────────────────────────────
+  localstack-cognito:
+    image: node:20-alpine
+    container_name: costscrunch-localstack-cognito
+    depends_on:
+      - cognito-local
+      - localstack
+    environment:
+      - COGNITO_ENDPOINT=http://cognito-local:9229
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    working_dir: /workspace
+    command: >
+      sh -c "npm install --silent 2>/dev/null || true &&
+             node scripts/provision-local-cognito.js"
+    volumes:
+      - /Users/kevinoane/Desktop/portfolio/costscrunch:/workspace  # Mount project root
+      - node-modules:/workspace/node_modules
+    networks:
+      - costscrunch-local
+    restart: "no"
+
   # ── LocalStack seed runner (one-shot) ───────────────────────────────────────
   localstack-seed:
     image: amazon/aws-cli:2.7.32
     container_name: costscrunch-localstack-seed
-    env_file:
-      - ../.env.${ENVIRONMENT:-dev}
+    # Note: .cognito.env is created by localstack-cognito container
+    # env vars are sourced directly in setup.sh from /workspace/.cognito.env
     depends_on:
       localstack:
         condition: service_healthy
+      localstack-cognito:
+        condition: service_completed_successfully
     environment:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - APP_URL=${VITE_APP_URL:-http://localhost:3000,http://localhost:3001}
       - RUN_ID
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID:-LocalPool}
+      - COGNITO_USER_POOL_CLIENT_ID=${COGNITO_USER_POOL_CLIENT_ID:-LocalClient}
     volumes:
       - ./localstack:/localstack  # Seed scripts to initialize LocalStack services
+      - /Users/kevinoane/Desktop/portfolio/costscrunch:/workspace  # Mount project root to access .cognito.env
     entrypoint: ["/bin/bash", "/localstack/dev/setup.sh"]
-    restart: "no"                 # Run once and exit
+    restart: "no"                # Run once and exit
     networks:
       - costscrunch-local
 
@@ -97,9 +145,13 @@ networks:
   costscrunch-local:
     name: costscrunch-local
     driver: bridge
-  
+
 volumes:
   localstack-data:
     name: costscrunch-localstack-data
   localstack-tmp:
     name: costscrunch-localstack-tmp
+  cognito-data:
+    name: costscrunch-cognito-data
+  node-modules:
+    name: costscrunch-node-modules

@@ -2,6 +2,29 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: CostsCrunch local dev API — SAM CLI (ARM64 Optimized)
 
+Parameters:
+  TableNameMain:
+    Type: String
+    Default: costscrunch-dev-main
+  BucketUploadsName:
+    Type: String
+    Default: costscrunch-dev-uploads-000000000000
+  TextractSnsTopicArn:
+    Type: String
+    Default: arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion
+  TextractRoleArn:
+    Type: String
+    Default: arn:aws:iam::000000000000:role/test-role
+  FromEmail:
+    Type: String
+    Default: noreply@costscrunch.dev
+  UserPoolId:
+    Type: String
+    Default: LocalPool
+  UserPoolClientId:
+    Type: String
+    Default: LocalClient
+
 Globals:
   Function:
     Runtime: nodejs20.x
@@ -15,10 +38,13 @@ Globals:
         AWS_ACCESS_KEY_ID: test
         AWS_SECRET_ACCESS_KEY: test
         AWS_REGION: us-east-1
-        MOCK_AUTH: "true"
+        MOCK_AUTH: "false"
         TABLE_NAME_MAIN: costscrunch-dev-main
         TABLE_NAME_CONNECTIONS: costscrunch-dev-connections
         EVENT_BUS_NAME: costscrunch-dev-events
+        USER_POOL_ID: !Ref UserPoolId
+        USER_POOL_CLIENT_ID: !Ref UserPoolClientId
+        COGNITO_ENDPOINT: http://cognito-local:9229
   Api:
     Cors:
       AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
@@ -178,6 +204,71 @@ Resources:
           Properties:
             Path: /profile
             Method: ANY
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+        EntryPoints:
+          - src/lambdas/auth/index.ts
+    Properties:
+      CodeUri: ../../backend
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME_MAIN: !Ref TableNameMain
+          USER_POOL_ID: !Ref UserPoolId
+          USER_POOL_CLIENT_ID: !Ref UserPoolClientId
+      Events:
+        AuthRegister:
+          Type: Api
+          Properties:
+            Path: /auth/register
+            Method: POST
+        AuthConfirm:
+          Type: Api
+          Properties:
+            Path: /auth/confirm
+            Method: POST
+        AuthLogin:
+          Type: Api
+          Properties:
+            Path: /auth/login
+            Method: POST
+        AuthRefresh:
+          Type: Api
+          Properties:
+            Path: /auth/refresh
+            Method: POST
+        AuthForgotPassword:
+          Type: Api
+          Properties:
+            Path: /auth/forgot-password
+            Method: POST
+        AuthConfirmPassword:
+          Type: Api
+          Properties:
+            Path: /auth/confirm-password
+            Method: POST
+        AuthConfirmMfa:
+          Type: Api
+          Properties:
+            Path: /auth/confirm-mfa
+            Method: POST
+        AuthLogout:
+          Type: Api
+          Properties:
+            Path: /auth/logout
+            Method: POST
+        AuthDeleteAccount:
+          Type: Api
+          Properties:
+            Path: /auth/account
+            Method: DELETE
 
   AuthTriggerFunction:
     Type: AWS::Serverless::Function

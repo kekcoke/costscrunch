@@ -138,6 +138,13 @@ cat <<EOF > "$PROJECT_ROOT/infrastructure/sam/env.json"
       "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
       "AWS_ENDPOINT_URL": "${ENDPOINT}"
     }
+  },
+  "AuthFunction": {
+    "EnvironmentVariables": {
+      "ENVIRONMENT": "${ENVIRONMENT}",
+      "TABLE_NAME_MAIN": "${TABLE_NAME_MAIN}",
+      "AWS_ENDPOINT_URL": "${ENDPOINT}",
+      "DYNAMODB_ENDPOINT": "${ENDPOINT}"
   }
 }
 EOF

@@ -1063,6 +1063,17 @@ export class CostsCrunchStack extends Stack {
             integration: new apigwv2Integrations.HttpLambdaIntegration("AuthMfaIntegration", authLambda),
         });
 
+        // Auth - logout (authenticated)
+        addRoute(apigwv2.HttpMethod.POST, "/auth/logout", authLambda);
+
+        // Auth - delete account (authenticated)
+        api.addRoutes({
+            path: "/auth/account",
+            methods: [apigwv2.HttpMethod.DELETE],
+            integration: new apigwv2Integrations.HttpLambdaIntegration("AuthDelAccountIntegration", authLambda),
+            authorizer,
+        });
+
         // ── CloudFront Response Headers Policy (CORS for all /api/* responses) ──────
         // Adds CORS headers at the CDN layer — covers 4XX/5XX errors from API GW
         // that never reach Lambda, making per-handler CORS headers unnecessary.
