@@ -65,7 +65,7 @@ services:
       - localstack-data:/var/lib/localstack
       - localstack-tmp:/tmp  # Lambda zip files survive container restarts
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../..:/workspace  # Mount project root for script access
+      - ..:/workspace  # Mount project root for script access
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
       interval: 10s
@@ -108,7 +108,7 @@ services:
       sh -c "npm install --silent 2>/dev/null || true &&
              node scripts/provision-local-cognito.js"
     volumes:
-      - ${PWD}/../costscrunch:/workspace  # Mount project root
+      - /Users/kevinoane/Desktop/portfolio/costscrunch:/workspace  # Mount project root
       - node-modules:/workspace/node_modules
     networks:
       - costscrunch-local
@@ -118,20 +118,24 @@ services:
   localstack-seed:
     image: amazon/aws-cli:2.7.32
     container_name: costscrunch-localstack-seed
-    env_file:
-      - ../.env.${ENVIRONMENT:-dev}
+    # Note: .cognito.env is created by localstack-cognito container
+    # env vars are sourced directly in setup.sh from /workspace/.cognito.env
     depends_on:
-      - localstack
-      - localstack-cognito
+      localstack:
+        condition: service_healthy
+      localstack-cognito:
+        condition: service_completed_successfully
     environment:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - APP_URL=${VITE_APP_URL:-http://localhost:3000,http://localhost:3001}
       - RUN_ID
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID:-LocalPool}
+      - COGNITO_USER_POOL_CLIENT_ID=${COGNITO_USER_POOL_CLIENT_ID:-LocalClient}
     volumes:
       - ./localstack:/localstack  # Seed scripts to initialize LocalStack services
-      - ${PWD}/../..:/workspace  # Mount project root to access .cognito files
+      - /Users/kevinoane/Desktop/portfolio/costscrunch:/workspace  # Mount project root to access .cognito.env
     entrypoint: ["/bin/bash", "/localstack/dev/setup.sh"]
     restart: "no"                # Run once and exit
     networks:

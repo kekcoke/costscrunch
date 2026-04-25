@@ -32,14 +32,17 @@
 
 set -euo pipefail
 
-# Load environment variables: .env -> .env.<ENVIRONMENT> -> .env.local
-# ENV_FILES=("../../../.env" "../../../.env.${ENVIRONMENT:-dev}" "../../../.env.local")
-# for f in "${ENV_FILES[@]}"; do
-#   if [ -f "$f" ]; then
-#     echo "  ↳ Sourcing $f"
-#     export $(grep -v '^#' "$f" | xargs)
-#   fi
-# done
+# Load environment variables from .env files
+for f in "/workspace/.cognito.env" "/localstack/.cognito.env" "../../.env.${ENVIRONMENT:-dev}" "../../.env"; do
+  if [ -f "$f" ]; then
+    echo "  ↳ Sourcing $f"
+    set -a; source "$f"; set +a
+  fi
+done
+
+# Cognito IDs from provisioning or defaults
+COGNITO_POOL_ID="${COGNITO_USER_POOL_ID:-LocalPool}"
+COGNITO_CLIENT_ID="${COGNITO_USER_POOL_CLIENT_ID:-LocalClient}"
 
 AWS="aws --endpoint-url=http://localstack:4566 --region us-east-1"
 TABLE_NAME_MAIN="costscrunch-dev-main"
@@ -336,27 +339,22 @@ $AWS s3api put-bucket-encryption \
 
 echo "✅ Assets bucket ready"
 
-# ── Cognito MOCK ─────────────────────────────────────────────────────────────
-# Cognito (cognito-idp) is a paid-tier LocalStack service.
+# ── Cognito setup ─────────────────────────────────────────────────────────────
+# Cognito is provided by cognito-local container (real Cognito emulation).
+# IDs come from .cognito.env (written by provision-local-cognito.js).
 #
-# This mock stores auth state directly in the main DynamoDB table using the
-# same pk/sk/GSI conventions as the rest of the app. It is intentionally
-# minimal — just enough to unblock local Lambda development and seeded test
-# users. It does NOT implement token issuance, SRP, or OAuth flows.
+# For backwards compatibility, we also create DynamoDB mock records that mirror
+# the Cognito pool/client structure for any code that falls back to MOCK_AUTH.
 #
-# Mock entity layout in DynamoDB:
+# Mock entity layout in DynamoDB (when MOCK_AUTH=true):
 #   User pool   pk=POOL#<id>          sk=POOL#<id>
 #   Client      pk=POOL#<id>          sk=CLIENT#<client-id>
 #   Group       pk=POOL#<id>          sk=GROUP#<name>
 #   User        pk=POOL#<id>          sk=USER#<sub>
 #               gsi1pk=EMAIL#<email>  gsi1sk=POOL#<id>   ← email lookup
 #
-# The app's Lambda code must guard Cognito calls with a MOCK_AUTH=true env
-# check and read user identity from the DynamoDB mock table instead.
-#
 # Stable IDs so SSM values are consistent across seed re-runs.
-MOCK_POOL_ID="local-pool-costscrunch-dev"
-MOCK_CLIENT_ID="local-client-costscrunch-dev-web"
+# Use real Cognito IDs when available, fallback to mock IDs.
 
 echo "📦 Seeding Cognito mock (DynamoDB-backed)"
 
@@ -364,10 +362,10 @@ echo "📦 Seeding Cognito mock (DynamoDB-backed)"
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
-    "sk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+    "pk":         {"S": "POOL#'"$COGNITO_POOL_ID"'"},
+    "sk":         {"S": "POOL#'"$COGNITO_POOL_ID"'"},
     "entityType": {"S": "COGNITO_POOL"},
-    "poolId":     {"S": "'"$MOCK_POOL_ID"'"},
+    "poolId":     {"S": "'"$COGNITO_POOL_ID"'"},
     "poolName":   {"S": "'"${PREFIX}-users"'"},
     "createdAt":  {"S": "2026-01-01T00:00:00.000Z"}
   }' \
@@ -377,10 +375,10 @@ $AWS dynamodb put-item \
 $AWS dynamodb put-item \
   --table-name "$TABLE_NAME_MAIN" \
   --item '{
-    "pk":           {"S": "POOL#'"$MOCK_POOL_ID"'"},
-    "sk":           {"S": "CLIENT#'"$MOCK_CLIENT_ID"'"},
+    "pk":           {"S": "POOL#'"$COGNITO_POOL_ID"'"},
+    "sk":           {"S": "CLIENT#'"$COGNITO_CLIENT_ID"'"},
     "entityType":   {"S": "COGNITO_CLIENT"},
-    "clientId":     {"S": "'"$MOCK_CLIENT_ID"'"},
+    "clientId":     {"S": "'"$COGNITO_CLIENT_ID"'"},
     "clientName":   {"S": "'"${PREFIX}-web"'"},
     "callbackUrls": {"L": [{"S": "'"$APP_URL"'/callback"}]},
     "logoutUrls":   {"L": [{"S": "'"$APP_URL"'/logout"}]},
@@ -395,7 +393,7 @@ for GROUP_DEF in "admins:1" "support:2" "business:3" "pro:4" "free:5"; do
   $AWS dynamodb put-item \
     --table-name "$TABLE_NAME_MAIN" \
     --item '{
-      "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+      "pk":         {"S": "POOL#'"$COGNITO_POOL_ID"'"},
       "sk":         {"S": "GROUP#'"$GROUP_NAME"'"},
       "entityType": {"S": "COGNITO_GROUP"},
       "groupName":  {"S": "'"$GROUP_NAME"'"},
@@ -417,10 +415,10 @@ for SUB in "${!USERS[@]}"; do
   $AWS dynamodb put-item \
     --table-name "$TABLE_NAME_MAIN" \
     --item '{
-      "pk":         {"S": "POOL#'"$MOCK_POOL_ID"'"},
+      "pk":         {"S": "POOL#'"$COGNITO_POOL_ID"'"},
       "sk":         {"S": "USER#'"$SUB"'"},
       "gsi1pk":     {"S": "EMAIL#'"$EMAIL"'"},
-      "gsi1sk":     {"S": "POOL#'"$MOCK_POOL_ID"'"},
+      "gsi1sk":     {"S": "POOL#'"$COGNITO_POOL_ID"'"},
       "entityType": {"S": "COGNITO_USER"},
       "sub":        {"S": "'"$SUB"'"},
       "email":      {"S": "'"$EMAIL"'"},
@@ -436,8 +434,8 @@ done
 MOCK_USER_SUB="00000000-0000-0000-0000-test-user-001"
 MOCK_USER_ID="$MOCK_USER_SUB"
 
-echo "  ↳ Mock pool ID:   $MOCK_POOL_ID"
-echo "  ↳ Mock client ID: $MOCK_CLIENT_ID"
+echo "  ↳ Cognito pool ID:   $COGNITO_POOL_ID"
+echo "  ↳ Cognito client ID: $COGNITO_CLIENT_ID"
 echo "  ↳ Test user sub:  $MOCK_USER_SUB"
 echo "✅ Cognito mock ready"
 
@@ -654,8 +652,8 @@ $AWS ssm put-parameter --name "/costscrunch/dev/processed-bucket" --value "$BUCK
 $AWS ssm put-parameter --name "/costscrunch/dev/receipts-bucket" --value "$BUCKET_RECEIPTS_NAME"  --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/event-bus-name"  --value "$EVENT_BUS_NAME"        --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Cognito mock IDs in place of real pool/client IDs
-$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-id"    --value "$MOCK_POOL_ID"     --type String --overwrite --no-cli-pager 2>/dev/null || true
-$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-client-id" --value "$MOCK_CLIENT_ID" --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-id"    --value "$COGNITO_POOL_ID"     --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/user-pool-client-id" --value "$COGNITO_CLIENT_ID" --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Stubs for paid-tier services
 $AWS ssm put-parameter --name "/costscrunch/dev/pinpoint-app-id" --value "local-pinpoint-stub-000000" --type String --overwrite --no-cli-pager 2>/dev/null || true
 $AWS ssm put-parameter --name "/costscrunch/dev/redis-host"      --value "localhost"         --type String --overwrite --no-cli-pager 2>/dev/null || true
@@ -851,8 +849,8 @@ echo "  EventBridge bus:      $EVENT_BUS_NAME"
 echo "  Textract SNS topic:   $TEXTRACT_TOPIC_ARN"
 echo "  Alarms SNS topic:     $ALARMS_TOPIC_ARN"
 echo "  Cognito mock:"
-echo "    pool ID:            $MOCK_POOL_ID"
-echo "    client ID:          $MOCK_CLIENT_ID"
+echo "    pool ID:            $COGNITO_POOL_ID"
+echo "    client ID:          $COGNITO_CLIENT_ID"
 echo "    test user sub:      $MOCK_USER_SUB"
 echo ""
 echo "Useful commands:"
