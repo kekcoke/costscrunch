@@ -40,20 +40,6 @@ export interface AlarmThreshold {
   durationP99: number;
 }
 
-export interface CostsCrunchStackProps extends StackProps {
-  environment: "dev" | "staging" | "prod";
-  domainName?: string;
-  config?: StackConfig;
-  /** DynamoDB and Lambda capacity mode: on-demand or provisioned */
-  capacityMode?: "on-demand" | "provisioned";
-  /** CloudWatch alarm thresholds */
-  alarmThreshold?: AlarmThreshold;
-  /** Enable Lambda provisioned concurrency for critical functions */
-  provisionedConcurrency?: boolean;
-  /** Removal policy for resources (destroy for dev, retain for prod) */
-  removalPolicy?: "destroy" | "retain";
-}
-
 export class CostsCrunchStack extends Stack {
     constructor(scope: Construct, id: string, props: CostsCrunchStackProps) {
         super(scope, id, props);
@@ -1361,6 +1347,7 @@ export class CostsCrunchStack extends Stack {
  */
 import { IAspect } from "aws-cdk-lib";
 import { StackConfig } from "./StackConfig";
+import { CostsCrunchStackProps } from "./CostsCrunchStackProps";
 
 class EncryptionEnforcementAspect implements IAspect {
     public visit(node: IConstruct): void {
