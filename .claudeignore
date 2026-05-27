@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+coverage/
+tmp/
+logs/
+
+.next/
+.cache/
+
+reviews/
+ai-output/
+scratch/
+.deep-review/
+
+*.log
+*.tmp
