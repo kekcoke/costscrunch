@@ -1,6 +1,50 @@
 # CostsCrunch — SKILLS.md
 ## AI-Assisted Development Guide
-> Last updated: 2026-03-07. Some features either omitted or included but not yet implemented.
+> Last updated: 2026-06-02.
+
+---
+
+## 0. Navigation Index
+> **Start here.** Load `ai/system/system-prompt.md` first in every session, then follow the routing table below for your domain.
+
+### Shared system context (inject into every session)
+```
+ai/system/system-prompt.md
+```
+Contains: project identity, stack versions, DynamoDB key patterns, Lambda handler contract, autonomy gates, commit conventions.
+
+### Agent routing (domain → agent file → audit IDs owned)
+
+| Domain | Agent file | Audit IDs |
+|--------|-----------|-----------|
+| Backend — Lambda, DynamoDB, business logic | `ai/agents/backend-agent.md` | CON-001, CON-002, PERF-001, PERF-002, DEP-001, DEP-002, DEP-004 |
+| Frontend — React 19, Zustand, WebSocket | `ai/agents/frontend-agent.md` | FE-001, FE-002, FE-003, FE-004, FE-005 |
+| Infrastructure — CDK v2, AWS, routing | `ai/agents/infra-agent.md` | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 |
+| CI/CD — GitHub Actions, OIDC, rollback | `ai/agents/cicd-agent.md` | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001 |
+| QA — Vitest, LocalStack, coverage | `ai/agents/qa-agent.md` | TEST-001, TEST-002, TEST-003, TEST-004 |
+| Local dev environment / LocalStack → Ministack migration | `ai/agents/localstack-agent.md` | — |
+
+### Skills index (task → skill file)
+
+| Task | File |
+|------|------|
+| Fix a critical audit finding (triage, branch, test, commit) | `ai/skills/fix-critical.md` |
+| Write or migrate Terraform (standalone HCL or CDK→Terraform) | `ai/skills/terraform.md` |
+| Add a Lambda endpoint | Section 4.1 below |
+| Add a React component | Section 4.2 below |
+| Write Vitest tests | Section 4.3 below |
+| Migrate LocalStack to ministack | `ai/skills/localstack-to-ministack.md` |
+
+### Audit source files (2026-05-30)
+| Domain | Audit notes file |
+|--------|----------------|
+| Backend concurrency / performance | `notes/2026-05-30-backend-audit-2.md` |
+| Deployment gaps / type safety | `notes/2026-05-30-deployment-audit.md` |
+| Infrastructure / CDK | `notes/2026-05-30-infrastructure-audit.md` |
+| GitHub Actions / CI/CD | `notes/2026-05-30-github-actions-audit.md` |
+| Frontend / React / state | `notes/2026-05-30-frontend-audit.md` |
+
+---
 
 ---
 
@@ -264,14 +308,35 @@ When performing mutations (POST, PATCH, DELETE) in frontend handlers, always syn
 ### 4.1 Adding a new Lambda endpoint
 ```
 Context to include:
-- "CostsCrunch uses DynamoDB single-table. PK=USER#<userId> SK=EXPENSE#<id>. GSI1 is STATUS#<status> / DATE#<date>, GSI2 is CATEGORY#<cat> / DATE#<date>.
-- Lambdas use Hono (hono/aws-lambda) for routing and middleware with @aws-lambda-powertools (logger, tracer, metrics). Handlers return APIGatewayProxyResultV2.
-- Auth is Cognito JWT; userId = c.get('jwtPayload').sub (from Hono auth middleware), or userId = event.requestContext.authorizer.jwt.claims.sub
+- "CostsCrunch uses DynamoDB single-table. PK=USER#<userId> SK=EXPENSE#<id>.
+  GSI1 = STATUS#<status> / DATE#<date>  (approval queue)
+  GSI2 = CATEGORY#<cat> / DATE#<date>   (analytics)
+  GSI3 = RECEIPT_HASH#<hash> / DATE#<date>  (duplicate detection)"
+- "Lambdas use withErrorHandler + getAuth pattern. Handlers return APIGatewayProxyResult
+  (REST v1 format, dual-mode with resolveRoute() for local/prod)."
+- "Auth: userId = getAuth(event).userId  — never read from request body."
+- "Use @aws-lambda-powertools/logger — never console.log."
+- "Validate all inputs with Zod at handler entry."
+
+Handler pattern:
+  import { withErrorHandler } from '@src/utils/errorHandler';
+  import { getAuth } from '@src/helpers/auth';
+  import { ok, err } from '@src/utils/response';
+  import { logger } from '@aws-lambda-powertools/logger';
+  import { z } from 'zod';
+
+  export const handler = withErrorHandler(async (event, context) => {
+    const { userId } = getAuth(event);
+    const body = BodySchema.parse(JSON.parse(event.body ?? '{}'));
+    // ...business logic...
+    return ok({ result });
+  });
 
 Prompt template:
 "Add a Lambda endpoint [METHOD] /[path] to the CostsCrunch backend.
- It should [description]. Follow the existing handler pattern in
- backend/lambdas/expenses/index.ts. Include zod input validation."
+ It should [description]. Follow the withErrorHandler + getAuth pattern in
+ backend/src/lambdas/expenses/index.ts. Include Zod input validation.
+ Add a Vitest unit test in backend/__tests__/unit/."
 ```
 
 ### 4.2 Adding a new frontend page/component
@@ -373,3 +438,40 @@ Findings must be recorded in `notes/YYYY-MM-DD-context-review.md` with the follo
 **Scenario**: Local API works, but Prod returns `No 'Access-Control-Allow-Origin' header`.
 **Root Cause**: CloudFront `ResponseHeadersPolicy` is active but `accessControlAllowHeaders` is an empty list `[]`, blocking the `Authorization` header required by the frontend.
 **Fix**: Synchronize the `CORS_ALLOW_HEADERS` array into both the API Gateway and the CloudFront policy.
+
+---
+
+## 9. Autonomy Model
+
+> Quick reference — full detail in `ai/system/system-prompt.md` §5.
+
+### Agents MAY do autonomously:
+- Edit source files in any workspace
+- Run tests (`npm run test:ut`, `npx vitest run`, `npm run synth`)
+- `git add` and `git commit` to feature branches
+- Create new branches: `git checkout -b fix/<domain>/<audit-id>`
+
+### Agents MUST NOT do without human approval:
+- `git push` to any remote
+- Open, merge, or comment on pull requests
+- Run any deploy command (`npm run deploy:*`, `cdk deploy`)
+- Modify `.env*` files or SSM/Secrets Manager values
+
+### Branch naming
+```
+fix/<domain>/<audit-id>       e.g.  fix/backend/CON-001
+feat/<domain>/<description>   e.g.  feat/frontend/ws-reconnect
+test/<domain>/<coverage>      e.g.  test/backend/settlement-atomicity
+```
+
+### Commit format (conventional commits)
+```
+fix:   resolve <description> (resolves <audit-id>)
+feat:  add <description>
+test:  add <description> (covers <audit-id>)
+infra: <description> (resolves <audit-id>)
+chore: <description> (resolves <audit-id>)
+```
+
+### Test gate (enforced before every commit)
+Run domain tests. Do not commit if any test is red. Do not use `.skip` or `// @ts-ignore` as a workaround for a failing test.
