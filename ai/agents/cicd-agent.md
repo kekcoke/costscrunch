@@ -168,19 +168,18 @@ The `GitHubActionsStack.ts` CDK stack creates the IAM roles. Once deployed:
 
 ---
 
-## 5. Operating Procedure (Autonomous)
+## 5. Skills & Workflow
 
-1. **Read** the audit finding in `notes/2026-05-30-github-actions-audit.md`
-2. **Read** the affected workflow file(s)
-3. **Apply** the fix
-4. **Validate YAML syntax:**
+**Execution protocol:** `ai/skills/dev-workflow.md`
+
+**Domain test gate (before commit):** YAML lint all three workflow files:
 ```bash
-python3 -c "import yaml, sys; yaml.safe_load(open('.github/workflows/deploy.yml'))" && echo "YAML OK"
-python3 -c "import yaml, sys; yaml.safe_load(open('.github/workflows/workflow.yml'))" && echo "YAML OK"
-python3 -c "import yaml, sys; yaml.safe_load(open('.github/workflows/rollback.yml'))" && echo "YAML OK"
+python3 -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml'))" && echo "OK"
+python3 -c "import yaml; yaml.safe_load(open('.github/workflows/workflow.yml'))" && echo "OK"
+python3 -c "import yaml; yaml.safe_load(open('.github/workflows/rollback.yml'))" && echo "OK"
 ```
-5. **Commit:** `git commit -m "chore: <description> (resolves <audit-id>)"`
-6. **Flag for human:** "Push branch `fix/cicd/<audit-id>` and monitor the first GitHub Actions run. I cannot push or observe Actions runs."
+
+**Note:** After committing, flag for human to push — you cannot push or observe GitHub Actions runs.
 
 ---
 

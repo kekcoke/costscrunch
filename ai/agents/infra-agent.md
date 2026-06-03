@@ -148,34 +148,14 @@ const expensesLambda = new NodejsFunction(this, 'ExpensesLambda', {
 
 ---
 
-## 5. Synchronization Rule (CRITICAL)
+## 5. Skills & Workflow
 
-Every CDK change must be mirrored in all four locations:
-
-| Change type | Files to update |
-|------------|-----------------|
-| New Lambda or env var | `setup.sh`, `bootstrap.sh`, SAM template, `.env.test` |
-| New S3 bucket | `setup.sh` (create bucket), `bootstrap.sh` (inject bucket name), SAM template |
-| New DynamoDB GSI | `setup.sh` (create table with GSI), `dynamodb.test.ts` |
-| New API route | `bootstrap.sh` (register route), SAM template |
-| New security group rule | No LocalStack equivalent — document in `notes/` |
+**Execution protocol:** `ai/skills/dev-workflow.md`
+**Synchronization rule (CDK ↔ LocalStack ↔ SAM):** `ai/system/system-prompt.md §6`
 
 ---
 
-## 6. Operating Procedure (Autonomous)
-
-1. **Read** the audit finding in the notes file
-2. **Read** `CostsCrunchStack.ts` to locate the affected construct
-3. **Apply** the fix
-4. **Mirror** the change to `setup.sh`, `bootstrap.sh`, SAM template, `.env.test` as needed
-5. **Run:** `cd infrastructure && npm run synth` — must succeed with no IAspect violations
-6. **Run:** `cd infrastructure && npm test` — LocalStack tests (if LocalStack is up)
-7. **Commit:** `git commit -m "infra: <description> (resolves <audit-id>)"`
-8. **Handoff:** if the fix unlocks a backend Lambda feature, notify backend-agent to verify
-
----
-
-## 7. Verification
+## 6. Verification
 
 ```bash
 # After every CDK change

@@ -139,17 +139,12 @@ High-level steps:
 
 ---
 
-## 7. Operating Procedure (Autonomous — current LocalStack maintenance)
+## 7. Skills & Workflow
 
-For non-migration local env changes (e.g., adding a new service to setup.sh after a CDK change):
+**Execution protocol:** `ai/skills/dev-workflow.md`
+**Migration skill:** `ai/skills/localstack-to-ministack.md`
 
-1. Identify what changed in `CostsCrunchStack.ts` (coordinate with infra-agent)
-2. Add the corresponding resource to `setup.sh` (LocalStack creation command)
-3. If it's a Lambda env var: add to `bootstrap.sh` env block + SAM template Globals
-4. Add to `infrastructure/.env.test` if needed for unit tests
-5. Run: `npm run dev:opt3` — confirm the new resource is accessible
-6. Run: `cd backend && npm run test:ig` — confirm integration tests pass
-7. Commit: `git commit -m "chore: sync localstack setup with CDK stack changes"`
+For non-migration changes: identify the CDK delta with infra-agent → add resource to `setup.sh` → mirror to `bootstrap.sh` + SAM template + `.env.test` → run `npm run dev:opt3` and `npm run test:ig`.
 
 ---
 

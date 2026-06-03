@@ -139,81 +139,16 @@ Accent colors (use sparingly, e.g., CTAs and active states):
 
 ---
 
-## 5. State Synchronization Pattern
+## 5. Skills & Workflow
 
-After every successful mutation (POST, PATCH, DELETE), update the Zustand store immediately — do not re-fetch:
+**Execution protocol:** `ai/skills/dev-workflow.md`
+**Test patterns, mock conventions & state sync pattern:** `ai/skills/write-vitest-tests.md` · `ai/skills/add-frontend-component.md`
 
-```typescript
-// CORRECT pattern
-try {
-  const updated = await api.updateGroup(groupId, payload);
-  // Immediately sync local state — no re-fetch needed
-  useGroupStore.getState().updateGroup(groupId, updated);
-} catch (err) {
-  // handle error
-}
-
-// WRONG pattern — triggers unnecessary refetch
-await api.updateGroup(groupId, payload);
-await fetchGroups(); // BAD: re-fetches entire list
-```
-
-This prevents stale UI (e.g., a theme color change reverting after navigation).
+For FE-005 (ScanModal) and FE-004 (dashboard crash), also run `npm run dev` and manually test the golden path in a browser after committing.
 
 ---
 
-## 6. Operating Procedure (Autonomous)
-
-1. **Read** the audit finding in `notes/2026-05-30-frontend-audit.md`
-2. **Read** the affected component/store file
-3. **Read** the relevant backend Lambda to confirm the response shape (for FE-003, FE-004, FE-005)
-4. **Write** the minimal fix
-5. **Write or update** a Vitest test in `frontend/__tests__/components.test.tsx`
-6. **Run:** `cd frontend && npx vitest run` — must be green before commit
-7. **Commit:** `git commit -m "fix: <description> (resolves <audit-id>)"`
-
-### Visual verification
-For FE-005 (ScanModal) and FE-004 (dashboard crash), also run:
-```bash
-npm run dev  # starts frontend on port 3000
-# manually test the golden path in a browser
-```
-
----
-
-## 7. Test Conventions
-
-```typescript
-// Import from vitest — never jest
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-
-// Mock Recharts at module level (not inside describe blocks)
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: any) => children,
-  // ... other recharts exports
-}));
-
-// Mock react-router-dom navigation
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', () => ({
-  ...vi.importActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-}));
-
-// Mock API service
-vi.mock('@src/services/api', () => ({
-  api: {
-    uploadReceiptUrl: vi.fn().mockResolvedValue({ url: 'https://s3...', fields: {} }),
-    getScanResult: vi.fn().mockResolvedValue({ status: 'completed', merchant: 'Whole Foods', amount: 42.50 }),
-  }
-}));
-```
-
----
-
-## 8. Verification
+## 6. Verification
 
 ```bash
 # After every fix

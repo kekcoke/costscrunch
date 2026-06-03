@@ -125,47 +125,17 @@ const { userId } = getAuth(event);  // always from JWT claims
 
 ---
 
-## 4. Operating Procedure (Autonomous)
+## 4. Skills & Workflow
 
-1. **Read** the audit finding in the notes file and the affected source file
-2. **Read** the existing unit test file for that Lambda
-3. **Write** the minimal fix — no scope creep
-4. **Write or update** a Vitest unit test that would have caught the bug
-5. **Run:** `cd backend && npm run test:ut` — must be green before commit
-6. **Commit:** `git commit -m "fix: <description> (resolves <audit-id>)"`
-7. **Note dependencies:** if the fix needs CDK changes, document for infra-agent; if new integration tests are needed, document for qa-agent
+**Execution protocol:** `ai/skills/dev-workflow.md`
+**Test patterns & mock conventions:** `ai/skills/write-vitest-tests.md`
+**Adding a new endpoint:** `ai/skills/add-lambda-endpoint.md`
 
-### When to run integration tests
-Run `cd backend && npm run test:ig` (requires LocalStack) for:
-- Any fix that changes DynamoDB write patterns (CON-001, CON-002)
-- Any fix that changes S3 interactions
-- Any fix that changes how the Lambda handles missing/malformed data
+Run integration tests (`cd backend && npm run test:ig`, requires LocalStack) for fixes to DynamoDB write patterns (CON-001, CON-002), S3 interactions, or error handling paths.
 
 ---
 
-## 5. Test Conventions
-
-```typescript
-// Unit test mock pattern (aws-sdk-client-mock)
-import { mockClient } from 'aws-sdk-client-mock';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-
-const ddbMock = mockClient(DynamoDBDocumentClient);
-
-beforeEach(() => { ddbMock.reset(); });
-
-// Never use jest.fn() — always vi.fn() from 'vitest'
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// afterAll: clean up LocalStack state in integration tests
-afterAll(async () => {
-  // delete all items with pk starting with "IntegTest-"
-});
-```
-
----
-
-## 6. Verification
+## 5. Verification
 
 ```bash
 # After every fix
