@@ -1,214 +1,62 @@
 # CostsCrunch — SKILLS.md
-## AI-Assisted Development Guide
-> Last updated: 2026-03-07. Some features either omitted or included but not yet implemented.
+## Index & Project Conventions
+> Last updated: 2026-06-02.
 
 ---
 
-## 1. Project Overview
+## 0. Navigation Index
+> **Start here.** Load `ai/system/system-prompt.md` first in every session, then follow the routing table below.
 
-**CostsCrunch** is a serverless expense-tracking platform targeting individuals, teams, and enterprises. The entire backend runs on AWS Lambda + DynamoDB (single-table design); the frontend is a Vite/React 18 SPA. All infrastructure is defined as CDK v2 TypeScript.
-
-**Repo layout:**
+### Shared system context (inject into every session)
 ```
-costscrunch
-├── ai/
-│   ├── adapters/
-│   ├── references/
-│   │   └── REFERENCES.md
-│   ├── skills/
-│   │   └── SKILLS.md
-│   └── system/
-├── backend/
-│   ├── .DS_Store
-│   ├── __tests__/
-│   │   ├── .DS_Store
-│   │   ├── __config__/
-│   │   │   └── testConfig.ts
-│   │   ├── __helpers__/
-│   │   │   └── localstack-client.ts                  # localstack mock environment
-│   │   ├── integration/
-│   │   ├── __mocks__/
-│   │   │   ├── .DS_Store
-│   │   │   ├── @aws-lambda-powertools/
-│   │   │   │   ├── index.ts
-│   │   │   │   ├── logger.ts
-│   │   │   │   ├── metrics.ts
-│   │   │   │   └── tracer.ts
-│   │   │   └── eventBridge.ts
-│   │   ├── integration/
-│   │   │   ├── analytics.integration.test.ts
-│   │   │   ├── expenses.integration.test.ts
-│   │   │   └── receipts.integration.test.ts
-│   │   ├── setup/
-│   │   │   ├── setupTestEnv.ts
-│   │   │   ├── vitest.setup.integration.ts
-│   │   │   └── vitest.setup.unit.ts
-│   │   └── unit/
-│   │       ├── analytics.unit.test.ts
-│   │       ├── expenses.unit.test.ts
-│   │       ├── groups.unit.test.ts
-│   │       ├── receipts.unit.test.ts
-│   │       ├── sns-webhook.unit.test.ts
-│   │       └── web-socket-notifier.unit.test.ts
-│   ├── package.json
-│   ├── src/
-│   │   ├── .DS_Store
-│   │   ├── lambdas/                                  # lambda handlers
-│   │   │   ├── .DS_Store
-│   │   │   ├── analytics/
-│   │   │   │   ├── .DS_Store
-│   │   │   │   └── index.ts
-│   │   │   ├── expenses/
-│   │   │   │   └── index.ts
-│   │   │   ├── groups/
-│   │   │   │   └── index.ts
-│   │   │   ├── notifications/
-│   │   │   │   └── index.ts
-│   │   │   ├── receipts/
-│   │   │   │   └── index.ts
-│   │   │   ├── sns-webhook/
-│   │   │   │   └── index.ts
-│   │   │   └── web-socket-notifier/
-│   │   │       └── index.ts
-│   │   ├── server.ts
-│   │   └── shared/
-│   │       └── models/
-│   │           ├── charts.ts
-│   │           └── types.ts
-│   ├── tsconfig.json
-│   ├── tsconfig.test.json
-│   └── vite.config.ts
-├── frontend/
-│   ├── .DS_Store
-│   ├── .gitignore
-│   ├── README.md
-│   ├── __tests__/
-│   │   ├── .DS_Store
-│   │   ├── components.test.tsx
-│   │   └── setup.ts
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package.json
-│   ├── public/
-│   │   └── vite.svg
-│   ├── src/
-│   │   ├── .DS_Store
-│   │   ├── App.css
-│   │   ├── App.tsx
-│   │   ├── assets/
-│   │   │   └── react.svg
-│   │   ├── components/
-│   │   │   ├── donutChart.tsx
-│   │   │   ├── expenseRow.tsx
-│   │   │   ├── index.ts
-│   │   │   ├── scanModal.tsx
-│   │   │   ├── sideBar.tsx
-│   │   │   ├── statCard.tsx
-│   │   │   └── topBar.tsx
-│   │   ├── constants/
-│   │   ├── helpers/
-│   │   │   ├── expense/
-│   │   │   │   └── createExpenseFromForm.ts
-│   │   │   ├── queryString.ts
-│   │   │   └── utils.ts
-│   │   ├── index.css
-│   │   ├── index.html
-│   │   ├── main.tsx                                  # Entrypoint
-│   │   ├── mocks/                                    # Mock data
-│   │   │   ├── expenses.ts
-│   │   │   ├── groups.ts
-│   │   │   └── results.ts
-│   │   ├── models/                                   # Type, schema, constant definitions
-│   │   │   ├── constants.ts
-│   │   │   ├── interfaceProps.ts
-│   │   │   ├── scanForm.ts
-│   │   │   └── types.ts
-│   │   ├── pages/                                    # Route-level pages
-│   │   │   ├── analytics.tsx
-│   │   │   ├── dashboard.tsx
-│   │   │   ├── expenses.tsx
-│   │   │   ├── groups.tsx
-│   │   │   ├── index.tsx
-│   │   │   └── settings.tsx
-│   │   ├── services/
-│   │   │   └── api.ts                                 # Type-safe API client with Amplify auth
-│   │   └── stores/                                    # Zustand state management
-│   │       └── useExpenseStore.ts
-│   ├── tsconfig.app.json
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
-│   └── vite.config.ts
-└── infrastructure/
-    ├── .DS_Store
-    ├── .dockerignore
-    ├── __tests__/
-    │   └── localstack/
-    │       ├── dynamodb.test.ts
-    │       ├── eventbridge.test.ts
-    │       ├── health.test.ts
-    │       ├── kms.test.ts
-    │       ├── s3.test.ts
-    │       ├── ses.test.ts
-    │       ├── sns.test.ts
-    │       ├── sqs.test.ts
-    │       └── ssm.test.ts
-    ├── docker-compose.localstack.yml                  # compose file localstack and seeding
-    ├── localstack/
-    │   └── dev/
-    │       └── setup.sh                               # seeds localstack according CostsCruncStack specs
-    ├── package.json
-    ├── stacks/
-    │   └── CostsCrunchStack.ts                         # cloud infra blueprint
-    └── tsconfig.json
+ai/system/system-prompt.md
 ```
----
+Contains: project identity, stack versions, DynamoDB key patterns, Lambda handler contract, autonomy gates, commit conventions.
 
-## 2. Architecture Principles (give this context to every AI session)
+### Agent routing (domain → agent file → audit IDs owned)
 
-| Principle | Details |
-|---|---|
-| **Serverless-first** | No EC2/ECS. Every compute is Lambda (Node.js 20, 1 GB RAM). |
-| **Single-table DynamoDB** | PK / SK plus GSI1 (status+date) and GSI2 (category+date). |
-| **Cognito for identity** | All auth delegates to Cognito; the auth lambda is a thin orchestrator. |
-| **CDK v2** | All infrastructure is code — no ClickOps. |
-| **Full Vitest Stack** | Both frontend AND backend use Vitest for unified testing (vi.*). |
-| **P99 < 80 ms** | Lambda provisioned concurrency on hot paths. DynamoDB on-demand. |
+| Domain | Agent file | Audit IDs |
+|--------|-----------|-----------|
+| Backend — Lambda, DynamoDB, business logic | `ai/agents/backend-agent.md` | CON-001, CON-002, PERF-001, PERF-002, DEP-001, DEP-002, DEP-004 |
+| Frontend — React 19, Zustand, WebSocket | `ai/agents/frontend-agent.md` | FE-001, FE-002, FE-003, FE-004, FE-005 |
+| Infrastructure — CDK v2, AWS, routing | `ai/agents/infra-agent.md` | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 |
+| CI/CD — GitHub Actions, OIDC, rollback | `ai/agents/cicd-agent.md` | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001 |
+| QA — Vitest, LocalStack, coverage | `ai/agents/qa-agent.md` | TEST-001, TEST-002, TEST-003, TEST-004 |
+| Local dev / LocalStack → Ministack migration | `ai/agents/localstack-agent.md` | — |
+
+### Skills index (task → skill file)
+
+| Task | Skill file |
+|------|-----------|
+| Execute any fix (branch, commit, document) | `ai/skills/dev-workflow.md` |
+| Fix a critical audit finding (triage, priority order) | `ai/skills/fix-critical.md` |
+| Add a Lambda endpoint | `ai/skills/add-lambda-endpoint.md` |
+| Add a React component or page | `ai/skills/add-frontend-component.md` |
+| Write Vitest tests / mock patterns | `ai/skills/write-vitest-tests.md` |
+| Write or migrate Terraform | `ai/skills/terraform.md` |
+| Migrate LocalStack to ministack | `ai/skills/localstack-to-ministack.md` |
+
+### Audit source files (2026-05-30)
+
+| Domain | Audit notes file |
+|--------|----------------|
+| Backend concurrency / performance | `notes/2026-05-30-backend-audit-2.md` |
+| Deployment gaps / type safety | `notes/2026-05-30-deployment-audit.md` |
+| Infrastructure / CDK | `notes/2026-05-30-infrastructure-audit.md` |
+| GitHub Actions / CI/CD | `notes/2026-05-30-github-actions-audit.md` |
+| Frontend / React / state | `notes/2026-05-30-frontend-audit.md` |
 
 ---
 
-## 3. Key Conventions
+## 1. Project Conventions
 
-### 3.1 DynamoDB key patterns
-```
-USER#<userId>   / PROFILE#<userId>
-USER#<userId>   / EXPENSE#<expenseId>
-USER#<userId>   / NOTIFICATION#<timestamp>
-GROUP#<groupId> / PROFILE#<groupId>
-GROUP#<groupId> / EXPENSE#<expenseId>
-GROUP#<groupId> / MEMBER#<userId>
+Conventions that don't belong to a single agent or skill file.
 
-GSI1PK = STATUS#<status>    GSI1SK = DATE#<isoDate>
-GSI2PK = CATEGORY#<cat>     GSI2SK = DATE#<isoDate>
-```
-IDs are always ULIDs (sortable, no UUID collisions). Use the `ulid` npm package.
+### 1.1 Auth Flow
 
-### 3.2 Lambda handler pattern
-Every Lambda:
-1. Uses a standard router pattern with a `normalizeRoute` helper to bridge REST v1 (actual paths) and dev-server (route keys).
-2. Uses @aws-lambda-powertools/logger, tracer, and metrics.
-3. Includes a `CORS_HEADERS` constant in all response helpers (`ok`, `err`) to pass browser preflight.
-4. Returns APIGatewayProxyResult (REST v1 format).
-5. Implements **Data Integrity Guards**:
-    - Atomic creation (e.g., Group + Member mapping in one `TransactWrite`).
-    - Block-on-Balance: Prevent member/group removal if balances are not settled ($0.00).
-6. Never logs PII in production.
-7. **Daily Changelogs**: Every session involving feature branch changes must conclude with a new entry in `changelog/YYYY-MM-DD.md` summarizing infra, backend, frontend, and test advancements.
-8. **Scalability Plan Updates**: The `notes/scalability-plan.md` must be updated alongside any substantial infrastructure changes in `CostsCrunchStack.ts` that affect resource capacity, billing modes, or scaling policies.
-
-### 3.3 Auth flow
 ```
 Login  →  POST /auth/login
-  ├── mfaRequired: false  →  { accessToken }  (store in useAuthStore.token)
+  ├── mfaRequired: false  →  { accessToken }  (store in useAuthStore.token — memory only)
   └── mfaRequired: true   →  { mfaSessionToken }  →  POST /auth/mfa/verify  →  { accessToken }
 
 OAuth  →  loginWithOAuth(provider)
@@ -218,10 +66,11 @@ Token refresh  →  automatic on 401 in apiFetch()
   └── POST /auth/refresh (refresh_token httpOnly cookie sent automatically)
 ```
 
-### 3.4 Statement import pipeline
+### 1.2 Statement Import Pipeline
+
 ```
 File arrives → size check:
-  < 1 MB  →  POST /statements/import (body = raw bytes)
+  < 1 MB   →  POST /statements/import (body = raw bytes)
   >= 1 MB  →  GET /statements/upload-url → PUT presigned S3 → POST /statements/import { s3Key }
 
 Server-side:
@@ -229,147 +78,116 @@ Server-side:
   PDF  →  S3 object  →  Textract DetectDocumentText  →  parsePDFText()  →  rowToExpense()
        (heuristic: DATE_PATTERN + AMOUNT_PATTERN on each text line)
 
-rowToExpense()  →  inferCategory()  →  batchWriteExpenses() (DynamoDB BatchWrite, 25/chunk)
+rowToExpense()  →  inferCategory()  →  batchWriteExpenses() (BatchWrite, 25/chunk)
 ```
 
-### 3.5 Analytics page chart types
-| Type | Recharts component | X-axis | Y-axis |
-|---|---|---|---|
-| Donut | Custom SVG DonutChart | N/A | N/A |
+Note: `rowToExpense()` returns `null` for amount ≤ 0 — statement import silently skips negative rows.
 
-Chart switching (soon) uses React.startTransition so the old chart stays visible until the new one is ready.
+### 1.3 Analytics Chart Types
 
-### 3.6 Troubleshooting & Documentation Protocol
-When performing feature tests or troubleshooting patches:
-1. **Command Logging**: Record the exact commands used to reproduce the failure (e.g., `cd infrastructure && npx vitest run __tests__/Specific.test.ts`).
-2. **Investigation Depth**: Systematically apply targeted tools (`grep`, `find`, `ls -R`, `jq`, `env`, `Annotations.fromStack`, log tracing, and `git diff`) to surface and resolve environment-specific issues (e.g., token resolution failures, config drift, variable misalignment, dependency inconsistencies).
-3. **Troubleshooting Summary**: Upon resolution, create a technical summary in `notes/YYYY-MM-DD-feature-context-tb.md`.
-    - **Problem Statement**: Describe the failure and error codes.
-    - **Commands Used**: List steps taken to identify and fix the issue.
-    - **Root Cause**: Explain why the issue occurred (e.g., direct string manipulation on CDK Tokens).
-    - **Final Solution**: Provide code snippets and verification results.
-4. **Knowledge Loop**: If a new pitfall is discovered, update section 6 of this document.
+| Type | Component | Notes |
+|------|-----------|-------|
+| Donut | Custom SVG `DonutChart` | No Recharts |
 
-### 3.7 Frontend State Synchronization
-When performing mutations (POST, PATCH, DELETE) in frontend handlers, always synchronize the local Zustand store immediately upon a successful API response to ensure UI consistency without requiring a full re-fetch:
-1. **Store Actions**: Implement granular actions in the store (e.g., `updateGroup`, `deleteGroup`) to modify the local state array.
-2. **Component Integration**: Call the store action within the component's `try/catch` block after the API call resolves successfully.
-3. **Immediate Feedback**: This pattern is critical for theme changes (colors), name updates, and item removals to prevent "stale" UI states.
+Chart switching uses `React.startTransition` — old chart stays visible until new one is ready.
 
+### 1.4 Troubleshooting Protocol
 
----
+When debugging a cross-environment inconsistency:
+1. **Command Logging** — record exact commands used to reproduce (`cd infrastructure && npx vitest run __tests__/Specific.test.ts`)
+2. **Investigation Depth** — use `grep`, `find`, `jq`, `env`, `Annotations.fromStack`, log tracing, and `git diff`
+3. **Troubleshooting Summary** — create `notes/YYYY-MM-DD-<context>-tb.md` with: Problem Statement, Commands Used, Root Cause, Final Solution
+4. **Knowledge Loop** — if a new pitfall is found, add to §2 Common Pitfalls below
 
-## 4. AI Prompting Patterns
-
-### 4.1 Adding a new Lambda endpoint
-```
-Context to include:
-- "CostsCrunch uses DynamoDB single-table. PK=USER#<userId> SK=EXPENSE#<id>. GSI1 is STATUS#<status> / DATE#<date>, GSI2 is CATEGORY#<cat> / DATE#<date>.
-- Lambdas use Hono (hono/aws-lambda) for routing and middleware with @aws-lambda-powertools (logger, tracer, metrics). Handlers return APIGatewayProxyResultV2.
-- Auth is Cognito JWT; userId = c.get('jwtPayload').sub (from Hono auth middleware), or userId = event.requestContext.authorizer.jwt.claims.sub
-
-Prompt template:
-"Add a Lambda endpoint [METHOD] /[path] to the CostsCrunch backend.
- It should [description]. Follow the existing handler pattern in
- backend/lambdas/expenses/index.ts. Include zod input validation."
-```
-
-### 4.2 Adding a new frontend page/component
-```
-Context to include:
-- "CostsCrunch uses Vite + React 18 + Zustand + React Router v6 + Recharts."
-- "CSS vars: --color-bg, --color-surface, --color-surface-2, --color-border,
-  --color-text, --color-text-dim, --font-display.
-  Accent: #6366f1 (indigo), #0ea5e9 (sky)."
-- "Auth state: useAuthStore. Expenses: useExpenseStore."
-- "All API calls go through frontend/src/services/api.ts."
-
-Prompt template:
-"Create a [ComponentName] React component for CostsCrunch. It should [description].
- Use inline styles with existing CSS variables. Export from frontend/src/pages/.
- Write Vitest tests covering [scenarios]."
-```
-
-### 4.3 Adding Vitest tests
-```
-Context:
-- "Tests are in frontend/__tests__/components.test.tsx."
-- "Use vi.fn() not jest.fn(). Import from vitest not jest."
-- "Recharts is mocked: vi.mock('recharts', ...) at module level."
-- "react-router-dom useNavigate is mocked; mockNavigate = vi.fn()."
-- "Components use data-testid attributes."
-
-Prompt:
-"Write Vitest tests for [ComponentName] covering [cases].
- Mock [list]. Add to the existing components.test.tsx."
-```
-
----
-
-## 5. Testing Cheatsheet
+### 1.5 Testing Quick Reference
 
 ```bash
-# Backend Unit tests
+# Backend unit tests (no LocalStack needed)
 cd backend && npm run test:ut
 
-# Backend Integration tests (requires LocalStack)
+# Backend integration tests (LocalStack required)
 cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
-cd ../backend && npm run test:ig
+cd backend && npm run test:ig
 
 # Infrastructure LocalStack tests
 cd infrastructure && npm test
 
 # Frontend Vitest
-cd frontend && npx vitest
+cd frontend && npx vitest run
+
+# Coverage
+cd backend && npm run test:coverage
+cd frontend && npx vitest run --coverage
 ```
+
+Full mock patterns (aws-sdk-client-mock, RTL, LocalStack afterAll): `ai/skills/write-vitest-tests.md`
 
 ---
 
-## 6. Common Pitfalls for AI Assistants
+## 2. Common Pitfalls
 
-1. **Token storage**: Access tokens go in useAuthStore.token (memory only). Never suggest localStorage.
-2. **DynamoDB keys**: Always include PK, SK, and all applicable GSI keys on writes.
-3. **Cognito error names**: Map exception names to user-friendly messages — never return raw Cognito errors.
-4. **Statement import skips negatives**: rowToExpense() returns null for amount <= 0.
-5. **Chart switching**: Use startTransition so the old chart stays visible during transition.
-6. **Vitest vs Jest**: Use vi.* everywhere. Module-level mocks go at top of test file.
-7. **BatchWrite limits**: DynamoDB BatchWriteItem max 25 items per call — batchWriteExpenses() already chunks.
-8. **PDF parsing is heuristic**: parsePDFText() works for most bank PDFs but may miss rows in complex multi-column layouts.
-9. **Infrastructure Synchronization**: When modifying S3 bucket patterns (e.g., S3 Quarantine Pattern) or environment variables in `CostsCrunchStack.ts`, apply the changes symmetrically to:
-    - `infrastructure/localstack/dev/setup.sh` (resource creation)
-    - `infrastructure/localstack/opt2/bootstrap.sh` (Lambda env injection)
-    - `infrastructure/sam/template-*.yaml` (Local API emulation)
-    - `infrastructure/.env.test` (Unit test mocks)
-    - **Resource Flushing**: Integration tests must implement an `afterAll` flush mechanism to remove all temporary resources (e.g., groups starting with `IntegTest-`) from LocalStack to prevent state pollution.
+> Add new entries here when a non-obvious bug or constraint is discovered.
 
-## 7. Environment Variable Management (Monorepo)
-To ensure consistency across Docker, Vitest, and frontend/backend projects, follow the **Centralized Source** pattern.
+1. **Token storage** — access tokens go in `useAuthStore.token` (memory only). Never suggest `localStorage`.
+2. **DynamoDB keys** — always include PK, SK, and all applicable GSI keys on writes. Missing a GSI key breaks queries.
+3. **Cognito error names** — map exception names to user-friendly messages; never return raw Cognito errors.
+4. **Statement import skips negatives** — `rowToExpense()` returns `null` for `amount <= 0`.
+5. **Chart switching** — use `startTransition` so the old chart stays visible during the React state transition.
+6. **Vitest vs Jest** — use `vi.*` everywhere. Module-level `vi.mock()` goes at the top of the file, before any `describe` block.
+7. **BatchWrite limits** — DynamoDB `BatchWriteItem` max 25 items per call. `batchWriteExpenses()` already chunks — don't bypass it.
+8. **PDF parsing is heuristic** — `parsePDFText()` works for most bank PDFs but may miss rows in complex multi-column layouts.
+9. **Infrastructure synchronization** — any CDK change to env vars, S3 buckets, or Lambda config must be mirrored in `setup.sh`, `bootstrap.sh`, SAM template, and `.env.test`. See `ai/system/system-prompt.md §6` for the full rule.
+10. **LocalStack API ID changes on restart** — no persistent volume by default; `API_ID` in `.env.dev` must be refreshed after `docker compose down`.
+11. **SAM v1.155 socket bug** — use `--docker-network costscrunch-local` workaround; do not use `--container-host`. See `notes/sam.md`.
+12. **getAuth identity is JWT-only** — never read `userId` from request body; always `getAuth(event).userId`.
 
-### 7.1 Single Source of Truth
-- **Root `.env`**: Maintain a master `.env` (or `.env.local`) at the monorepo root for shared configuration (e.g., `APP_URL`, `AWS_REGION`).
-- **Docker Compose**: Use the `env_file` property to point to the root file.
-    - Path in `infrastructure/docker-compose.localstack.yml`: `../.env`
-    - Path in `infrastructure/localstack/opt2/docker-compose.opt2.yml`: `../../../.env`
+---
 
-### 7.2 Usage in Subprojects
-- **Vite/Frontend**: Vite automatically looks for `.env` in the project root. Use a symlink if shared variables are required: `ln -s ../../.env .env.local`.
-- **Vitest**: Use `dotenv` in the `vitest.setup.ts` to load the root file: `dotenv.config({ path: '../../.env' })`.
+## 3. Environment Variable Management
 
-## 8. System Review & Risk Identification Protocol
-When tasked with reviewing system behavior or investigating cross-environment inconsistencies (e.g., "Why does CORS fail locally but might pass/fail in Prod?"):
+To ensure consistency across Docker, Vitest, and frontend/backend, follow the **Centralized Source** pattern.
 
-### 8.1 Analysis Framework
-1. **Trace the Entry Point**: Identify where the request first hits the system (e.g., LocalStack Edge vs. CloudFront).
-2. **Audit Configuration vs. Usage**: Compare defined variables (e.g., `CORS_ALLOW_HEADERS`) against where they are actually applied (e.g., `accessControlAllowHeaders`).
-3. **Check Error Passthroughs**: Ensure 4xx/5xx responses from the infrastructure (API Gateway, WAF) include the same security headers as successful Lambda responses.
+### 3.1 Single Source of Truth
 
-### 8.2 Notetaking & Reporting
-Findings must be recorded in `notes/YYYY-MM-DD-context-review.md` with the following sections:
-- **Environment Delta**: Highlight differences between Local, Staging, and Prod.
-- **Identified Risks**: Specific configuration gaps (e.g., "CloudFront policy overrides API Gateway but lacks required headers").
-- **Optimization Strategies**: Redundancy removal or streamlining (e.g., "Consolidate CORS to a single source of truth at the CDN layer").
+- **Root `.env.dev`**: master env file for local dev (`MOCK_AUTH=true`, `AWS_ENDPOINT_URL=http://localhost:4566`, bucket names, etc.)
+- **Docker Compose**: `env_file: ../.env.dev` in `infrastructure/docker-compose.localstack.yml`
 
-### 8.3 Example: The "Edge-First" CORS Lesson
-**Scenario**: Local API works, but Prod returns `No 'Access-Control-Allow-Origin' header`.
-**Root Cause**: CloudFront `ResponseHeadersPolicy` is active but `accessControlAllowHeaders` is an empty list `[]`, blocking the `Authorization` header required by the frontend.
-**Fix**: Synchronize the `CORS_ALLOW_HEADERS` array into both the API Gateway and the CloudFront policy.
+### 3.2 Subproject Usage
+
+- **Vite/Frontend**: Vite auto-reads `.env` in project root. Use symlink if needed: `ln -s ../../.env.dev .env.local`
+- **Vitest**: load root file in `vitest.setup.ts` via `dotenv.config({ path: '../../.env.dev' })`
+- **SAM (opt3)**: `localstack-opt3.sh` generates `infrastructure/sam/env.json` from `.env.dev` at startup
+
+### 3.3 Key Variables
+
+| Variable | Where set | Purpose |
+|----------|-----------|---------|
+| `MOCK_AUTH=true` | `.env.dev` | Bypasses Cognito JWT validation in Lambda handlers |
+| `AWS_ENDPOINT_URL` | `.env.dev` | Points AWS SDK to LocalStack (or ministack) |
+| `TABLE_NAME_MAIN` | `.env.dev` + CDK | DynamoDB table name |
+| `BUCKET_*_NAME` | `.env.dev` + CDK | S3 bucket names (5 buckets) |
+
+---
+
+## 4. System Review Protocol
+
+When investigating cross-environment inconsistencies (e.g., "Why does CORS fail locally but not in prod?"):
+
+### 4.1 Analysis Framework
+
+1. **Trace the Entry Point** — identify where the request first hits the system (LocalStack Edge vs. CloudFront)
+2. **Audit Config vs. Usage** — compare defined variables (e.g., `CORS_ALLOW_HEADERS`) against where they are applied (`accessControlAllowHeaders`)
+3. **Check Error Passthroughs** — ensure 4xx/5xx responses include the same CORS/security headers as 2xx
+
+### 4.2 Reporting Format
+
+Create `notes/YYYY-MM-DD-<context>-review.md`:
+- **Environment Delta**: differences between Local, Staging, Prod
+- **Identified Risks**: specific configuration gaps
+- **Optimization Strategies**: redundancy removal or streamlining
+
+### 4.3 Example: Edge-First CORS
+
+**Scenario:** Local API works, Prod returns `No 'Access-Control-Allow-Origin' header`.
+**Root Cause:** CloudFront `ResponseHeadersPolicy` active but `accessControlAllowHeaders` is `[]`, blocking the `Authorization` header.
+**Fix:** Synchronize `CORS_ALLOW_HEADERS` into both the API Gateway and the CloudFront policy.
