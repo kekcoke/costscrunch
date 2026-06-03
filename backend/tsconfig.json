@@ -4,7 +4,7 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": ".",
+    "rootDir": "..",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -17,9 +17,11 @@
     ],
     "paths": {
       "@shared/*": ["./src/shared/*"],
-      "@lambdas/*": ["./src/lambdas/*"]
+      "@lambdas/*": ["./src/lambdas/*"],
+      "@costscrunch/api": ["../shared/src/index.ts"],
+      "@costscrunch/api/*": ["../shared/src/*"]
     }
   },
-  "include": ["src/**/*", "__tests__/**/*.ts", "vite.config.ts"],
+  "include": ["src/**/*", "__tests__/**/*.ts", "vite.config.ts", "../shared/src/**/*"],
   "exclude": ["node_modules", "dist", "dist-test"]
 }

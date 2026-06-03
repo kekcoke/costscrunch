@@ -93,10 +93,12 @@ function connect() {
 }
 ```
 
-### FE-003 — GuestScanWidget Reads Wrong Property (MEDIUM)
+### FE-003 — GuestScanWidget Reads Wrong Property (MEDIUM) ✅ ROOT CAUSE FIXED
 **File:** `frontend/src/components/` (find GuestScanWidget or similar scan result display)
-**Problem:** The component reads `scanResult.extractedData` but the backend response shape returns fields directly on the scan result object (e.g., `scanResult.merchant`, `scanResult.amount`, `scanResult.category`).
-**Fix:** Align property access to the actual backend response shape. Read `backend/src/lambdas/sns-webhook/index.ts` to confirm the exact response structure, then update the component's property access.
+**Root cause (AC-001 + AC-002):** The backend was returning raw DynamoDB `ScanResult` entities with nested `extractedData` and `aiEnrichment`. The frontend tried to read `scanResult.extractedData.merchant` (DynamoDB shape) while the `ScanResult` type declared flat fields like `scanResult.merchant`. Now fixed:
+- Backend `scanToResponse()` in `receipts/index.ts` normalizes to flat shape
+- `api.ts` uses `ScanListResponse`/`ScanResultResponse` from `@costscrunch/api`
+**Remaining work:** Verify `guestScanWidget.tsx` reads flat fields (`result.merchant`, `result.amount`, `result.category`) — no `result.extractedData` access. If any `extractedData` access remains, remove it.
 
 ### FE-004 — Dashboard GroupBudget Card Crashes (HIGH)
 **File:** `frontend/src/pages/dashboard.tsx`
@@ -146,6 +148,8 @@ Accent colors (use sparingly, e.g., CTAs and active states):
 
 For FE-005 (ScanModal) and FE-004 (dashboard crash), also run `npm run dev` and manually test the golden path in a browser after committing.
 
+**API contract rule:** Never add inline response interfaces to `frontend/src/models/types.ts` for API shapes — import from `@costscrunch/api` instead. If the type doesn't exist there yet, add it to `shared/src/api/types.ts` first and coordinate with backend-agent. See `ai/agents/contract-agent.md` for the full protocol.
+
 ---
 
 ## 6. Verification
@@ -158,5 +162,12 @@ cd frontend && npx vitest run
 cd frontend && npx vitest run --coverage
 
 # Visual check for UI fixes
-npm run dev   # frontend on :3000, point to LocalStack backend
+# Check port 3000 before starting — another dev server or agent may already hold it.
+lsof -iTCP:3000 -sTCP:LISTEN && echo "PORT 3000 OCCUPIED — identify the process before proceeding" || npm run dev
+# If 3000 is already occupied by a previously started frontend session, attach to it rather
+# than starting a second instance. Do not kill the occupying process blindly.
 ```
+
+> **Backend API port:** `npm run dev` wires the frontend to the backend via `VITE_API_URL`.
+> Confirm the value in `.env.dev` before testing: `3001` = SAM opt3, `4000` = Express opt1/opt2.
+> Mismatch causes every API call to fail with a connection refused — not a frontend bug.

@@ -25,7 +25,9 @@ export default defineConfig(({ mode }) => {
     alias: {
       // Allows absolute imports: import { X } from "@/components/X"
       "@src": resolve(__dirname, "./src"),
-      "@tests": resolve(__dirname, "__tests__") 
+      "@tests": resolve(__dirname, "__tests__"),
+      // Shared API contract types (see shared/src/api/types.ts)
+      "@costscrunch/api": resolve(__dirname, "../shared/src/index.ts"),
     },
   },
 

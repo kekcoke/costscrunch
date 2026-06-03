@@ -22,7 +22,12 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    "paths": {
+      "@costscrunch/api": ["../shared/src/index.ts"],
+      "@costscrunch/api/*": ["../shared/src/*"]
+    }
   },
   "include": ["src", "__tests__"]
 }

@@ -19,8 +19,9 @@ Contains: project identity, stack versions, DynamoDB key patterns, Lambda handle
 |--------|-----------|-----------|
 | Backend — Lambda, DynamoDB, business logic | `ai/agents/backend-agent.md` | CON-001, CON-002, PERF-001, PERF-002, DEP-001, DEP-002, DEP-004 |
 | Frontend — React 19, Zustand, WebSocket | `ai/agents/frontend-agent.md` | FE-001, FE-002, FE-003, FE-004, FE-005 |
+| API contract — shared response types | `ai/agents/contract-agent.md` | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006 |
 | Infrastructure — CDK v2, AWS, routing | `ai/agents/infra-agent.md` | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 |
-| CI/CD — GitHub Actions, OIDC, rollback | `ai/agents/cicd-agent.md` | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001 |
+| CI/CD — GitHub Actions, OIDC, rollback | `ai/agents/cicd-agent.md` | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001, CON-CI-002 |
 | QA — Vitest, LocalStack, coverage | `ai/agents/qa-agent.md` | TEST-001, TEST-002, TEST-003, TEST-004 |
 | Local dev / LocalStack → Ministack migration | `ai/agents/localstack-agent.md` | — |
 
@@ -140,6 +141,7 @@ Full mock patterns (aws-sdk-client-mock, RTL, LocalStack afterAll): `ai/skills/w
 10. **LocalStack API ID changes on restart** — no persistent volume by default; `API_ID` in `.env.dev` must be refreshed after `docker compose down`.
 11. **SAM v1.155 socket bug** — use `--docker-network costscrunch-local` workaround; do not use `--container-host`. See `notes/sam.md`.
 12. **getAuth identity is JWT-only** — never read `userId` from request body; always `getAuth(event).userId`.
+13. **API response shapes vs DynamoDB entity shapes** — `backend/src/shared/models/types.ts` contains DynamoDB entity types (with `pk`, `sk`, `gsi*` fields). These must never be returned directly from a Lambda. API response shapes (what the frontend receives) live in `shared/src/api/types.ts` (`@costscrunch/api`). Always apply a `*ToResponse()` normalization function before calling `ok()`. Skipping normalization leaks DynamoDB internals and produces frontend type mismatches (e.g., FE-003). See `ai/agents/contract-agent.md`.
 
 ---
 

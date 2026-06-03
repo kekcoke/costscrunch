@@ -486,8 +486,8 @@ describe("handleGetScan", () => {
 
   it("returns items from DynamoDB for a valid expenseId", async () => {
     const mockItems = [
-      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#1", status: "completed" },
-      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#2", status: "processing" }
+      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#1", scanId: "scan-1", expenseId, status: "completed", createdAt: "2026-01-01T00:00:00Z" },
+      { pk: `RECEIPT#${expenseId}`, sk: "SCAN#2", scanId: "scan-2", expenseId, status: "processing", createdAt: "2026-01-02T00:00:00Z" }
     ];
     mockDynamoDbSend.mockResolvedValueOnce({ Items: mockItems });
 
@@ -495,7 +495,11 @@ describe("handleGetScan", () => {
     const body = JSON.parse((result as any).body);
 
     expect(result?.statusCode).toBe(200);
-    expect(body.items).toEqual(mockItems);
+    // scanToResponse() strips DynamoDB keys and normalizes — assert on the API response shape
+    expect(body.items).toEqual([
+      { scanId: "scan-1", expenseId, status: "completed", createdAt: "2026-01-01T00:00:00Z" },
+      { scanId: "scan-2", expenseId, status: "processing", createdAt: "2026-01-02T00:00:00Z" },
+    ]);
     expect(body.count).toBe(2);
     expectCorsHeaders(result);
 
@@ -522,16 +526,17 @@ describe("handleGetScan", () => {
       path:     "/receipts/guest/scan",
       queryStringParameters: { sessionId }
     });
-    
-    const mockItems = [{ pk: `GUEST#SESSION#${sessionId}`, sk: "SCAN#1", status: "completed" }];
+
+    const mockItems = [{ pk: `GUEST#SESSION#${sessionId}`, sk: "SCAN#1", scanId: "scan-g1", expenseId: "exp-g1", status: "completed" }];
     mockDynamoDbSend.mockResolvedValueOnce({ Items: mockItems });
 
     const result = await handler(event);
     const body = JSON.parse((result as any).body);
 
     expect(result?.statusCode).toBe(200);
-    expect(body.items).toEqual(mockItems);
-    
+    // scanToResponse() strips DynamoDB keys — assert on the normalized API shape
+    expect(body.items).toEqual([{ scanId: "scan-g1", expenseId: "exp-g1", status: "completed" }]);
+
     const queryArg = vi.mocked(QueryCommand).mock.calls[0]?.[0] as any;
     expect(queryArg.ExpressionAttributeValues[":pk"]).toBe(`GUEST#SESSION#${sessionId}`);
   });
