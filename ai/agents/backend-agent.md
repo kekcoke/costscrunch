@@ -123,6 +123,16 @@ const { userId } = JSON.parse(event.body ?? '{}');
 const { userId } = getAuth(event);  // always from JWT claims
 ```
 
+### AC-001 — Receipts Scan Response Not Normalized (HIGH) ✅ FIXED
+**File:** `backend/src/lambdas/receipts/index.ts`
+**Problem:** Both scan poll handlers returned raw DynamoDB `ScanResult` entities including `pk`, `sk`, nested `extractedData`, and `aiEnrichment`. This was the root cause of FE-003 (GuestScanWidget reading wrong properties).
+**Fix applied:** `scanToResponse()` added — maps `extractedData.total → amount`, flattens `aiEnrichment`, strips all DynamoDB keys. See `contract-agent.md` §3 for the normalization pattern.
+
+### AC-003 — Group Response Leaks DynamoDB Keys (MEDIUM)
+**File:** `backend/src/lambdas/groups/index.ts`
+**Problem:** `POST /groups` (line 178) and `GET /groups/{id}` (line 192) return raw Group entities with `pk`, `sk`, `gsi1pk`, `gsi1sk`, `entityType` fields.
+**Fix:** Add `groupToResponse(item)` and add `GroupResponse` to `shared/src/api/types.ts` first — see `contract-agent.md §4` for the coordination protocol. The pattern mirrors `toResponse()` in `expenses/index.ts`.
+
 ---
 
 ## 4. Skills & Workflow
@@ -130,6 +140,8 @@ const { userId } = getAuth(event);  // always from JWT claims
 **Execution protocol:** `ai/skills/dev-workflow.md`
 **Test patterns & mock conventions:** `ai/skills/write-vitest-tests.md`
 **Adding a new endpoint:** `ai/skills/add-lambda-endpoint.md`
+
+**API contract rule:** When changing a Lambda response body shape, update `shared/src/api/types.ts` first and run `cd frontend && npx tsc --noEmit` to verify the frontend still compiles before touching the Lambda. See `ai/agents/contract-agent.md` for the full coordination protocol.
 
 Run integration tests (`cd backend && npm run test:ig`, requires LocalStack) for fixes to DynamoDB write patterns (CON-001, CON-002), S3 interactions, or error handling paths.
 
@@ -142,9 +154,22 @@ Run integration tests (`cd backend && npm run test:ig`, requires LocalStack) for
 cd backend && npm run test:ut
 
 # After DynamoDB / S3 fix (requires LocalStack up)
-cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+# Use the lock guard from localstack-agent §9 — do NOT call `docker compose up -d` directly.
+# If LocalStack is already running (another agent started it), skip startup entirely.
+curl -sf http://localhost:4566/_localstack/health | jq -e '.services.dynamodb == "available"' \
+  || (cd infrastructure && bash -c '
+      exec 200>/tmp/costscrunch-localstack.lock
+      flock -w 30 200
+      docker compose -f docker-compose.localstack.yml up -d
+      until curl -sf http://localhost:4566/_localstack/health | jq -e ".services.dynamodb == \"available\"" &>/dev/null; do sleep 2; done
+      flock -u 200')
 cd backend && npm run test:ig
 
 # Coverage check (must not regress below 75% functions/lines, 70% branches)
 cd backend && npm run test:coverage
 ```
+
+> **Port note:** integration test HTTP calls target `http://localhost:4566` (LocalStack) for DynamoDB/S3,
+> not the application API port. When smoke-testing a running backend, use port `4000` (Express opt1/opt2)
+> or port `3001` (SAM opt3 — see localstack-agent §3 Network table). Do not assume a fixed port; check
+> which opt is running.

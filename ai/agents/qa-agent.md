@@ -133,7 +133,15 @@ it('returns 409 when group member already exists (concurrent join)', async () =>
 cd backend && npm run test:ut
 
 # Backend integration tests (LocalStack required)
-cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+# IMPORTANT: never call `docker compose up -d` directly — use the health-check-first lock guard.
+# If LocalStack is already healthy (started by another agent), this is a no-op.
+curl -sf http://localhost:4566/_localstack/health | jq -e '.services.dynamodb == "available"' \
+  || (cd infrastructure && bash -c '
+      exec 200>/tmp/costscrunch-localstack.lock
+      flock -w 30 200
+      docker compose -f docker-compose.localstack.yml up -d
+      until curl -sf http://localhost:4566/_localstack/health | jq -e ".services.dynamodb == \"available\"" &>/dev/null; do sleep 2; done
+      flock -u 200')
 cd backend && npm run test:ig
 
 # Backend coverage
@@ -145,7 +153,7 @@ cd frontend && npx vitest run
 # Frontend coverage
 cd frontend && npx vitest run --coverage
 
-# Infrastructure LocalStack tests
+# Infrastructure LocalStack tests (also uses the running LocalStack instance — no restart)
 cd infrastructure && npm test
 
 # Run a single test file
@@ -156,6 +164,15 @@ cd frontend && npx vitest run __tests__/components.test.tsx
 cd backend && npm run test:watch
 cd frontend && npx vitest
 ```
+
+> **Parallel isolation rules:**
+> - Never call `docker compose down` or restart LocalStack from inside a test run — tests use the shared
+>   running instance. Teardown is the orchestrator's responsibility.
+> - Integration tests must flush their own DynamoDB records in `afterAll` (write test data with a
+>   unique `pk` prefix, e.g., `TEST#<uuid>#` so cleanup can be targeted without affecting other agents).
+> - Do not run `cd infrastructure && npm test` (infra LocalStack tests) concurrently with
+>   `cd backend && npm run test:ig` — both write to the same LocalStack DynamoDB tables and produce
+>   cross-test noise. Serialize them.
 
 ---
 

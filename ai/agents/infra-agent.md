@@ -159,18 +159,35 @@ const expensesLambda = new NodejsFunction(this, 'ExpensesLambda', {
 
 ```bash
 # After every CDK change
+# cdk.out/ is not concurrent-safe: do not run `npm run synth` while another agent is also
+# synthesizing (e.g., during a parallel CI job or alongside backend-agent integration tests).
 cd infrastructure && npm run synth
 
 # After security group or network changes (requires LocalStack)
-cd infrastructure && docker compose -f docker-compose.localstack.yml up -d
+# Use the lock guard — do NOT call `docker compose up -d` directly.
+# See localstack-agent §9 for the full protocol.
+curl -sf http://localhost:4566/_localstack/health | jq -e '.services.dynamodb == "available"' \
+  || bash -c '
+      exec 200>/tmp/costscrunch-localstack.lock
+      flock -w 30 200
+      docker compose -f docker-compose.localstack.yml up -d
+      until curl -sf http://localhost:4566/_localstack/health | jq -e ".services.dynamodb == \"available\"" &>/dev/null; do sleep 2; done
+      flock -u 200'
 cd infrastructure && npm test
 
 # After adding a new Lambda (verify route is accessible)
-npm run dev:opt3   # start SAM + LocalStack + Vite
-curl http://localhost:4000/expenses/export   # expect non-404
+# Port depends on the running opt:
+#   opt3 (SAM CLI): http://localhost:3001  ← default; use find_free_port if 3001 is occupied
+#   opt2 (Express via LocalStack): http://localhost:4000
+npm run dev:opt3   # start SAM + LocalStack + Vite (uses port 3001 by default)
+curl http://localhost:3001/expenses/export   # expect non-404 (NOT 4000)
 
 # Synth output — look for IAspect violations in stderr
 ```
+
+> **SAM build isolation:** if running `sam build` outside the canonical `npm run dev:opt3` flow
+> (e.g., in a one-off verification), use `--build-dir /tmp/sam-build-$$` to avoid clobbering
+> the `.aws-sam/` directory used by any concurrently running opt3 session.
 
 ---
 

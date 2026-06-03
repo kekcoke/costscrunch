@@ -7,7 +7,8 @@ import { toQueryString } from "../helpers/queryString";
 import type {
   Expense, Group, ScanResult, CreateExpenseRequest,
   GetExpensesQuery, InitiateUploadResponse
-} from "../models/types.js"
+} from "../models/types.js";
+import type { ScanListResponse, ScanResultResponse, UploadUrlResponse } from "@costscrunch/api";
 import type { ExpenseSummaryStats } from "../models/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://api.costscrunch.io";
@@ -168,8 +169,9 @@ export const expensesApi = {
 // ─── Receipts / Scanning ──────────────────────────────────────────────────────
 export const receiptsApi = {
   // 1. Get pre-signed S3 upload URL (Authenticated)
+  // Returns UploadUrlResponse from @costscrunch/api — backend field is `url`, not `uploadUrl`.
   getUploadUrl: (file: File, expenseId?: string) =>
-    apiFetch<InitiateUploadResponse>("/receipts/upload-url", {
+    apiFetch<UploadUrlResponse>("/receipts/upload-url", {
       method: "POST",
       body: JSON.stringify({
         filename: file.name,
@@ -181,7 +183,7 @@ export const receiptsApi = {
 
   // 1b. Get pre-signed S3 upload URL (Guest)
   getGuestUploadUrl: (file: File, sessionId: string) =>
-    apiFetch<InitiateUploadResponse>("/receipts/guest-upload-url", {
+    apiFetch<UploadUrlResponse>("/receipts/guest-upload-url", {
       method: "POST",
       body: JSON.stringify({
         filename: file.name,
@@ -205,34 +207,35 @@ export const receiptsApi = {
   scanReceipt: async (
     file: File,
     onProgress?: (stage: "uploading" | "scanning" | "complete") => void
-  ): Promise<{ expenseId: string; scanId: string; result?: ScanResult }> => {
+  ): Promise<{ expenseId: string; scanId: string; result?: ScanResultResponse }> => {
     onProgress?.("uploading");
-    const { uploadUrl, expenseId, scanId } = await receiptsApi.getUploadUrl(file);
-    await receiptsApi.uploadToS3(uploadUrl, file);
+    const { url, expenseId, scanId } = await receiptsApi.getUploadUrl(file);
+    await receiptsApi.uploadToS3(url, file);
 
     onProgress?.("scanning");
-    // Poll for results (Textract is async)
     const result = await receiptsApi.pollScanResult(expenseId, scanId);
     onProgress?.("complete");
 
     return { expenseId, scanId, result };
   },
 
-  // Poll scan result with exponential backoff
+  // Poll scan result with exponential backoff.
+  // Backend returns ScanListResponse — extracts the first item.
   pollScanResult: async (
     expenseId: string,
     scanId: string,
     maxAttempts = 10
-  ): Promise<ScanResult> => {
+  ): Promise<ScanResultResponse> => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise<void>((r) =>
         setTimeout(r, Math.min(1000 * 2 ** attempt, 8000))
       );
-      const result = await apiFetch<ScanResult>(
+      const envelope = await apiFetch<ScanListResponse>(
         `/receipts/${expenseId}/scan?scanId=${scanId}`
       );
-      if (result.status === "completed" || result.status === "failed") {
-        return result;
+      const item = envelope.items[0];
+      if (item?.status === "completed" || item?.status === "failed") {
+        return item;
       }
     }
     throw new Error("Scan timed out after maximum polling attempts");
@@ -242,16 +245,15 @@ export const receiptsApi = {
   pollGuestScanResult: async (
     sessionId: string,
     maxAttempts = 10
-  ): Promise<ScanResult> => {
+  ): Promise<ScanResultResponse> => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise<void>((r) =>
         setTimeout(r, Math.min(1000 * 2 ** attempt, 8000))
       );
-      const result = await apiFetch<ScanResult>(
+      const envelope = await apiFetch<ScanListResponse>(
         `/receipts/guest/scan?sessionId=${sessionId}`
       );
-      // Guest API returns { items: ScanResult[], count: number }
-      const item = (result as any).items?.[0];
+      const item = envelope.items[0];
       if (item?.status === "completed" || item?.status === "failed") {
         return item;
       }

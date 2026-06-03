@@ -27,7 +27,26 @@ import { withLocalAuth } from "../_local/mockAuth.js";
 import type { S3Event, APIGatewayProxyEventV2 } from "aws-lambda";
 import { ulid } from "ulid";
 import type { ScanResult } from "../../shared/models/types.js";
+import type { ScanResultResponse } from "@costscrunch/api";
 import { initiateUploadSchema } from "../../shared/validation/schemas.js";
+
+// Normalize a DynamoDB ScanResult entity to the API response shape.
+// Strips pk/sk/gsi keys and flattens extractedData + aiEnrichment.
+function scanToResponse(item: ScanResult): ScanResultResponse {
+  const extracted = (item as any).extractedData ?? {};
+  const ai = (item as any).aiEnrichment ?? {};
+  return {
+    scanId:     item.scanId,
+    expenseId:  item.expenseId,
+    status:     item.status,
+    merchant:   extracted.merchant,
+    amount:     extracted.total,
+    date:       extracted.date,
+    category:   ai.category,
+    confidence: ai.confidence,
+    createdAt:  item.createdAt,
+  };
+}
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const s3 = createS3Client();
@@ -208,7 +227,7 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
         },
       }));
 
-      const scans = result.Items || [];
+      const scans = (result.Items || []).map(item => scanToResponse(item as ScanResult));
       return ok({ items: scans, count: scans.length });
     }
 
@@ -227,7 +246,7 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
         },
       }));
 
-      const scans = result.Items || [];
+      const scans = (result.Items || []).map(item => scanToResponse(item as ScanResult));
       return ok({ items: scans, count: scans.length });
     }
 

@@ -1,19 +1,22 @@
 // ─── CostsCrunch — Shared Domain Types ───────────────────────────────────────
 // Single source of truth for most domain models used across frontend.
-// Backend should export matching types from backend/src/shared/models/types.ts.
+// API response shape types (scan results, upload URL) live in @costscrunch/api.
 
 import type { ReactNode } from "react";
+export type { ExpenseStatus, ScanResultResponse, SplitResponse, UploadUrlResponse } from "@costscrunch/api";
 
-export type ExpenseStatus = "approved" | "pending" | "rejected" | "draft";
+// ExpenseStatus is re-exported from @costscrunch/api (canonical: draft | submitted | approved | rejected | reimbursed)
 export type CategoryName = "Groceries" | "Travel" | "Software" | "Meals" | "Office" | "Equipment" | "Other";
 export type ExpenseSource = "manual" | "scan" | "bank_sync" | "api";
 
+// Split.shares and Split.settledAt are optional — only present for "shares" split method
+// and after settlement respectively. Matches backend SplitResponse from @costscrunch/api.
 export interface Split {
   userId: string;
   amount: number;
   percentage?: number;
-  shares: number;
-  settledAt: string;
+  shares?: number;
+  settledAt?: string;
 }
 
 export interface Expense {
@@ -97,15 +100,9 @@ export interface Group {
   myShare: number;
 }
 
-export interface ScanResult {
-  merchant: string;
-  amount: string;
-  category: CategoryName;
-  date: string;
-  notes: string;
-  confidence: number;
-  status: "pending" | "completed" | "failed";
-}
+// ScanResult is an alias for ScanResultResponse from @costscrunch/api.
+// Do not extend or duplicate here — update shared/src/api/types.ts instead.
+export type { ScanResultResponse as ScanResult } from "@costscrunch/api";
 
 // ─── API Request / Response shapes ───────────────────────────────────────────
 

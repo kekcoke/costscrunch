@@ -116,6 +116,7 @@ Services that LocalStack free tier **does not** fully emulate — any replacemen
 3. **Opt2 vs Opt3 endpoint format** — opt2 Lambda environment uses `http://localstack:4566`; opt3 uses `http://costscrunch-localstack:4566` (DNS differs by network)
 4. **SAM Globals env var merge bug** — `ENVIRONMENT: dev` is hardcoded in SAM Globals because SAM's merge strategy drops the parameter override; do not "fix" this
 5. **cognito-local is a separate container** — not part of LocalStack proper; its data does not persist across restarts; the `localstack-cognito` one-shot container re-provisions it on each start
+6. **Parallel agent execution risks** — three separate agents (backend-agent, qa-agent, infra-agent) each contain `docker compose up -d` in their verification sections. Running them concurrently causes: (a) container restart mid-test invalidating the API_ID, (b) `env.json` clobber when two opt3 orchestrators generate it simultaneously, (c) `.aws-sam/` build dir corruption from concurrent `sam build`. See §9 for the lock protocol all agents must follow.
 
 ---
 
@@ -136,6 +137,81 @@ High-level steps:
 8. Final verification: `npm run dev:opt3` end-to-end smoke test
 9. Update `README.md`, `CLAUDE.md`, and this file with ministack specifics
 10. Commit: `git commit -m "feat: migrate local dev environment from LocalStack to ministack"`
+
+---
+
+## 9. Parallel Execution: Orchestrator Lock & Dynamic Ports
+
+**Rule:** Only one process may start, stop, or restart LocalStack at a time. All other parallel agents must check health first and skip startup if LocalStack is already available.
+
+### Port ownership (canonical)
+
+| Port | Owner | Conflict action |
+|------|-------|-----------------|
+| 3000 | Vite frontend | Check before `npm run dev`; if occupied, identify PID — do not kill blindly |
+| 3001 | SAM CLI (opt3 default) | Fallback range 3002–3099 using `find_free_port` below |
+| 4000 | Express local dev (opt1/opt2) | Check before starting; only one instance |
+| 4566 | LocalStack | Shared singleton; never restart if healthy |
+| 9229 | cognito-local | Shared singleton; part of docker-compose stack |
+
+**Port check helper** (add to any shell script that binds a port):
+```bash
+find_free_port() {
+  local start=${1:-3001} end=${2:-3099}
+  for port in $(seq "$start" "$end"); do
+    ! lsof -iTCP:"$port" -sTCP:LISTEN &>/dev/null && echo "$port" && return
+  done
+  echo "[ERROR] No free port in $start-$end" >&2; exit 1
+}
+
+# Usage — opt3 SAM start:
+SAM_PORT=$(find_free_port 3001 3099)
+sam local start-api --port "$SAM_PORT" ...
+```
+
+### LocalStack startup lock
+
+Use a POSIX file lock so at most one process performs `docker compose up -d` at a time. All other agents check health first and skip if already running:
+
+```bash
+LOCK_FILE=/tmp/costscrunch-localstack.lock
+
+localstack_healthy() {
+  curl -sf http://localhost:4566/_localstack/health \
+    | jq -e '.services.dynamodb == "available"' &>/dev/null
+}
+
+localstack_start_locked() {
+  # Skip entirely if already healthy — do NOT restart a live container
+  localstack_healthy && return 0
+
+  # Acquire exclusive lock (wait up to 30 s for another agent to finish starting)
+  exec 200>"$LOCK_FILE"
+  flock -w 30 200 || { echo "[ERROR] Could not acquire LocalStack lock" >&2; exit 1; }
+
+  # Re-check inside the lock (another agent may have started it while we waited)
+  if ! localstack_healthy; then
+    docker compose -f docker-compose.localstack.yml up -d
+    until localstack_healthy; do sleep 2; done
+  fi
+
+  flock -u 200
+}
+
+# Call this instead of bare `docker compose up -d`
+localstack_start_locked
+```
+
+**All agents that currently call `docker compose ... up -d` must substitute `localstack_start_locked` above.**
+
+### Shared file collision guards
+
+| Shared artifact | Risk | Guard |
+|-----------------|------|-------|
+| `infrastructure/sam/env.json` | Two opt3 orchestrators clobber simultaneously | Only `localstack-opt3.sh` (owned by this agent) generates it; other agents must not invoke opt3 while it is running |
+| `cdk.out/` | Two `cdk synth` runs corrupt the output directory | Only infra-agent runs `cdk synth`; serialize with the LOCK_FILE above if running alongside integration tests |
+| `.env.dev` (API_ID) | LocalStack restart regenerates API_ID; stale value breaks integration tests in other agents | Never restart LocalStack while integration tests are in-flight; use `localstack_healthy` guard |
+| `.aws-sam/` | `sam build` from two processes overwrites build artifacts | Use `--build-dir /tmp/sam-build-$$` (PID-namespaced) when running outside the canonical opt3 flow |
 
 ---
 
