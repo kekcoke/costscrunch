@@ -153,6 +153,24 @@ concurrency:
   cancel-in-progress: false   # Never cancel an in-progress deploy — queue it
 ```
 
+### CON-CI-002 — Parallel CI Jobs Share a Single LocalStack State (HIGH)
+**Problem:** The CI workflow runs backend integration tests (`npm run test:ig`) and infrastructure LocalStack tests (`cd infrastructure && npm test`) as separate jobs. If they run concurrently against the same LocalStack container, they write to the same DynamoDB tables and produce cross-job test noise (flaky tests that pass locally and fail intermittently in CI).
+**Fix in `workflow.yml`:** Either serialize the two test jobs with `needs`:
+```yaml
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cd backend && npm run test:ig
+
+  infra-test:
+    runs-on: ubuntu-latest
+    needs: backend-test   # serializes against the shared LocalStack state
+    steps:
+      - run: cd infrastructure && npm test
+```
+Or isolate by prefixing all test data writes with a job-unique string (`TEST#${{ github.run_id }}#`) so records from parallel jobs never collide. The prefix must be stripped in `afterAll` cleanup. Coordinate with qa-agent for the test data isolation pattern.
+
 ---
 
 ## 4. OIDC Setup Reference
