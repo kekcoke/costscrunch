@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Group, GroupMember } from "../../models/types";
-import { groupsApi } from "../../services/api";
+import { groupsApi, ApiError } from "../../services/api";
 import { useGroupStore } from "../../stores/useGroupStore";
 import { LoadingSpinner } from "../spinner";
 import Modal from "../modal";
@@ -26,8 +26,10 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   const [editForm, setEditForm] = useState({ name: "", description: "", color: "" });
   const [status, setStatus] = useState<{ type: "success" | "error" | "warn", msg: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<{ notFound: boolean; message: string } | null>(null);
 
   const fetchGroup = () => {
+    setFetchError(null);
     Promise.all([
       groupsApi.get(groupId),
       groupsApi.getBalances(groupId)
@@ -38,6 +40,12 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
         name: groupData.name,
         description: groupData.description || "",
         color: groupData.color,
+      });
+    }).catch((err: unknown) => {
+      const notFound = err instanceof ApiError && err.statusCode === 404;
+      setFetchError({
+        notFound,
+        message: err instanceof Error ? err.message : "Failed to load group",
       });
     }).finally(() => setLoading(false));
   };
@@ -140,6 +148,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
   };
 
   if (loading) return <LoadingSpinner size="40px" />;
+  if (fetchError) return <div>{fetchError.notFound ? "Group not found." : fetchError.message}</div>;
   if (!group) return <div>Group not found.</div>;
 
   const members = group.members || [];
