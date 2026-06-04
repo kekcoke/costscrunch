@@ -1287,6 +1287,12 @@ export class CostsCrunchStack extends Stack {
             masterKey: kmsKey,
         });
 
+        // Subscribe an alert email if provided via CDK context (--context alarmEmail=ops@example.com)
+        const alarmEmail = this.node.tryGetContext("alarmEmail") as string | undefined;
+        if (alarmEmail) {
+            alarmsTopic.addSubscription(new sns_subscriptions.EmailSubscription(alarmEmail));
+        }
+
         const alarmAction = new cw_actions.SnsAction(alarmsTopic);
 
         // 1. Lambda Error Rate & Duration Alarms
