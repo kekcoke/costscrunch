@@ -153,42 +153,39 @@ describe('Expenses Lambda - Group Support', () => {
     });
   });
 
-  describe('ScanCommand Fallback', () => {
-    it('should use ScanCommand as fallback when GetCommand fails', async () => {
+  describe('GET /expenses/{id} — direct key lookup', () => {
+    it('returns 200 when GetCommand finds the item', async () => {
       const mockSend = getMockSend();
-      
+
       const mockEvent = {
         httpMethod: 'GET',
         path: '/expenses/expense-123',
       };
 
-      // GetCommand returns no Item, then ScanCommand finds it
-      mockSend.mockResolvedValueOnce({ Item: undefined });
       mockSend.mockResolvedValueOnce({
-        Items: [{ pk: 'USER#', sk: 'EXPENSE#expense-123', expenseId: 'expense-123' }],
+        Item: { pk: 'USER#test-user-001', sk: 'EXPENSE#expense-123', expenseId: 'expense-123' },
       });
 
       const result = await rawHandler(mockEvent);
 
       expect(result.statusCode).toBe(200);
-      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(mockSend).toHaveBeenCalledTimes(1);
     });
 
-    it('should return 404 when both GetCommand and ScanCommand fail', async () => {
+    it('returns 404 when GetCommand misses (no scan fallback)', async () => {
       const mockSend = getMockSend();
-      
+
       const mockEvent = {
         httpMethod: 'GET',
         path: '/expenses/nonexistent',
       };
 
-      // GetCommand returns no Item, ScanCommand returns empty
       mockSend.mockResolvedValueOnce({ Item: undefined });
-      mockSend.mockResolvedValueOnce({ Items: [] });
 
       const result = await rawHandler(mockEvent);
 
       expect(result.statusCode).toBe(404);
+      expect(mockSend).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -273,7 +270,7 @@ describe('Expenses Lambda - Group Support', () => {
       };
 
       mockSend.mockResolvedValueOnce({
-        Items: [{ pk: 'USER#', sk: 'EXPENSE#expense-123', ownerId: 'user-123' }],
+        Item: { pk: 'USER#test-user-001', sk: 'EXPENSE#expense-123', ownerId: 'user-123' },
       });
       mockSend.mockResolvedValueOnce({
         Attributes: {

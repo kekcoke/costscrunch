@@ -321,14 +321,6 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
       Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
     }));
     if (result.Item) return ok(result.Item);
-
-    const scanRes = await ddb.send(new ScanCommand({
-      TableName: TABLE,
-      FilterExpression: "sk = :sk",
-      ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
-    }));
-    if (scanRes?.Items?.[0]) return ok(scanRes.Items[0]);
-
     return err("Expense not found", 404);
   }
 
@@ -381,21 +373,14 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const body = parsed.data;
     const now = new Date().toISOString();
 
-    const currentRes = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND sk = :sk",
-      ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":sk": `EXPENSE#${expenseId}` }
-    }));
-    let currentItem = currentRes?.Items?.[0];
+    const groupId = body.groupId ?? event.queryStringParameters?.groupId;
+    const pk = groupId ? `GROUP#${groupId}` : `USER#${auth.userId}`;
 
-    if (!currentItem) {
-      const scanRes = await ddb.send(new ScanCommand({
-        TableName: TABLE,
-        FilterExpression: "sk = :sk",
-        ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
-      }));
-      currentItem = scanRes?.Items?.[0];
-    }
+    const currentRes = await ddb.send(new GetCommand({
+      TableName: TABLE,
+      Key: { pk, sk: `EXPENSE#${expenseId}` },
+    }));
+    const currentItem = currentRes?.Item;
 
     if (!currentItem) return err("Expense not found", 404);
 
