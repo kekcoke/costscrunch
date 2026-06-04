@@ -1,4 +1,4 @@
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient } from "../utils/awsClients.js";
 
 const ddb = createDynamoDBDocClient();
@@ -47,9 +47,9 @@ export class AnalyticsRepository {
     } else if (scope === "group" && groupId) {
       expenses = await this.queryPartition(`GROUP#${groupId}`, filterExpr, exprNames, exprValues, scanForward);
     } else {
-      // scope === 'all'
-      const personalPromise = this.queryPartition(`USER#${userId}`, filterExpr, exprNames, exprValues, scanForward);
-      
+      // scope === 'all': personal via queryPartition + group analytics via BatchGetItem
+      const personalExpenses = await this.queryPartition(`USER#${userId}`, filterExpr, exprNames, exprValues, scanForward);
+
       const memberRes = await ddb.send(new QueryCommand({
         TableName: TABLE,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
@@ -59,14 +59,25 @@ export class AnalyticsRepository {
         },
       }));
 
-      const groupIds = (memberRes.Items || []).map(m => m.groupId);
-      const groupPromises = groupIds.map(gid => 
-        this.queryPartition(`GROUP#${gid}`, filterExpr, exprNames, exprValues, scanForward)
-      );
+      const groupIds = (memberRes.Items || []).map(m => m.groupId as string);
+      const period = `${startDate}:${endDate}`;
+      const groupExpenses: any[] = [];
 
-      const allResults = await Promise.all([personalPromise, ...groupPromises]);
-      expenses = allResults.flat();
-      
+      if (groupIds.length > 0) {
+        let pendingKeys = groupIds.map(gid => ({ pk: `GROUP#${gid}`, sk: `ANALYTICS#${period}` }));
+        while (pendingKeys.length > 0) {
+          const batch = pendingKeys.splice(0, 100);
+          const batchRes = await ddb.send(new BatchGetCommand({
+            RequestItems: { [TABLE]: { Keys: batch } },
+          }));
+          groupExpenses.push(...(batchRes.Responses?.[TABLE] ?? []));
+          const unprocessed = batchRes.UnprocessedKeys?.[TABLE]?.Keys;
+          pendingKeys = unprocessed ? (unprocessed as typeof batch) : [];
+        }
+      }
+
+      expenses = [...personalExpenses, ...groupExpenses];
+
       // Manual sort for multi-partition results
       expenses.sort((a, b) => {
         const valA = a[sortBy];

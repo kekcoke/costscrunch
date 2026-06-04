@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { AnalyticsRepository } from "../../src/logic/analyticsRepository.js";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
+
+// Capture the TABLE name as the module sees it (from .env.dev loaded by vitest setup,
+// before beforeEach overrides process.env.TABLE_NAME_MAIN to "TestTable").
+const MODULE_TABLE = process.env.TABLE_NAME_MAIN!;
 
 describe("AnalyticsRepository", () => {
   let repo: AnalyticsRepository;
@@ -63,11 +67,11 @@ describe("AnalyticsRepository", () => {
     });
 
     it("sorts 'all' scope results manually", async () => {
-      // Mock personal query
       ddbMock.on(QueryCommand)
         .resolvesOnce({ Items: [mockExpense("p1", "2023-01-05", 50)] }) // Personal
-        .resolvesOnce({ Items: [{ groupId: "group-1" }] }) // Memberships
-        .resolvesOnce({ Items: [mockExpense("g1", "2023-01-01", 20)] }); // Group 1
+        .resolvesOnce({ Items: [{ groupId: "group-1" }] });              // Memberships
+      ddbMock.on(BatchGetCommand)
+        .resolvesOnce({ Responses: { [MODULE_TABLE]: [mockExpense("g1", "2023-01-01", 20)] }, UnprocessedKeys: {} });
 
       const result = await repo.getExpenses({
         userId: "user-123",
