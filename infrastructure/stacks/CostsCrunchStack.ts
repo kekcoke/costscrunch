@@ -756,12 +756,6 @@ export class CostsCrunchStack extends Stack {
         textractTopic.addSubscription(new sns_subscriptions.SqsSubscription(scanQueue));
         snsWebhookLambda.addEventSource(new lambdaEventSources.SqsEventSource(scanQueue));
 
-        // API Gateway Management: ws-notifier pushes messages to connections
-        wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
-            actions:   ["execute-api:ManageConnections"],
-            resources: [`arn:aws:execute-api:${regionId}:${accountId}:*/prod/POST/@connections/*`],
-        }));
-
         // KMS
         kmsKey.grantEncryptDecrypt(expensesLambda);
         kmsKey.grantEncryptDecrypt(imagePreprocessLambda);
