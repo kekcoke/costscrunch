@@ -694,7 +694,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadData(analyticsLambda);
         table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
-        table.grantWriteData(authTriggerLambda);
+        table.grantReadWriteData(authTriggerLambda);
         table.grantReadData(expenseExportLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
