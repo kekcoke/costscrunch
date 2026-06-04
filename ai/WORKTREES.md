@@ -74,7 +74,7 @@
 | Worktree | Branch | Agent | Issues | PR | Status | Depends On |
 |---|---|---|---|---|---|---|
 | `p2/backend-perf` | `feat/p2/backend-perf` | backend-agent | CON-003, CON-004, PERF-003, PERF-004, SCALE-001, SCALE-002, SCALE-003 | — | blocked | p1/backend-critical |
-| `p2/backend-safety` | `feat/p2/backend-safety` | backend-agent | SF-006, SF-007, SF-008, SF-009, SIMP-001, SIMP-002, OPS-001, DEP-003 | — | blocked | p1/backend-critical |
+| `p2/backend-safety` | `feat/p2/backend-safety` | backend-agent | SF-006, SF-007, SF-008, SF-009, SIMP-001, SIMP-002, OPS-001, DEP-003 | — | pr open | p1/backend-critical |
 | `p2/types` | `feat/p2/types` | types-agent | TDA-001, TDA-002, TDA-003, TDA-004, TDA-005 | — | blocked | p1/backend-critical |
 | `p2/infra` | `feat/p2/infra` | infra-agent | IaC-008, IaC-009, IaC-010, IaC-011, IaC-012, IaC-013, IaC-014, IaC-015, IaC-016, IaC-017, IaC-018 | — | blocked | p1/infra-critical |
 | `p2/cicd` | `feat/p2/cicd` | cicd-agent | SEC-003, SEC-004, BUG-004, BUG-005, BUG-006, BUG-007, BUG-008, CONF-001, CONF-002 | — | blocked | p1/cicd-critical |
