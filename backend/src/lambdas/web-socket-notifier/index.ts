@@ -119,6 +119,33 @@ async function pushToConnection(
   }
 }
 
+// ─── Section 4: Shared fan-out helper ────────────────────────────────────────
+// Pushes a payload to all active connections for a user and throws only when
+// every connection fails (preserves partial-failure semantics for callers).
+
+async function pushToUsers(userId: string, connectionIds: string[], payload: unknown): Promise<{ sent: number; stale: number; errors: number }> {
+  const results = await Promise.allSettled(
+    connectionIds.map(id => pushToConnection(userId, id, payload as object))
+  );
+
+  let sent = 0, stale = 0, errors = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      r.value === "sent" ? sent++ : stale++;
+    } else {
+      errors++;
+      logger.error("Failed to push to connection", { reason: r.reason });
+    }
+  }
+
+  if (errors > 0 && errors === connectionIds.length) {
+    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
+    throw firstRejection.reason;
+  }
+
+  return { sent, stale, errors };
+}
+
 // ─── Handler: ReceiptScanCompleted ─────────────────────────────────────────────
 async function handleReceiptScanCompleted(
   event: EventBridgeEvent<"ReceiptScanCompleted", ReceiptScanCompletedDetail>
@@ -149,30 +176,13 @@ async function handleReceiptScanCompleted(
     isMultiPage:  detail.isMultiPage ?? false,
   };
 
-  const results = await Promise.allSettled(
-    connectionIds.map(id => pushToConnection(userId, id, wsPayload))
-  );
+  const { sent, stale, errors } = await pushToUsers(userId, connectionIds, wsPayload);
 
-  let sent = 0, stale = 0, errors = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      r.value === "sent" ? sent++ : stale++;
-    } else {
-      errors++;
-      logger.error("Failed to push to connection", { reason: r.reason });
-    }
-  }
-
-  logger.info("WebSocket push complete", { sent, stale, errors });
+  logger.info("WebSocket push complete", { sent, stale });
   metrics.addMetric("WsMessagesSent", MetricUnit.Count, sent);
   metrics.addMetric("WsStaleConns",   MetricUnit.Count, stale);
   if (errors > 0) {
     metrics.addMetric("WsPartialFailures", MetricUnit.Count, errors);
-  }
-
-  if (errors > 0 && errors === connectionIds.length) {
-    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
-    throw firstRejection.reason;
   }
 }
 
@@ -202,29 +212,12 @@ async function handleQuarantineEvent(
     action:   "Please upload a valid image or PDF receipt",
   };
 
-  const results = await Promise.allSettled(
-    connectionIds.map(id => pushToConnection(userId, id, wsPayload))
-  );
+  const { sent, stale, errors } = await pushToUsers(userId, connectionIds, wsPayload);
 
-  let sent = 0, stale = 0, errors = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      r.value === "sent" ? sent++ : stale++;
-    } else {
-      errors++;
-      logger.error("Failed to push quarantine to connection", { reason: r.reason });
-    }
-  }
-
-  logger.info("Quarantine WebSocket push complete", { sent, stale, errors });
+  logger.info("Quarantine WebSocket push complete", { sent, stale });
   metrics.addMetric("WsQuarantineSent", MetricUnit.Count, sent);
   if (errors > 0) {
     metrics.addMetric("WsPartialFailures", MetricUnit.Count, errors);
-  }
-
-  if (errors > 0 && errors === connectionIds.length) {
-    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
-    throw firstRejection.reason;
   }
 }
 
