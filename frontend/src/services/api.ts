@@ -399,10 +399,9 @@ export const authApi = {
     return tokens;
   },
 
-  deleteAccount: (userId: string, email: string) =>
+  deleteAccount: () =>
     apiFetch<{ message: string }>("/auth/account", {
       method: "DELETE",
-      body: JSON.stringify({ userId, email }),
     }),
 
   logout: async () => {

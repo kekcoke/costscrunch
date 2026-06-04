@@ -162,7 +162,7 @@ export function SettingsPage() {
             onClick={async () => {
               if (confirm("Are you sure you want to delete your account? This will archive your data and disable your login.")) {
                 try {
-                  await authApi.deleteAccount(profile.userId, profile.email);
+                  await authApi.deleteAccount();
                   localStorage.clear();
                   window.location.href = "/";
                 } catch (e: any) {
