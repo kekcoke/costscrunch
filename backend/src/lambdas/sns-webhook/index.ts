@@ -147,14 +147,20 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Equipment:  ["apple", "best buy", "dell", "hp", "logitech", "amazon"],
 };
 
+const categoryPatterns = Object.fromEntries(
+  Object.entries(CATEGORY_KEYWORDS).map(([cat, kws]) => [
+    cat,
+    new RegExp(kws.map(k => `\\b${k}\\b`).join("|"), "i"),
+  ])
+);
+
 function guessCategory(
   merchant: string,
   lineItems: string[]
 ): { category: string; confidence: number } {
   const text = [merchant, ...lineItems].join(" ");
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    // \b ensures we only match whole words. 'i' makes it case-insensitive.
-    if (keywords.some(kw => new RegExp(`\\b${kw}\\b`, "i").test(text))) {
+  for (const [category, pattern] of Object.entries(categoryPatterns)) {
+    if (pattern.test(text)) {
       return { category, confidence: 85 };
     }
   }
