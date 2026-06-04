@@ -150,7 +150,12 @@ export class CostsCrunchStack extends Stack {
             tableName: `${prefix}-main`,
             partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
             sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
-            billing: dynamodb.Billing.onDemand(),
+            billing: capacityMode === 'provisioned'
+                ? dynamodb.Billing.provisioned({
+                    readCapacity: dynamodb.Capacity.fixed(isProd ? 50 : 5),
+                    writeCapacity: dynamodb.Capacity.autoscaled({ maxCapacity: isProd ? 20 : 5 }),
+                  })
+                : dynamodb.Billing.onDemand(),
             encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
             pointInTimeRecovery: true,
             deletionProtection: isProd,
