@@ -4,6 +4,7 @@ import {
   GetCommand,
   QueryCommand,
   UpdateCommand,
+  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { describe, it, expect, beforeEach } from "vitest";
 
@@ -95,10 +96,10 @@ describe("Groups API Unit Tests", () => {
   describe("POST /groups/{id}/settle", () => {
     it("marks approved expenses as reimbursed", async () => {
       ddbMock
-        .on(QueryCommand).resolves({ 
-          Items: [{ pk: "GROUP#g1", sk: "EXPENSE#e1", status: "approved" }] 
+        .on(QueryCommand).resolves({
+          Items: [{ pk: "GROUP#g1", sk: "EXPENSE#e1", status: "approved" }]
         })
-        .on(UpdateCommand).resolves({});
+        .on(TransactWriteCommand).resolves({});
 
       const res = await handler(makeEvent({
         routeKey: "POST /groups/{id}/settle",
@@ -106,9 +107,10 @@ describe("Groups API Unit Tests", () => {
       }) as any);
 
       expect(res.statusCode).toBe(200);
-      expect(ddbMock).toHaveReceivedCommand(UpdateCommand);
-      const update = ddbMock.commandCalls(UpdateCommand)[0].args[0].input;
-      expect(update.ExpressionAttributeValues[":s"]).toBe("reimbursed");
+      expect(ddbMock).toHaveReceivedCommand(TransactWriteCommand);
+      const tw = ddbMock.commandCalls(TransactWriteCommand)[0].args[0].input;
+      const updateItem = tw.TransactItems![0].Update!;
+      expect(updateItem.ExpressionAttributeValues![":s"]).toBe("reimbursed");
     });
 
     it("returns 400 if no approved expenses", async () => {

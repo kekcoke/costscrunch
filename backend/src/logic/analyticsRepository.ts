@@ -82,15 +82,22 @@ export class AnalyticsRepository {
   }
 
   private async queryPartition(pk: string, filterExpr: string, exprNames: Record<string, string>, exprValues: Record<string, any>, scanForward: boolean) {
-    const res = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: filterExpr,
-      ExpressionAttributeNames: exprNames,
-      ExpressionAttributeValues: { ":pk": pk, ":prefix": "EXPENSE#", ...exprValues },
-      ScanIndexForward: scanForward,
-    }));
-    return res.Items || [];
+    const items: any[] = [];
+    let lastKey: Record<string, any> | undefined;
+    do {
+      const res = await ddb.send(new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        FilterExpression: filterExpr,
+        ExpressionAttributeNames: exprNames,
+        ExpressionAttributeValues: { ":pk": pk, ":prefix": "EXPENSE#", ...exprValues },
+        ScanIndexForward: scanForward,
+        ExclusiveStartKey: lastKey,
+      }));
+      items.push(...(res.Items || []));
+      lastKey = res.LastEvaluatedKey;
+    } while (lastKey);
+    return items;
   }
 }
 
