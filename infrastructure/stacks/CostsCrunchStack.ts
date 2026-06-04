@@ -396,7 +396,7 @@ export class CostsCrunchStack extends Stack {
             cacheNodeType: isProd ? "cache.t2.micro" : "cache.t2.micro",
             engine: "redis",
             engineVersion: "7.0",
-            numCacheClusters: 1,
+            numCacheClusters: isProd ? 2 : 1,
             automaticFailoverEnabled: isProd,
             multiAzEnabled: true,
             atRestEncryptionEnabled: true,
