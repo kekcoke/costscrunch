@@ -103,6 +103,25 @@
 
 ---
 
+## GitHub Actions — Pinned SHAs
+
+| Action | Tag | Commit SHA |
+|---|---|---|
+| `actions/checkout` | v4 | `34e114876b0b11c390a56381ad16ebd13914f8d5` |
+| `actions/setup-node` | v4 | `49933ea5288caeca8642d1e84afbd3f7d6820020` |
+| `actions/upload-artifact` | v4 | `ea165f8d65b6e75b540449e92b4886f43607fa02` |
+| `actions/download-artifact` | v4 | `d3f86a106a0bac45b974a628896c90dbdf5c8093` |
+| `aws-actions/configure-aws-credentials` | v4 | `7474bc4690e29a8392af63c5b98e7449536d5c3a` |
+| `codecov/codecov-action` | v4 | `b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238` |
+| `returntocorp/semgrep-action` | v1 | `713efdd345f3035192eaa63f56867b88e63e4e5d` |
+| `gitleaks/gitleaks-action` | v2 | `ff98106e4c7b2bc287b24eaf42907196329070c7` |
+| `8398a7/action-slack` | v3.19.0 | `77eaa4f1c608a7d68b38af4e3f739dcd8cba273e` |
+
+Refresh: `gh api repos/<owner>/<repo>/git/refs/tags/<tag> --jq '.object.sha'`
+(Dereference annotated tags: if `.object.type == "tag"`, call `git/tags/<sha>` again.)
+
+---
+
 ## Load Testing Targets
 
 | Metric | Target |
