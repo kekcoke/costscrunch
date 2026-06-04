@@ -248,3 +248,5 @@ ai/embeddings/
 
 # Local Notes
 notes/
+
+.agent.md

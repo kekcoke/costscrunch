@@ -29,9 +29,21 @@ jobs:
   health-check-and-rollback:
     name: Health Check → Rollback on Failure
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       health_check_passed: ${{ steps.health_check.outputs.passed }}
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4
+        with:
+          role-to-assume: ${{ inputs.environment == 'production' && vars.PROD_GITHUB_ROLE_ARN || vars.STAGING_GITHUB_ROLE_ARN }}
+          role-session-name: rollback-${{ github.run_id }}
+          aws-region: us-east-1
+
       - name: Wait for propagation (30s)
         run: |
           echo "Waiting 30 seconds for deployment propagation..."
@@ -45,45 +57,45 @@ jobs:
           RETRY_INTERVAL=10
           APP_URL="${{ inputs.api_url }}"
           HEALTH_ENDPOINT="${APP_URL}/health"
-          
+
           echo "Starting health checks against: ${HEALTH_ENDPOINT}"
-          
+
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i of $MAX_RETRIES..."
-            
+
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${HEALTH_ENDPOINT}")
-            
+
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health check passed (HTTP $HTTP_CODE)"
               echo "passed=true" >> $GITHUB_OUTPUT
               exit 0
             fi
-            
+
             echo "❌ Health check failed (HTTP $HTTP_CODE)"
-            
+
             if [ $i -lt $MAX_RETRIES ]; then
               echo "Retrying in ${RETRY_INTERVAL} seconds..."
               sleep $RETRY_INTERVAL
             fi
           done
-          
+
           echo "passed=false" >> $GITHUB_OUTPUT
           echo "All $MAX_RETRIES health check attempts failed. Triggering rollback..."
           exit 1
 
       - name: Rollback on failure
-        if: steps.health_check.outputs.passed == 'false'
+        if: always() && steps.health_check.outputs.passed == 'false'
         run: |
           echo "Initiating rollback for stack: ${{ inputs.stack_name }}"
           echo "Deployment SHA: ${{ inputs.deployment_sha }}"
-          
+
           # Get previous deployed template from S3
           PREVIOUS_TEMPLATE=$(aws cloudformation get-template \
             --stack-name ${{ inputs.stack_name }} \
             --template-stage Previous \
             --query 'TemplateBody' \
             --output text 2>/dev/null || echo "")
-          
+
           if [ -n "$PREVIOUS_TEMPLATE" ]; then
             echo "Found previous template, rolling back..."
             aws cloudformation rollback-stack \
@@ -96,16 +108,16 @@ jobs:
             npm run deploy:${{ inputs.cdk_command }} -w infrastructure
             git checkout -
           fi
-          
+
           echo "Waiting for rollback to complete..."
           aws cloudformation wait stack-rollback-complete \
             --stack-name ${{ inputs.stack_name }}
-          
+
           echo "Rollback completed for stack: ${{ inputs.stack_name }}"
 
       - name: Post rollback notification
-        if: steps.health_check.outputs.passed == 'false'
-        uses: 8398a7/action-slack@v3
+        if: always() && steps.health_check.outputs.passed == 'false'
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
         with:
           status: 'failure'
           text: |
@@ -119,7 +131,7 @@ jobs:
 
       - name: Post success notification
         if: steps.health_check.outputs.passed == 'true'
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
         with:
           status: 'success'
           text: |

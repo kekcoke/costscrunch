@@ -20,8 +20,8 @@ jobs:
     name: Frontend · Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -34,7 +34,7 @@ jobs:
       - name: Run tests
         run: npm run test -w frontend
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -42,8 +42,8 @@ jobs:
     name: Backend · Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -56,7 +56,7 @@ jobs:
       - name: Run unit tests
         run: npm run test:ut -w backend
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -64,8 +64,8 @@ jobs:
     name: Infrastructure · Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -82,9 +82,9 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - name: Semgrep SAST
-        uses: returntocorp/semgrep-action@v1
+        uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d  # v1
         with:
           config: >-
             p/typescript
@@ -97,7 +97,7 @@ jobs:
       - name: Dependency audit
         run: npm audit --audit-level=high
       - name: Secrets scan — Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -105,14 +105,24 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [quality-frontend, quality-backend, quality-infrastructure, security]
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install all dependencies
         run: npm ci
+      - name: Configure AWS credentials (OIDC)
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4
+        with:
+          role-to-assume: ${{ vars.DEV_GITHUB_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Build backend
         run: npm run build -w backend
       - name: Build frontend
@@ -121,18 +131,8 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: CDK Synth
         run: npm run synth -w infrastructure
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
-      - name: Configure AWS credentials (OIDC) for synth
-        if: github.event_name != 'pull_request'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.DEV_GITHUB_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: build-artifacts
           path: |
@@ -146,15 +146,15 @@ jobs:
     needs: build
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
         run: npm ci -w backend
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: build-artifacts
       - name: Run LocalStack & Cognito
@@ -162,7 +162,7 @@ jobs:
           # Start LocalStack
           cd infrastructure
           docker compose -f docker-compose.localstack.yml up -d
-          
+
           # Start Cognito Local Emulator
           docker run -d -p 9229:9229 --name cognito-local \
             -v $(pwd)/../.cognito:/app/.cognito \
@@ -172,7 +172,7 @@ jobs:
           # Wait for LocalStack health
           echo "⏳ Waiting for LocalStack..."
           for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
-          
+
           # Wait for Cognito health
           echo "⏳ Waiting for Cognito Local..."
           for i in {1..20}; do nc -z localhost 9229 && break || sleep 5; done
@@ -192,15 +192,44 @@ jobs:
         run: |
           # Fetch dynamic API_ID for REST v1
           API_ID=$(docker exec costscrunch-localstack /usr/local/bin/aws --endpoint-url=http://localhost:4566 --region us-east-1 apigateway get-rest-apis --query "items[?name=='costscrunch-dev-api'].id | [-1]" --output text)
-          
+
           # Load Cognito IDs from provisioning artifacts
           COGNITO_USER_POOL_ID=$(jq -r '.UserPool.Id' .cognito_pool_info.json)
           COGNITO_CLIENT_ID=$(jq -r '.UserPoolClient.ClientId' .cognito_client_info.json)
-          
+
           echo "Running against API: $API_ID"
           echo "Cognito Pool: $COGNITO_USER_POOL_ID"
-          
+
           API_ID=$API_ID \
           COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
           COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID \
           npm run test:ig -w backend
+
+  # CON-CI-002: serialized after backend integration tests to prevent
+  # concurrent LocalStack access on shared self-hosted runners
+  infra-integration:
+    name: Infrastructure · Integration Tests (LocalStack)
+    runs-on: ubuntu-latest
+    needs: [build, integration]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci -w infrastructure
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: build-artifacts
+      - name: Start LocalStack
+        run: |
+          cd infrastructure
+          docker compose -f docker-compose.localstack.yml up -d
+      - name: Wait for LocalStack
+        run: |
+          for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
+      - name: Run LocalStack infrastructure tests
+        run: npm run test:localstack -w infrastructure
