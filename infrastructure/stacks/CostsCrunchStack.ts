@@ -834,8 +834,10 @@ export class CostsCrunchStack extends Stack {
             autoDeploy:    true,
         });
 
-        // Inject the WSS callback URL so ws-notifier can call @connections
-        wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", config.webSocketEndpoint || wsStage.callbackUrl);
+        // Inject the WSS callback URL so ws-notifier and image-preprocess can call @connections
+        const wsEndpoint = config.webSocketEndpoint || wsStage.callbackUrl;
+        wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", wsEndpoint);
+        imagePreprocessLambda.addEnvironment("WEBSOCKET_ENDPOINT", wsEndpoint);
 
         // ── Provisioned Concurrency (prod only) ─────────────────────────────────
         if (useProvisionedConcurrency) {
