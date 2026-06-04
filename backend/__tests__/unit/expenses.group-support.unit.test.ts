@@ -72,7 +72,7 @@ describe('Expenses Lambda - Group Support', () => {
           merchant: 'Restaurant',
           amount: 100.00,
           currency: 'USD',
-          category: 'meals',
+          category: 'Meals',
           date: '2024-03-31',
           description: 'Team lunch',
           groupId: 'group-123',
@@ -107,7 +107,7 @@ describe('Expenses Lambda - Group Support', () => {
           merchant: 'Taxi',
           amount: 50.00,
           currency: 'USD',
-          category: 'transport',
+          category: 'Travel',
           date: '2024-03-31',
         }),
       };

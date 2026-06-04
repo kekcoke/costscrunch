@@ -22,6 +22,7 @@ const urlSchema = z.string().url();
 
 export const ExpenseStatusSchema = z.enum(['draft', 'pending', 'submitted', 'approved', 'rejected', 'reimbursed']);
 export type ExpenseStatus = z.infer<typeof ExpenseStatusSchema>;
+export const CategoryNameSchema = z.enum(['Groceries', 'Travel', 'Software', 'Meals', 'Office', 'Equipment', 'Other']);
 export const entityTypeSchema = z.enum(['PERSONAL', 'GROUP', 'BUSINESS']);
 export const splitMethodSchema = z.enum(['equal', 'exact', 'percentage', 'shares']);
 export const userRoleSchema = z.enum(['owner', 'admin', 'member', 'viewer']);
@@ -48,7 +49,7 @@ export const createExpenseSchema = z.object({
   merchant: z.string().min(1, 'Merchant is required').max(200, 'Merchant name too long'),
   amount: z.number().positive('Amount must be positive').max(1_000_000, 'Amount exceeds maximum'),
   currency: currencySchema,
-  category: z.string().max(50).optional().default('Other'),
+  category: CategoryNameSchema.optional().default('Other'),
   date: isoDateSchema,
   description: z.string().max(1000).optional(),
   groupId: ulidSchema.optional(),
@@ -64,7 +65,7 @@ export const createExpenseSchema = z.object({
 
 export const updateExpenseSchema = z.object({
   merchant: z.string().min(1).max(200).optional(),
-  category: z.string().max(50).optional(),
+  category: CategoryNameSchema.optional(),
   date: isoDateSchema.optional(),
   description: z.string().max(1000).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
