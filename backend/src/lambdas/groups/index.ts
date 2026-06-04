@@ -16,6 +16,11 @@ import { ulid } from "ulid";
 import type { ApiEvent, Group, GroupMember } from "../../shared/models/types.js";
 import { createGroupSchema } from "../../shared/validation/schemas.js";
 
+function groupToResponse(item: Group): Omit<Group, "pk" | "sk" | "gsi1pk" | "gsi1sk" | "entityType"> {
+  const { pk, sk, gsi1pk, gsi1sk, entityType, ...rest } = item;
+  return rest;
+}
+
 const ddb = createDynamoDBDocClient();
 const ses = new SESClient(baseConfig());
 const TABLE = process.env.TABLE_NAME_MAIN!;
@@ -175,7 +180,7 @@ export const rawHandler = async (event: ApiEvent) => {
         { Put: { TableName: TABLE, Item: { pk: `USER#${auth.userId}`, sk: `GROUP_MEMBER#${id}`, entityType: "GROUP_MEMBER", groupId: id, name: body.name, userId: auth.userId, role: "owner", joinedAt: now } } }
       ]
     });
-    return ok(group, 201);
+    return ok(groupToResponse(group), 201);
   }
 
   if (route === "GET /groups") {
@@ -189,7 +194,7 @@ export const rawHandler = async (event: ApiEvent) => {
   if (route === "GET /groups/{id}") {
     const result = await ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } }));
     if (!result.Item) return err("Group not found", 404);
-    return ok(result.Item);
+    return ok(groupToResponse(result.Item as Group));
   }
 
   if (route === "GET /groups/{id}/balances") {
