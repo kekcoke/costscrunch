@@ -62,3 +62,53 @@ export interface UploadUrlResponse {
   expenseId: string;
   scanId: string;
 }
+
+// ─── Group ────────────────────────────────────────────────────────────────────
+
+export interface GroupMemberResponse {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  joinedAt: string;
+  totalSpend: number;
+  balance: number;
+}
+
+export interface BudgetResponse {
+  period: "monthly" | "quarterly" | "annual" | "trip";
+  amount: number;
+  currency: string;
+  category?: string;
+  alertAt: number;
+  hardCap: boolean;
+}
+
+// Normalized shape returned by POST /groups and GET /groups/{id} after
+// groupToResponse() strips DynamoDB keys (pk, sk, gsi1pk, gsi1sk, entityType).
+export interface GroupResponse {
+  groupId: string;
+  name: string;
+  description?: string;
+  type: "personal" | "trip" | "household" | "business" | "project";
+  ownerId: string;
+  color: string;
+  iconEmoji?: string;
+  members: GroupMemberResponse[];
+  memberCount: number;
+  budgets: BudgetResponse[];
+  currency: string;
+  approvalRequired?: boolean;
+  approvalThreshold?: number;
+  requireReceipts?: boolean;
+  requireReceiptsAbove?: number;
+  policyId?: string;
+  costCenters?: string[];
+  projectCodes?: string[];
+  totalSpend: number;
+  monthSpend: number;
+  expenseCount: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

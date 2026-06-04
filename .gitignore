@@ -209,6 +209,9 @@ backend/shared/generated/
 storybook-static/
 
 
+# ─── Worktree agent context (generated per-worktree by syslink-configs.sh) ────
+.agent.md
+
 # ─── Temporary files ──────────────────────────────────────────────────────────
 tmp/
 temp/
