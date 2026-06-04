@@ -349,13 +349,11 @@ export const handler = withErrorHandler(async (event: S3Event) => {
             .toBuffer();
           outputFormat = "png";
         } else {
-          // JPEG: re-compress with lossless quality
-          logger.info("JPEG detected — applying lossless compression");
+          // JPEG: auto-orient only — no re-encode to preserve Textract accuracy
+          logger.info("JPEG detected — applying auto-orient only");
           processedBuffer = await sharp(bodyBuffer)
-            .jpeg({ 
-              quality: 100,  // Lossless quality
-              mozjpeg: true, // Better compression
-            })
+            .withMetadata()
+            .rotate()
             .toBuffer();
           outputFormat = "jpg";
         }

@@ -25,6 +25,8 @@ const { mockS3Send, mockSharpInstance } = vi.hoisted(() => {
     jpeg: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
     heif: vi.fn().mockReturnThis(),
+    withMetadata: vi.fn().mockReturnThis(),
+    rotate: vi.fn().mockReturnThis(),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from("compressed-data")),
   };
 
@@ -201,14 +203,13 @@ describe("MIME type detection", () => {
 
 // ─── UNIT: Image compression ──────────────────────────────────────────────────
 describe("Image compression", () => {
-  it("compresses JPEG with quality 100", async () => {
+  it("auto-orients JPEG without re-encoding", async () => {
     resetS3Mock("image/jpeg");
     await handler(makeS3Event(`uploads/${TEST_USER_ID}/exp-001/scan-001/receipt.jpg`));
-    
-    expect(mockSharpInstance.jpeg).toHaveBeenCalledWith({
-      quality: 100,
-      mozjpeg: true,
-    });
+
+    expect(mockSharpInstance.withMetadata).toHaveBeenCalled();
+    expect(mockSharpInstance.rotate).toHaveBeenCalled();
+    expect(mockSharpInstance.jpeg).not.toHaveBeenCalled();
   });
 
   it("compresses PNG with max compression", async () => {
