@@ -83,7 +83,7 @@ export function minimizeTransactions(balances: Record<string, number>): Array<{ 
 }
 
 function normalizeRoute(method: string, path: string, routeKey?: string): { route: string; params: Record<string, string> } {
-  console.log(`[normalizeRoute] method=${method}, path=${path}, routeKey=${routeKey}`);
+  logger.debug("normalizeRoute called", { method, path, routeKey });
   const params: Record<string, string> = {};
   // Extract method from routeKey if method is empty
   if (!method && routeKey) {
@@ -92,7 +92,7 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
   }
   const cleanKey = routeKey?.replace(/^\$default\s+/, "") || "";
   const segments = path.split('/').filter(Boolean);
-  console.log(`[normalizeRoute] segments=${JSON.stringify(segments)}, cleanKey=${cleanKey}`);
+  logger.debug("normalizeRoute resolved", { segments, cleanKey });
 
   const gIdx = segments.findIndex(s => s.toLowerCase() === 'groups');
   const settleIdx = segments.findIndex(s => s.toLowerCase() === 'settle');
@@ -138,7 +138,7 @@ function normalizeRoute(method: string, path: string, routeKey?: string): { rout
 export { normalizeRoute };
 
 export const rawHandler = async (event: ApiEvent) => {
-  console.log(`[DEBUG] rawHandler called. routeKey: ${event.routeKey}, httpMethod: ${event.httpMethod}`);
+  logger.debug("rawHandler called", { routeKey: event.routeKey, httpMethod: event.httpMethod });
   let method = (event.httpMethod || event.requestContext?.http?.method || "").toUpperCase();
 
   if (!method && event.routeKey) {
@@ -149,11 +149,7 @@ export const rawHandler = async (event: ApiEvent) => {
   const path = event.path || event.requestContext?.http?.path || "";
   const resourcePath = (event as any).requestContext?.resourcePath;
   const { route, params: pathParams } = normalizeRoute(method, path, event.routeKey || resourcePath);
-  console.log(`[DEBUG] Parsed: method=${method}, path=${path}, route=${route}, params=${JSON.stringify(pathParams)}`);
-  
-  if (process.env.VITEST || process.env.DEBUG_LOGS) {
-    console.log(`[DEBUG] Groups Route: "${route}", Params: ${JSON.stringify(pathParams)}, Method: ${method}, Path: ${path}`);
-  }
+  logger.debug("Route parsed", { method, path, route, params: pathParams });
 
   let auth;
   try { auth = getAuth(event); } catch (e) { return err("Unauthorized", 401); }
