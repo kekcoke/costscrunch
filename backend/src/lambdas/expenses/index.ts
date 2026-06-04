@@ -139,7 +139,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
   let auth;
   try {
     auth = getAuth(event);
-    if (auth.userId === "local-user-uuid-123" || !auth.userId) {
+    if (process.env.MOCK_AUTH === 'true' && (auth.userId === "local-user-uuid-123" || !auth.userId)) {
       auth.userId = "test-user-001";
     }
   } catch (e) {

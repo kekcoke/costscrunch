@@ -62,8 +62,8 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent)
   let auth;
   try {
     auth = getAuth(event);
-    if (!auth.userId || auth.userId === "local-user-uuid-123") {
-      auth.userId = "test-user-001"; // local dev fallback
+    if (process.env.MOCK_AUTH === 'true' && (!auth.userId || auth.userId === "local-user-uuid-123")) {
+      auth.userId = "test-user-001";
     }
   } catch (e) {
     return err("Unauthorized", 401);
