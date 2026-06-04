@@ -29,6 +29,7 @@ Contains: project identity, stack versions, DynamoDB key patterns, Lambda handle
 
 | Task | Skill file |
 |------|-----------|
+| Commit a single verified fix with test gate | `ai/skills/commit-fix.md` ← **use this in every worktree session** |
 | Execute any fix (branch, commit, document) | `ai/skills/dev-workflow.md` |
 | Fix a critical audit finding (triage, priority order) | `ai/skills/fix-critical.md` |
 | Add a Lambda endpoint | `ai/skills/add-lambda-endpoint.md` |
@@ -37,7 +38,7 @@ Contains: project identity, stack versions, DynamoDB key patterns, Lambda handle
 | Write or migrate Terraform | `ai/skills/terraform.md` |
 | Migrate LocalStack to ministack | `ai/skills/localstack-to-ministack.md` |
 | Run parallel agent sessions across worktrees | `ai/skills/SKILLS.md §6` + `ai/WORKTREES.md` |
-| Start a worktree session (copy-paste primers) | `ai/SESSION-PRIMERS.md` |
+| Start a worktree session (copy-paste primers) | `ai/SESSION-PRIMERS.md` (Phase 0) · `ai/phases/primers/` (Phases 1–3) |
 
 ### Audit source files (2026-05-30)
 
