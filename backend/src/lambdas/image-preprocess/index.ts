@@ -45,6 +45,10 @@ const logger  = new Logger({ serviceName: "image-preprocess" });
 const tracer  = new Tracer({ serviceName: "image-preprocess" });
 const metrics = new Metrics({ namespace: "CostsCrunch", serviceName: "image-preprocess" });
 
+if (!WEBSOCKET_ENDPOINT) {
+  logger.warn("WEBSOCKET_ENDPOINT is not set — quarantine push notifications will be skipped. Coordinate with infra-agent (IaC-011) to inject this variable.");
+}
+
 // ─── Supported formats ─────────────────────────────────────────────────────────
 const SUPPORTED_FORMATS = {
   "image/jpeg": "jpg",
