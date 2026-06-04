@@ -1,4 +1,4 @@
-import { PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, DeleteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient } from "../../utils/awsClients.js";
 import { withErrorHandler } from "../../utils/withErrorHandler.js";
 import { getAuth } from "../../utils/auth.js";
@@ -45,13 +45,33 @@ export const rawHandler = async (event: any) => {
   }
 
   if (routeKey === "$disconnect") {
-    // Note: $disconnect is best-effort. We scan for the connectionId if we don't have userId
-    // But usually we store it such that we can delete by connectionId if we use a GSI
-    // Here we'll try to find the item first if possible, or wait for GoneException in notifier
     logger.info("WS Disconnected", { connectionId });
-    
-    // In a production app, we'd query a GSI (connectionId) to find the userId then delete
-    // For now, we'll rely on the notifier's GoneException cleanup to keep it lean
+
+    const ddb = createDynamoDBDocClient();
+    const CONN_TABLE = process.env.TABLE_NAME_CONNECTIONS!;
+
+    // Scan for the connection record by connectionId attribute.
+    // NOTE: A GSI on connectionId (IaC-011) should replace this scan in production
+    // to make the lookup O(1) rather than O(N).
+    const found = await ddb.send(new ScanCommand({
+      TableName: CONN_TABLE,
+      FilterExpression: "connectionId = :cid",
+      ExpressionAttributeValues: { ":cid": connectionId },
+      ProjectionExpression: "pk, sk",
+      Limit: 1,
+    }));
+
+    const item = found.Items?.[0];
+    if (item) {
+      await ddb.send(new DeleteCommand({
+        TableName: CONN_TABLE,
+        Key: { pk: item.pk, sk: item.sk },
+      }));
+      logger.info("WS connection record deleted", { connectionId });
+    } else {
+      logger.warn("WS disconnect: no connection record found", { connectionId });
+    }
+
     return { statusCode: 200, body: "Disconnected" };
   }
 

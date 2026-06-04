@@ -298,6 +298,18 @@ async function writeScanFailed(expenseId: string, scanId: string): Promise<void>
   );
 }
 
+async function writeScanDuplicate(expenseId: string, scanId: string): Promise<void> {
+  await ddb.send(
+    new UpdateCommand({
+      TableName:        TABLE,
+      Key:              { pk: `RECEIPT#${expenseId}`, sk: `SCAN#${scanId}` },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames:  { "#status": "status" },
+      ExpressionAttributeValues: { ":status": "duplicate" },
+    })
+  );
+}
+
 async function writeScanPendingManualReview(expenseId: string, scanId: string): Promise<void> {
   await ddb.send(
     new UpdateCommand({
@@ -347,7 +359,8 @@ async function checkForDuplicate(opts: {
     }));
   } catch (e: any) {
     if (e.name === "ResourceNotFoundException" || e.message?.includes("Index not found")) {
-      logger.warn("ReceiptHashIndex GSI not available — skipping duplicate check", { error: e.message });
+      logger.warn("DuplicateCheckSkipped", { error: e });
+      metrics.addMetric("DuplicateCheckSkipped", MetricUnit.Count, 1);
       return { isDuplicate: false, similarity: "none", merchantDistance: 0, amountDifference: 0 };
     }
     throw e;
@@ -572,6 +585,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
           ),
         });
 
+        await writeScanDuplicate(expenseId, scanId);
         metrics.addMetric("DuplicateDetected", MetricUnit.Count, 1);
         logger.info("Duplicate receipt detected", {
           existingExpenseId: duplicateCheck.existingExpenseId,

@@ -166,6 +166,9 @@ async function handleReceiptScanCompleted(
   logger.info("WebSocket push complete", { sent, stale, errors });
   metrics.addMetric("WsMessagesSent", MetricUnit.Count, sent);
   metrics.addMetric("WsStaleConns",   MetricUnit.Count, stale);
+  if (errors > 0) {
+    metrics.addMetric("WsPartialFailures", MetricUnit.Count, errors);
+  }
 
   if (errors > 0 && errors === connectionIds.length) {
     const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
@@ -215,6 +218,9 @@ async function handleQuarantineEvent(
 
   logger.info("Quarantine WebSocket push complete", { sent, stale, errors });
   metrics.addMetric("WsQuarantineSent", MetricUnit.Count, sent);
+  if (errors > 0) {
+    metrics.addMetric("WsPartialFailures", MetricUnit.Count, errors);
+  }
 
   if (errors > 0 && errors === connectionIds.length) {
     const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
