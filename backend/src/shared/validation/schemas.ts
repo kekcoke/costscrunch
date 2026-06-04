@@ -206,6 +206,27 @@ export const updateProfileSchema = z.object({
   autoApproveBelow: z.number().nonnegative().optional().nullable(),
 }).strict();
 
+// ── Expense DynamoDB Schema (for type-safe reads) ────────────────────────────
+
+export const ExpenseSchema = z.object({
+  pk: z.string(),
+  sk: z.string(),
+  entityType: z.literal('EXPENSE'),
+  expenseId: z.string(),
+  ownerId: z.string(),
+  merchant: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  amountUSD: z.number(),
+  category: z.string(),
+  date: z.string(),
+  status: ExpenseStatusSchema,
+  source: expenseSourceSchema,
+  tags: z.array(z.string()).default([]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+
 // ── Validation Helper ────────────────────────────────────────────────────────
 
 export type ValidationResult<T> =

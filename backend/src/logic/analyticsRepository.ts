@@ -1,5 +1,7 @@
 import { QueryCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient } from "../utils/awsClients.js";
+import type { Expense } from "../shared/models/types.js";
+import { ExpenseSchema } from "../shared/validation/schemas.js";
 
 const ddb = createDynamoDBDocClient();
 const TABLE = process.env.TABLE_NAME_MAIN!;
@@ -17,7 +19,7 @@ export interface QueryParams {
 }
 
 export class AnalyticsRepository {
-  async getExpenses(params: QueryParams) {
+  async getExpenses(params: QueryParams): Promise<Expense[]> {
     const { scope, userId, groupId, startDate, endDate, categories, category, sortBy = "date", sortOrder = "asc" } = params;
 
     const catList = categories || [];
@@ -39,7 +41,7 @@ export class AnalyticsRepository {
       exprValues[":category"] = category;
     }
 
-    let expenses: any[] = [];
+    let expenses: Expense[] = [];
     const scanForward = sortOrder === "asc";
 
     if (scope === "personal") {
@@ -85,15 +87,15 @@ export class AnalyticsRepository {
         if (typeof valA === "string" && typeof valB === "string") {
           return sortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
-        return sortOrder === "asc" ? (valA - valB) : (valB - valA);
+        return sortOrder === "asc" ? ((valA as number) - (valB as number)) : ((valB as number) - (valA as number));
       });
     }
 
     return expenses;
   }
 
-  private async queryPartition(pk: string, filterExpr: string, exprNames: Record<string, string>, exprValues: Record<string, any>, scanForward: boolean) {
-    const items: any[] = [];
+  private async queryPartition(pk: string, filterExpr: string, exprNames: Record<string, string>, exprValues: Record<string, any>, scanForward: boolean): Promise<Expense[]> {
+    const items: Expense[] = [];
     let lastKey: Record<string, any> | undefined;
     do {
       const res = await ddb.send(new QueryCommand({
@@ -105,7 +107,7 @@ export class AnalyticsRepository {
         ScanIndexForward: scanForward,
         ExclusiveStartKey: lastKey,
       }));
-      items.push(...(res.Items || []));
+      items.push(...(res.Items || []).map(item => ExpenseSchema.parse(item) as unknown as Expense));
       lastKey = res.LastEvaluatedKey;
     } while (lastKey);
     return items;

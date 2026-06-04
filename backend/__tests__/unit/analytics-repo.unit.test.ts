@@ -21,9 +21,20 @@ describe("AnalyticsRepository", () => {
   const mockExpense = (id: string, date: string, amount: number) => ({
     pk: "USER#user-123",
     sk: `EXPENSE#${id}`,
-    date,
+    entityType: "EXPENSE",
+    expenseId: id,
+    ownerId: "user-123",
+    merchant: "Test",
     amount,
-    category: "Food"
+    amountUSD: amount,
+    currency: "USD",
+    category: "Meals",
+    date,
+    status: "approved",
+    source: "manual",
+    tags: [],
+    createdAt: "2023-01-01T00:00:00.000Z",
+    updatedAt: "2023-01-01T00:00:00.000Z",
   });
 
   describe("getExpenses", () => {
@@ -105,8 +116,8 @@ describe("AnalyticsRepository", () => {
         ddbMock.reset();
         ddbMock.on(QueryCommand)
           .resolvesOnce({ Items: [
-              { amount: 10, date: "2023-01-01" },
-              { amount: 50, date: "2023-01-02" }
+              mockExpense("a", "2023-01-01", 10),
+              mockExpense("b", "2023-01-02", 50),
           ] })
           .resolvesOnce({ Items: [] });
 
