@@ -15,6 +15,7 @@ import {
   PutCommand,
   GetCommand,
   QueryCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { createDynamoDBDocClient, createS3Client } from "../../utils/awsClients.js";
 import { Logger } from "@aws-lambda-powertools/logger";
@@ -322,6 +323,15 @@ export const rawHandler = async (event: S3Event | APIGatewayProxyEventV2) => {
         })
       );
       JobId = response.JobId;
+    } catch (e) {
+      await ddb.send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { pk: scanRecord.pk, sk: scanRecord.sk },
+        UpdateExpression: "SET #status = :status",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":status": "failed" },
+      }));
+      throw e;
     } finally {
       textractSubsegment?.close();
     }

@@ -333,8 +333,7 @@ describe("POST /expenses", () => {
 // ── PATCH /expenses/:id ────────────────────────────────────────────────────────
 describe("PATCH /expenses/{id}", () => {
   beforeEach(() => {
-    // The refined handler now performs a lookup before patching
-    ddbMock.on(QueryCommand).resolves({ Items: [SAMPLE_EXPENSE] });
+    ddbMock.on(GetCommand).resolves({ Item: SAMPLE_EXPENSE });
     ddbMock.on(UpdateCommand).resolves({
       Attributes: { ...SAMPLE_EXPENSE, merchant: "Updated Corp" },
     });
