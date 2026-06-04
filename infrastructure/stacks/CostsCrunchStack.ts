@@ -398,7 +398,7 @@ export class CostsCrunchStack extends Stack {
         // upgrade prod to at least cache.t4g.small for better performance
         const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
             replicationGroupDescription: `${prefix} Redis`,
-            cacheNodeType: isProd ? "cache.t2.micro" : "cache.t2.micro",
+            cacheNodeType: isProd ? "cache.t4g.small" : "cache.t2.micro",
             engine: "redis",
             engineVersion: "7.0",
             numCacheClusters: isProd ? 2 : 1,
