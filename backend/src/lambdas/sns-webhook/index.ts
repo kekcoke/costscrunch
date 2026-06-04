@@ -359,7 +359,8 @@ async function checkForDuplicate(opts: {
     }));
   } catch (e: any) {
     if (e.name === "ResourceNotFoundException" || e.message?.includes("Index not found")) {
-      logger.warn("ReceiptHashIndex GSI not available — skipping duplicate check", { error: e.message });
+      logger.warn("DuplicateCheckSkipped", { error: e });
+      metrics.addMetric("DuplicateCheckSkipped", MetricUnit.Count, 1);
       return { isDuplicate: false, similarity: "none", merchantDistance: 0, amountDifference: 0 };
     }
     throw e;
