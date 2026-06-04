@@ -439,12 +439,14 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
         TableName: TABLE,
         Key: { pk: `USER#${auth.userId}`, sk: `EXPENSE#${expenseId}` },
         ConditionExpression: "attribute_exists(pk) AND ownerId = :uid",
-        ExpressionAttributeValues: { ":uid": auth.userId }
+        ExpressionAttributeValues: { ":uid": auth.userId },
+        ReturnValuesOnConditionCheckFailure: "ALL_OLD",
       }));
       return ok({ deleted: true });
     } catch (e: any) {
       if (e.name === "ConditionalCheckFailedException") {
-        return ok({ deleted: true, note: "not found or wrong owner" });
+        if (e.Item) return err("Not authorized to delete this expense", 403);
+        return err("Expense not found", 404);
       }
       throw e;
     }

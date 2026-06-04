@@ -315,9 +315,28 @@ describe('Expenses Lambda - Group Support', () => {
   });
 
   describe('Delete - Wrong Owner', () => {
-    it('should handle delete with wrong owner gracefully', async () => {
+    it('returns 403 when ConditionalCheckFailed and item exists (wrong owner)', async () => {
       const mockSend = getMockSend();
-      
+
+      const mockEvent = {
+        httpMethod: 'DELETE',
+        path: '/expenses/expense-123',
+      };
+
+      const error: any = new Error('ConditionalCheckFailedException');
+      error.name = 'ConditionalCheckFailedException';
+      error.Item = { pk: 'USER#other-user', sk: 'EXPENSE#expense-123' };
+      mockSend.mockRejectedValueOnce(error);
+
+      const result = await rawHandler(mockEvent);
+
+      expect(result.statusCode).toBe(403);
+      expect(result.body).toContain('Not authorized');
+    });
+
+    it('returns 404 when ConditionalCheckFailed and item does not exist', async () => {
+      const mockSend = getMockSend();
+
       const mockEvent = {
         httpMethod: 'DELETE',
         path: '/expenses/expense-123',
@@ -329,8 +348,8 @@ describe('Expenses Lambda - Group Support', () => {
 
       const result = await rawHandler(mockEvent);
 
-      expect(result.statusCode).toBe(200);
-      expect(result.body).toContain('not found or wrong owner');
+      expect(result.statusCode).toBe(404);
+      expect(result.body).toContain('Expense not found');
     });
   });
 });
