@@ -237,3 +237,10 @@ jobs:
           for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
       - name: Run LocalStack infrastructure tests
         run: npm run test:localstack -w infrastructure
+
+  deploy:
+    name: Trigger Deployment
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
