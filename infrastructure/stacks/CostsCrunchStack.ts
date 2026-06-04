@@ -832,6 +832,15 @@ export class CostsCrunchStack extends Stack {
         // Inject the WSS callback URL so ws-notifier can call @connections
         wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", config.webSocketEndpoint || wsStage.callbackUrl);
 
+        // ── Provisioned Concurrency (prod only) ─────────────────────────────────
+        if (useProvisionedConcurrency) {
+            for (const fn of [expensesLambda, groupsLambda, snsWebhookLambda]) {
+                const alias = fn.addAlias('live');
+                const scaling = alias.addAutoScaling({ minCapacity: 1, maxCapacity: 10 });
+                scaling.scaleOnUtilization({ utilizationTarget: 0.5 });
+            }
+        }
+
         // ── EventBridge → Notifications Lambda ───────────────────────────────────
         // ReceiptScanCompleted fires both the WebSocket notifier AND the
         // existing notifications Lambda (email/push/Pinpoint).
