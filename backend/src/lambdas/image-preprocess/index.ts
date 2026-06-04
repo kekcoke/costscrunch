@@ -38,6 +38,11 @@ const PROCESSED_BUCKET = process.env.BUCKET_PROCESSED_NAME!;
 const QUARANTINE_BUCKET = process.env.BUCKET_QUARANTINE_NAME!;
 const TABLE_NAME       = process.env.TABLE_NAME_MAIN!;
 const WEBSOCKET_ENDPOINT = process.env.WEBSOCKET_ENDPOINT || "";
+const wsClient = WEBSOCKET_ENDPOINT
+  ? new ApiGatewayManagementApiClient({
+      endpoint: WEBSOCKET_ENDPOINT.replace("wss://", "https://"),
+    })
+  : null;
 const MAX_FILE_SIZE    = 10 * 1024 * 1024; // 10MB
 const MAX_DIMENSION    = 10000; // Max width/height in pixels
 
@@ -112,15 +117,12 @@ function getContentType(key: string, mimeType?: string): SupportedMimeType | nul
 
 // ─── Helper: WebSocket notification ────────────────────────────────────────────
 async function notifyUserViaWebSocket(connectionId: string, payload: object): Promise<void> {
-  if (!WEBSOCKET_ENDPOINT || connectionId === "GUEST") {
-    logger.debug("WebSocket notification skipped", { connectionId, reason: !WEBSOCKET_ENDPOINT ? "no endpoint" : "guest" });
+  if (!wsClient || connectionId === "GUEST") {
+    logger.debug("WebSocket notification skipped", { connectionId, reason: !wsClient ? "no endpoint" : "guest" });
     return;
   }
 
   try {
-    const wsClient = new ApiGatewayManagementApiClient({
-      endpoint: WEBSOCKET_ENDPOINT.replace("wss://", "https://"),
-    });
     await wsClient.send(new PostToConnectionCommand({
       ConnectionId: connectionId,
       Data: Buffer.from(JSON.stringify(payload)),
