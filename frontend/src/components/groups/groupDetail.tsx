@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Group, GroupMember } from "../../models/types";
+import type { Group, GroupMember, BalancesResponse } from "../../models/types";
 import { groupsApi, ApiError } from "../../services/api";
 import { useGroupStore } from "../../stores/useGroupStore";
 import { LoadingSpinner } from "../spinner";
@@ -9,7 +9,7 @@ import Modal from "../modal";
 export default function GroupDetail({ groupId, onBack }: { groupId: string, onBack: () => void }) {
   const { updateGroup: updateStoreGroup, deleteGroup: deleteStoreGroup } = useGroupStore();
   const [group, setGroup] = useState<Group | null>(null);
-  const [balances, setBalances] = useState<any>(null);
+  const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   
   // View State
@@ -322,7 +322,7 @@ export default function GroupDetail({ groupId, onBack }: { groupId: string, onBa
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {balances?.settlements?.length === 0 ? (
               <div style={{ fontSize: "13px", color: "var(--color-text-dim)", fontStyle: "italic" }}>All settled!</div>
-            ) : balances?.settlements?.map((s: any, i: number) => {
+            ) : balances?.settlements?.map((s, i) => {
               const fromName = members.find(m => m.userId === s.from)?.name || "Unknown";
               const toName = members.find(m => m.userId === s.to)?.name || "Unknown";
               return (
