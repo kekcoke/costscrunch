@@ -1417,5 +1417,12 @@ class EncryptionEnforcementAspect implements IAspect {
                 Annotations.of(node).addError("DynamoDB Table must have SSE encryption enabled.");
             }
         }
+        // TableV2 synthesizes to AWS::DynamoDB::GlobalTable — enforce encryption there too
+        if (node instanceof dynamodb.CfnGlobalTable) {
+            const sse = (node as dynamodb.CfnGlobalTable).sseSpecification;
+            if (!sse) {
+                Annotations.of(node).addError("DynamoDB GlobalTable must have SSE encryption enabled.");
+            }
+        }
     }
 }
