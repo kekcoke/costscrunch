@@ -7,6 +7,10 @@ on:
     branches: [main, staging]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   NODE_VERSION: '20.x'
   AWS_REGION: us-east-1
