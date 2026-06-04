@@ -173,7 +173,7 @@ export const rawHandler = async (event: ApiEvent) => {
     await transactWriteWithRetry(ddb, {
       TransactItems: [
         { Put: { TableName: TABLE, Item: group, ConditionExpression: "attribute_not_exists(pk)" } },
-        { Put: { TableName: TABLE, Item: { pk: `USER#${auth.userId}`, sk: `GROUP_MEMBER#${id}`, entityType: "GROUP_MEMBER", groupId: id, name: body.name, userId: auth.userId, role: "owner", joinedAt: now } } }
+        { Put: { TableName: TABLE, Item: { pk: `USER#${auth.userId}`, sk: `ACTIVE_GROUP_MEMBER#${id}`, entityType: "GROUP_MEMBER", groupId: id, name: body.name, userId: auth.userId, role: "owner", joinedAt: now } } }
       ]
     });
     return ok(groupToResponse(group), 201);
@@ -182,7 +182,7 @@ export const rawHandler = async (event: ApiEvent) => {
   if (route === "GET /groups") {
     const result = await ddb.send(new QueryCommand({
       TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      FilterExpression: "active <> :false", ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":prefix": "GROUP_MEMBER#", ":false": false }
+      ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":prefix": "ACTIVE_GROUP_MEMBER#" }
     }));
     return ok({ items: result.Items || [] });
   }
@@ -271,7 +271,7 @@ export const rawHandler = async (event: ApiEvent) => {
               TableName: TABLE,
               Item: {
                 pk: `USER#${auth.userId}`,
-                sk: `GROUP_MEMBER#${groupId}`,
+                sk: `ACTIVE_GROUP_MEMBER#${groupId}`,
                 entityType: "GROUP_MEMBER",
                 groupId,
                 name: group.name,
@@ -309,7 +309,7 @@ export const rawHandler = async (event: ApiEvent) => {
     await transactWriteWithRetry(ddb, {
       TransactItems: [
         { Update: { TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` }, UpdateExpression: "SET active = :false, deletedAt = :now", ExpressionAttributeValues: { ":false": false, ":now": now } } },
-        { Update: { TableName: TABLE, Key: { pk: `USER#${auth.userId}`, sk: `GROUP_MEMBER#${groupId}` }, UpdateExpression: "SET active = :false", ExpressionAttributeValues: { ":false": false } } }
+        { Delete: { TableName: TABLE, Key: { pk: `USER#${auth.userId}`, sk: `ACTIVE_GROUP_MEMBER#${groupId}` } } }
       ]
     });
     return ok({ deleted: true });

@@ -55,7 +55,7 @@ export class AnalyticsRepository {
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
         ExpressionAttributeValues: {
           ":pk": `USER#${userId}`,
-          ":prefix": "GROUP_MEMBER#",
+          ":prefix": "ACTIVE_GROUP_MEMBER#",
         },
       }));
 
