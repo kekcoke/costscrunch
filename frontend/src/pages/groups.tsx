@@ -45,6 +45,8 @@ export function GroupsPage() {
         name: formData.name,
         color: formData.color,
       });
+      useGroupStore.setState({ lastFetchedAt: null });
+      await useGroupStore.getState().fetchGroups();
       setStatus("success");
       setTimeout(resetForm, 1500);
     } catch (err: any) {
