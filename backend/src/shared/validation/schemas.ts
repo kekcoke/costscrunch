@@ -20,7 +20,8 @@ const urlSchema = z.string().url();
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 
-export const expenseStatusSchema = z.enum(['draft', 'pending', 'submitted', 'approved', 'rejected', 'reimbursed']);
+export const ExpenseStatusSchema = z.enum(['draft', 'pending', 'submitted', 'approved', 'rejected', 'reimbursed']);
+export type ExpenseStatus = z.infer<typeof ExpenseStatusSchema>;
 export const entityTypeSchema = z.enum(['PERSONAL', 'GROUP', 'BUSINESS']);
 export const splitMethodSchema = z.enum(['equal', 'exact', 'percentage', 'shares']);
 export const userRoleSchema = z.enum(['owner', 'admin', 'member', 'viewer']);
@@ -72,13 +73,13 @@ export const updateExpenseSchema = z.object({
   costCenter: z.string().max(50).optional(),
   billable: z.boolean().optional(),
   reimbursable: z.boolean().optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   approverNote: z.string().max(500).optional(),
 });
 
 export const getExpensesQuerySchema = z.object({
   groupId: ulidSchema.optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   category: z.string().max(50).optional(),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
@@ -89,7 +90,7 @@ export const getExpensesQuerySchema = z.object({
 export const exportExpensesQuerySchema = z.object({
   format: z.enum(["csv", "json", "pdf"]).optional().default("csv"),
   groupId: ulidSchema.optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   category: z.string().max(50).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
