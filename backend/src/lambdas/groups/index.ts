@@ -204,7 +204,7 @@ export const rawHandler = async (event: ApiEvent) => {
     }
     const balances = calculateBalances(expRes.Items || [], groupRes.Item.members || []);
     const settlements = minimizeTransactions(balances);
-    console.log(`[DEBUG] Balances count: ${Object.keys(balances).length}, Settlements: ${settlements.length}`);
+    logger.debug("Balances calculated", { balancesCount: Object.keys(balances).length, settlementsCount: settlements.length });
     return ok({ balances, settlements });
   }
 
