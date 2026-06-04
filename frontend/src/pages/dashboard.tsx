@@ -51,7 +51,7 @@ export function DashboardPage() {
           Overview
         </h1>
         <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
-          February 2026
+          {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
         </div>
       </header>
 
