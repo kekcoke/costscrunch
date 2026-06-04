@@ -288,6 +288,7 @@ export class CostsCrunchStack extends Stack {
             encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+            enforceSSL: true,
             removalPolicy,
         });
 
