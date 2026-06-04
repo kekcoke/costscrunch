@@ -512,6 +512,7 @@ export class CostsCrunchStack extends Stack {
             LOG_LEVEL: isProd ? "INFO" : "DEBUG",
             ENVIRONMENT: environment,
             AWS_REGION_ID: regionId, // Explicitly pass concrete region
+            BEDROCK_REGION: regionId,
             // SSM/Secrets Manager parameter paths for runtime retrieval
             SSM_BEDROCK_MODEL_ID: bedrockModelIdParam.parameterName,
             SSM_VITE_APP_URL: viteAppUrlParam.parameterName,
