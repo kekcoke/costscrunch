@@ -6,6 +6,7 @@
  * This middleware extracts claims and provides a consistent auth interface.
  */
 
+import { type APIGatewayProxyResult } from "aws-lambda";
 import { extractClaims, isTokenExpired, type JwtClaims } from "./jwtUtils.js";
 import { Logger } from "@aws-lambda-powertools/logger";
 
@@ -21,6 +22,12 @@ export interface AuthEvent {
     };
   };
 }
+
+export type AuthorizedEvent = Omit<AuthEvent, "requestContext"> & {
+  requestContext: NonNullable<AuthEvent["requestContext"]> & {
+    authorizer: { jwt: { claims: JwtClaims } };
+  };
+};
 
 /**
  * Extract and verify JWT token from Authorization header.
@@ -63,12 +70,11 @@ export function extractUserId(claims: JwtClaims): string {
  */
 export function withAuth<TEvent extends AuthEvent, TResult>(
   handler: (event: TEvent, context: any) => Promise<TResult>,
-) {
-  return async (event: TEvent, context: any): Promise<TResult> => {
+): (event: TEvent, context: any) => Promise<TResult | APIGatewayProxyResult> {
+  return async (event: TEvent, context: any): Promise<TResult | APIGatewayProxyResult> => {
     try {
       const claims = await verifyToken(event);
 
-      // Inject claims into the event structure (same shape as API Gateway JWT authorizer)
       const enrichedEvent = {
         ...event,
         requestContext: {
@@ -85,7 +91,7 @@ export function withAuth<TEvent extends AuthEvent, TResult>(
       return {
         statusCode: 401,
         body: JSON.stringify({ message: error.message }),
-      } as unknown as TResult;
+      };
     }
   };
 }

@@ -20,7 +20,9 @@ const urlSchema = z.string().url();
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 
-export const expenseStatusSchema = z.enum(['draft', 'pending', 'submitted', 'approved', 'rejected', 'reimbursed']);
+export const ExpenseStatusSchema = z.enum(['draft', 'pending', 'submitted', 'approved', 'rejected', 'reimbursed']);
+export type ExpenseStatus = z.infer<typeof ExpenseStatusSchema>;
+export const CategoryNameSchema = z.enum(['Groceries', 'Travel', 'Software', 'Meals', 'Office', 'Equipment', 'Other']);
 export const entityTypeSchema = z.enum(['PERSONAL', 'GROUP', 'BUSINESS']);
 export const splitMethodSchema = z.enum(['equal', 'exact', 'percentage', 'shares']);
 export const userRoleSchema = z.enum(['owner', 'admin', 'member', 'viewer']);
@@ -47,7 +49,7 @@ export const createExpenseSchema = z.object({
   merchant: z.string().min(1, 'Merchant is required').max(200, 'Merchant name too long'),
   amount: z.number().positive('Amount must be positive').max(1_000_000, 'Amount exceeds maximum'),
   currency: currencySchema,
-  category: z.string().max(50).optional().default('Other'),
+  category: CategoryNameSchema.optional().default('Other'),
   date: isoDateSchema,
   description: z.string().max(1000).optional(),
   groupId: ulidSchema.optional(),
@@ -63,7 +65,7 @@ export const createExpenseSchema = z.object({
 
 export const updateExpenseSchema = z.object({
   merchant: z.string().min(1).max(200).optional(),
-  category: z.string().max(50).optional(),
+  category: CategoryNameSchema.optional(),
   date: isoDateSchema.optional(),
   description: z.string().max(1000).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
@@ -72,13 +74,13 @@ export const updateExpenseSchema = z.object({
   costCenter: z.string().max(50).optional(),
   billable: z.boolean().optional(),
   reimbursable: z.boolean().optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   approverNote: z.string().max(500).optional(),
 });
 
 export const getExpensesQuerySchema = z.object({
   groupId: ulidSchema.optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   category: z.string().max(50).optional(),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
@@ -89,7 +91,7 @@ export const getExpensesQuerySchema = z.object({
 export const exportExpensesQuerySchema = z.object({
   format: z.enum(["csv", "json", "pdf"]).optional().default("csv"),
   groupId: ulidSchema.optional(),
-  status: expenseStatusSchema.optional(),
+  status: ExpenseStatusSchema.optional(),
   category: z.string().max(50).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
@@ -203,6 +205,27 @@ export const updateProfileSchema = z.object({
   defaultApprover: z.string().max(50).optional().nullable(),
   autoApproveBelow: z.number().nonnegative().optional().nullable(),
 }).strict();
+
+// ── Expense DynamoDB Schema (for type-safe reads) ────────────────────────────
+
+export const ExpenseSchema = z.object({
+  pk: z.string(),
+  sk: z.string(),
+  entityType: z.literal('EXPENSE'),
+  expenseId: z.string(),
+  ownerId: z.string(),
+  merchant: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  amountUSD: z.number(),
+  category: z.string(),
+  date: z.string(),
+  status: ExpenseStatusSchema,
+  source: expenseSourceSchema,
+  tags: z.array(z.string()).default([]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
 
 // ── Validation Helper ────────────────────────────────────────────────────────
 

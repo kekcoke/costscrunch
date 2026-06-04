@@ -33,14 +33,20 @@ function makeExpense(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     pk: "USER#user-abc",
     sk: "EXPENSE#01HZ",
+    entityType: "EXPENSE",
     expenseId: "01HZ",
+    ownerId: "user-abc",
     merchant: "Starbucks",
     amount: 12.5,
     amountUSD: 12.5,
     currency: "USD",
     category: "Meals",
-    date: new Date().toISOString().slice(0, 10), // today
+    date: new Date().toISOString().slice(0, 10),
     status: "approved",
+    source: "manual",
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }
