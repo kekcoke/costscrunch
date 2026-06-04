@@ -160,16 +160,12 @@ export async function handler(event: LambdaEvent): Promise<LambdaResponse> {
       }
 
       case "DELETE /auth/account": {
-        // Authenticated route - userId and email should come from authorizer context
-        // In local development or manual test events, we can fallback to body for convenience
-        const body = parseBody(event);
         const context = (event as any).requestContext?.authorizer?.jwt?.claims;
-        
-        const userId = context?.sub || body.userId;
-        const email = context?.email || body.email;
+        const userId = context?.sub;
+        const email = context?.email;
 
         if (!userId || !email) {
-          return error(400, "Missing identity context: userId or email");
+          return error(401, "Unauthorized");
         }
 
         await deleteAccount(userId, email);

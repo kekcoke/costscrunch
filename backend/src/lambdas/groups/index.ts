@@ -213,18 +213,33 @@ export const rawHandler = async (event: ApiEvent) => {
   }
 
   if (route === "POST /groups/{id}/settle") {
-    const expRes = await ddb.send(new QueryCommand({
-      TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" }
-    }));
-    const approved = (expRes.Items || []).filter(e => e.status === "approved");
+    let allItems: any[] = [];
+    let lastKey: Record<string, any> | undefined;
+    do {
+      const expRes = await ddb.send(new QueryCommand({
+        TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" },
+        ExclusiveStartKey: lastKey,
+      }));
+      allItems = allItems.concat(expRes.Items || []);
+      lastKey = expRes.LastEvaluatedKey;
+    } while (lastKey);
+
+    const approved = allItems.filter(e => e.status === "approved");
     if (approved.length === 0) return err("No approved expenses to settle", 400);
+    if (approved.length > 100) return err("Too many expenses to settle at once (max 100)", 422);
     const now = new Date().toISOString();
-    await Promise.all(approved.map(exp => ddb.send(new UpdateCommand({
-      TableName: TABLE, Key: { pk: exp.pk, sk: exp.sk },
-      UpdateExpression: "SET #status = :s, updatedAt = :now",
-      ExpressionAttributeNames: { "#status": "status" }, ExpressionAttributeValues: { ":s": "reimbursed", ":now": now }
-    }))));
+    await transactWriteWithRetry(ddb, {
+      TransactItems: approved.map(exp => ({
+        Update: {
+          TableName: TABLE,
+          Key: { pk: exp.pk, sk: exp.sk },
+          UpdateExpression: "SET #status = :s, updatedAt = :now",
+          ExpressionAttributeNames: { "#status": "status" },
+          ExpressionAttributeValues: { ":s": "reimbursed", ":now": now },
+        },
+      })),
+    });
     return ok({ message: `Settled ${approved.length} expenses` });
   }
 
@@ -232,10 +247,6 @@ export const rawHandler = async (event: ApiEvent) => {
     const groupRes = await ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } }));
     if (!groupRes.Item) return err("Group not found", 404);
     const group = groupRes.Item as Group;
-    
-    if (group.members.some(m => m.userId === auth.userId)) {
-      return err("Already a member", 400);
-    }
 
     const now = new Date().toISOString();
     const newMember: GroupMember = {
@@ -248,33 +259,44 @@ export const rawHandler = async (event: ApiEvent) => {
       balance: 0,
     };
 
-    await transactWriteWithRetry(ddb, {
-      TransactItems: [
-        {
-          Update: {
-            TableName: TABLE,
-            Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
-            UpdateExpression: "SET members = list_append(members, :m), memberCount = memberCount + :one, updatedAt = :now",
-            ExpressionAttributeValues: { ":m": [newMember], ":one": 1, ":now": now }
-          }
-        },
-        {
-          Put: {
-            TableName: TABLE,
-            Item: {
-              pk: `USER#${auth.userId}`,
-              sk: `GROUP_MEMBER#${groupId}`,
-              entityType: "GROUP_MEMBER",
-              groupId,
-              name: group.name,
-              userId: auth.userId,
-              role: "member",
-              joinedAt: now
+    try {
+      await transactWriteWithRetry(ddb, {
+        TransactItems: [
+          {
+            Update: {
+              TableName: TABLE,
+              Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` },
+              UpdateExpression: "SET members = list_append(members, :m), memberCount = memberCount + :one, updatedAt = :now",
+              ExpressionAttributeValues: { ":m": [newMember], ":one": 1, ":now": now }
+            }
+          },
+          {
+            Put: {
+              TableName: TABLE,
+              Item: {
+                pk: `USER#${auth.userId}`,
+                sk: `GROUP_MEMBER#${groupId}`,
+                entityType: "GROUP_MEMBER",
+                groupId,
+                name: group.name,
+                userId: auth.userId,
+                role: "member",
+                joinedAt: now
+              },
+              ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)",
             }
           }
-        }
-      ]
-    });
+        ]
+      });
+    } catch (e: any) {
+      if (
+        e.name === "TransactionCanceledException" &&
+        e.CancellationReasons?.some((r: any) => r.Code === "ConditionalCheckFailed")
+      ) {
+        return err("Already a member", 409);
+      }
+      throw e;
+    }
     return ok({ joined: true, groupId });
   }
 
@@ -297,8 +319,7 @@ export const rawHandler = async (event: ApiEvent) => {
     return ok({ deleted: true });
   }
 
-  // Temporarily return the actual route to debug
-  return { statusCode: 500, body: JSON.stringify({ debug: true, route, groupId, path, routeKey: event.routeKey }), headers: { "Content-Type": "application/json" } };
+  return err(`Route not found: ${route}`, 404);
 };
 
 export const handler = withLocalAuth(withErrorHandler(rawHandler));
