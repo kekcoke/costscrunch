@@ -169,12 +169,11 @@ jobs:
   deploy-prod:
     name: Deploy — Production
     runs-on: ubuntu-latest
-    needs: [build, deploy-staging]
-    # Run if build succeeded AND (staging succeeded OR staging was skipped)
+    needs: [build, deploy-staging, post-deploy-staging]
     if: |
-      always() &&
       needs.build.result == 'success' &&
       (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped') &&
+      (needs.post-deploy-staging.result == 'success' || needs.post-deploy-staging.result == 'skipped') &&
       github.ref == 'refs/heads/main'
     environment:
       name: production
