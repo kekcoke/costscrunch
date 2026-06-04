@@ -5,32 +5,11 @@ import {
 import { logger } from './logger.js';
 import { ValidationError, NotFoundError, CircuitOpenError } from './errors.js';
 
-/**
- * Universal Lambda Handler type.
- */
-type AnyHandler = (
-  event: any,
-  context: Context,
-  ...rest: any[]
-) => any;
-
-/**
- * Higher-Order Function that wraps Lambda handlers with a global try/catch block.
- * Maps known error types to HTTP status codes and ensures structured logging.
- * 
- * Uses Awaited and ReturnType to preserve the original handler's return type 
- * while adding the API Gateway error response shape.
- */
-export const withErrorHandler = <T extends AnyHandler>(
-  handler: T
-): (
-  event: Parameters<T>[0],
-  context?: Context,
-  ...rest: any[]
-) => Promise<Awaited<ReturnType<T>> | APIGatewayProxyStructuredResultV2> => {
-  return async (event: Parameters<T>[0], context?: Context, ...rest: any[]) => {
+export const withErrorHandler = <E, R>(
+  handler: (event: E, context: Context) => Promise<R>
+) => async (event: E, context: Context): Promise<R | APIGatewayProxyStructuredResultV2> => {
     const requestId =
-      context?.awsRequestId ||
+      (context as any)?.awsRequestId ||
       (event && typeof event === 'object' && 'headers' in event ? (event as Record<string, any>).headers?.['x-request-id'] : undefined) ||
       'unknown';
 
@@ -40,12 +19,10 @@ export const withErrorHandler = <T extends AnyHandler>(
     };
 
     try {
-      // Pass through context and rest parameters (like callback) if provided
-      const result = await handler(event, context as Context, ...rest);
+      const result = await handler(event, context);
 
-      // Inject CORS headers into successful responses
       if (result && typeof result === 'object' && 'statusCode' in result) {
-        result.headers = { ...CORS_HEADERS, ...result.headers };
+        (result as Record<string, any>).headers = { ...CORS_HEADERS, ...(result as Record<string, any>).headers };
       }
 
       return result;
@@ -65,7 +42,6 @@ export const withErrorHandler = <T extends AnyHandler>(
         body: JSON.stringify({ error: message, requestId }),
       };
     }
-  };
 };
 
 const getStatusCode = (error: Error): number => {
