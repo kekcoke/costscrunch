@@ -298,6 +298,18 @@ async function writeScanFailed(expenseId: string, scanId: string): Promise<void>
   );
 }
 
+async function writeScanDuplicate(expenseId: string, scanId: string): Promise<void> {
+  await ddb.send(
+    new UpdateCommand({
+      TableName:        TABLE,
+      Key:              { pk: `RECEIPT#${expenseId}`, sk: `SCAN#${scanId}` },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames:  { "#status": "status" },
+      ExpressionAttributeValues: { ":status": "duplicate" },
+    })
+  );
+}
+
 async function writeScanPendingManualReview(expenseId: string, scanId: string): Promise<void> {
   await ddb.send(
     new UpdateCommand({
@@ -572,6 +584,7 @@ export const handler = withErrorHandler(async (event: SNSEvent): Promise<void> =
           ),
         });
 
+        await writeScanDuplicate(expenseId, scanId);
         metrics.addMetric("DuplicateDetected", MetricUnit.Count, 1);
         logger.info("Duplicate receipt detected", {
           existingExpenseId: duplicateCheck.existingExpenseId,
