@@ -157,6 +157,7 @@ jobs:
       id-token: write
       contents: read
     uses: ./.github/workflows/rollback.yml
+    secrets: inherit
     with:
       environment: staging
       stack_name: costscrunch-staging-CostsCrunchStack
@@ -225,6 +226,7 @@ jobs:
       id-token: write
       contents: read
     uses: ./.github/workflows/rollback.yml
+    secrets: inherit
     with:
       environment: production
       stack_name: costscrunch-prod-CostsCrunchStack
