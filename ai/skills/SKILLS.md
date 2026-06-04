@@ -37,6 +37,7 @@ Contains: project identity, stack versions, DynamoDB key patterns, Lambda handle
 | Write or migrate Terraform | `ai/skills/terraform.md` |
 | Migrate LocalStack to ministack | `ai/skills/localstack-to-ministack.md` |
 | Run parallel agent sessions across worktrees | `ai/skills/SKILLS.md §6` + `ai/WORKTREES.md` |
+| Start a worktree session (copy-paste primers) | `ai/SESSION-PRIMERS.md` |
 
 ### Audit source files (2026-05-30)
 
