@@ -5,13 +5,13 @@
 
 ## Dependency Tracks
 
-**Track A — Gate (must merge first)**
+**Track A — Gate ✅ Merged**
 
 | Worktree | Branch | Agent | Issues | PR | Status |
 |---|---|---|---|---|---|
-| `contract/fix-ac003` | `feat/contract/fix-ac003` | contract-agent | AC-003 | — | not started |
+| `contract/fix-ac003` | `feat/contract/fix-ac003` | contract-agent | AC-003 | — | merged |
 
-**Track B — Parallel (start after AC-003 merges)**
+**Track B — Parallel (in progress)**
 
 | Worktree | Branch | Agent | Issues | PR | Status | Depends On |
 |---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@
 
 | Status | Meaning |
 |---|---|
-| `not started` | Worktree not yet created |
+| `ready` | Worktree exists, no blocking dependency — open a session and start |
 | `in progress` | Active Claude Code session running |
 | `blocked` | Waiting on a dependency to merge |
 | `pr open` | PR submitted, awaiting review |
