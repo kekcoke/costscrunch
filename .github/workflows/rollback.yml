@@ -81,7 +81,6 @@ jobs:
 
           echo "passed=false" >> $GITHUB_OUTPUT
           echo "All $MAX_RETRIES health check attempts failed. Triggering rollback..."
-          exit 1
 
       - name: Rollback on failure
         if: always() && steps.health_check.outputs.passed == 'false'
@@ -141,3 +140,7 @@ jobs:
             Health checks passed after ${{ inputs.environment }} deploy.
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Fail job if health check failed
+        if: always() && steps.health_check.outputs.passed == 'false'
+        run: exit 1

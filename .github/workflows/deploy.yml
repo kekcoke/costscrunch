@@ -247,4 +247,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Rollback CDK stack
         run: |
-          echo "Rolling back to previous stack version..."
+          aws cloudformation rollback-stack --stack-name costscrunch-prod
+          aws cloudformation wait stack-rollback-complete --stack-name costscrunch-prod
+      - name: Notify Slack
+        if: always()
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
+        with:
+          status: ${{ job.status }}
+          text: "CostsCrunch production manual rollback ${{ job.status }} — ${{ github.sha }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
