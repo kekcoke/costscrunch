@@ -93,6 +93,7 @@ deploy_function() {
     "BUCKET_UPLOADS_NAME": "costscrunch-dev-uploads-000000000000",
     "BUCKET_PROCESSED_NAME": "costscrunch-dev-processed-000000000000",
     "BUCKET_RECEIPTS_NAME": "costscrunch-dev-receipts-000000000000",
+    "BUCKET_ASSETS_NAME": "costscrunch-dev-assets-000000000000",
     "TEXTRACT_SNS_TOPIC_ARN": "arn:aws:sns:us-east-1:000000000000:costscrunch-dev-textract-completion",
     "TEXTRACT_ROLE_ARN": "arn:aws:iam::000000000000:role/test-role",
     "EVENT_BUS_NAME": "costscrunch-dev-events",
@@ -118,7 +119,7 @@ JSONEOF
 
 # ── Lambda Functions ────────────────────────────────────────────────────────
 echo "📦 Deploying Lambda functions"
-for FN in "GroupsFunction" "ExpensesFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "AuthFunction" "AuthTriggerFunction" "SnsWebhookFunction" "WsNotifierFunction" "WsHandlerFunction" "HealthFunction"; do
+for FN in "GroupsFunction" "ExpensesFunction" "ExpenseExportFunction" "ReceiptsFunction" "AnalyticsFunction" "ProfileFunction" "AuthFunction" "AuthTriggerFunction" "SnsWebhookFunction" "WsNotifierFunction" "WsHandlerFunction" "HealthFunction"; do
   deploy_function "$FN" "index.handler"
   # Add global permission once per function to prevent redundant "updates" during route registration
   "${AWS_CMD[@]}" lambda add-permission --function-name "$FN" \
@@ -212,7 +213,7 @@ add_route /groups/{id}/join GroupsFunction
 # Expenses (3 routes — sub-paths share one resource)
 add_route /expenses ExpensesFunction
 add_route /expenses/{id} ExpensesFunction
-add_route /expenses/export ExpensesFunction
+add_route /expenses/export ExpenseExportFunction
 
 # Receipts (3 routes)
 add_route /receipts ReceiptsFunction

@@ -382,6 +382,14 @@ export class CostsCrunchStack extends Stack {
 
         const redisSg = new ec2.SecurityGroup(this, "RedisSg", { vpc, description: "Redis SG" });
 
+        const lambdaSg = new ec2.SecurityGroup(this, "LambdaSg", {
+            vpc,
+            description: "Shared Lambda SG",
+            allowAllOutbound: true,
+        });
+        // IaC-003: allow all Lambda functions to reach Redis on 6379
+        redisSg.addIngressRule(lambdaSg, ec2.Port.tcp(6379), "Lambda to Redis");
+
         // upgrade prod to at least cache.t4g.small for better performance
         const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
             replicationGroupDescription: `${prefix} Redis`,
@@ -494,6 +502,7 @@ export class CostsCrunchStack extends Stack {
             BUCKET_PROCESSED_NAME: processedBucket.bucketName,
             BUCKET_RECEIPTS_NAME: receiptsBucket.bucketName,
             BUCKET_QUARANTINE_NAME: quarantineBucket.bucketName,
+            BUCKET_ASSETS_NAME: assetsBucket.bucketName,
             // WEBSOCKET_ENDPOINT is injected after wsStage is created (see line ~801)
             REDIS_HOST: redis.attrPrimaryEndPointAddress,
             REDIS_PORT: redis.attrPrimaryEndPointPort,
@@ -524,6 +533,7 @@ export class CostsCrunchStack extends Stack {
             },
             vpc,
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+            securityGroups: [lambdaSg],
             logRetention: isProd ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_WEEK,
             reservedConcurrentExecutions: isProd ? 500 : 50,
             environment: sharedEnv as { [key: string]: string },
@@ -652,11 +662,28 @@ export class CostsCrunchStack extends Stack {
             },
         });
 
+        // ── Expense Export Lambda ─────────────────────────────────────────────────
+        // IaC-001: expense-export was missing from the CDK stack entirely.
+        const expenseExportLambda = new NodejsFunction(this, "ExpenseExportLambda", {
+            ...sharedLambdaProps as any,
+            entry: path.resolve(__dirname, "../../backend/src/lambdas/expense-export/index.ts"),
+            functionName: `${prefix}-expense-export`,
+            environment: { ...sharedEnv },
+        });
+
         // Wire the auth trigger into the already-deployed UserPool via L1 construct
         const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
         cfnUserPool.lambdaConfig = {
             postConfirmation: authTriggerLambda.functionName,
         };
+
+        // IaC-005: grant Cognito permission to invoke the post-confirmation trigger.
+        // Without this resource policy, new user registrations fail in prod.
+        authTriggerLambda.addPermission("CognitoInvoke", {
+            principal: new iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            sourceArn: userPool.userPoolArn,
+            action: "lambda:InvokeFunction",
+        });
 
         // ── IAM Permissions ──────────────────────────────────────────────────────
         // Main table
@@ -668,6 +695,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
         table.grantWriteData(authTriggerLambda);
+        table.grantReadData(expenseExportLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
         connTable.grantReadWriteData(wsNotifierLambda);
@@ -682,6 +710,9 @@ export class CostsCrunchStack extends Stack {
             resources: [`${quarantineBucket.attrArn}/*`],
         }));
         
+        // Expense export: reads table (above), writes CSV to assets bucket
+        assetsBucket.grantPut(expenseExportLambda);
+
         // Receipts: presigned POST generation for processed bucket
         processedBucket.grantPut(receiptsLambda);       // presigned POST generation
         receiptsBucket.grantRead(snsWebhookLambda);    // Textract reads from here (via IAM role)
@@ -739,6 +770,7 @@ export class CostsCrunchStack extends Stack {
         kmsKey.grantEncryptDecrypt(profileLambda);
         kmsKey.grantEncryptDecrypt(wsNotifierLambda);
         kmsKey.grantEncryptDecrypt(authTriggerLambda);
+        kmsKey.grantEncryptDecrypt(expenseExportLambda);
 
         // SSM Parameter Store: Bedrock model ID
         bedrockModelIdParam.grantRead(snsWebhookLambda);
@@ -858,7 +890,7 @@ export class CostsCrunchStack extends Stack {
         // If this stack is deployed outside us-east-1, move this LogGroup to a
         // separate us-east-1 stack and reference its ARN cross-stack.
         const wafLogGroup = new logs.LogGroup(this, "WafLogGroup", {
-            logGroupName: `/aws/wafv2/${prefix}-waf-logs`,
+            logGroupName: `aws-waf-logs-costscrunch-${environment}`,
             retention: logs.RetentionDays.THREE_MONTHS,
             removalPolicy,
         });
@@ -1025,7 +1057,7 @@ export class CostsCrunchStack extends Stack {
 
         // Expense routes
         addRoute(apigwv2.HttpMethod.GET, "/expenses", expensesLambda);
-        addRoute(apigwv2.HttpMethod.GET, "/expenses/export", expensesLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/expenses/export", expenseExportLambda);
         addRoute(apigwv2.HttpMethod.POST, "/expenses", expensesLambda);
         addRoute(apigwv2.HttpMethod.GET, "/expenses/{id}", expensesLambda);
         addRoute(apigwv2.HttpMethod.PATCH, "/expenses/{id}", expensesLambda);
@@ -1051,6 +1083,7 @@ export class CostsCrunchStack extends Stack {
         addRoute(apigwv2.HttpMethod.GET, "/analytics/summary", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/trends", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/analytics/chartData", analyticsLambda);
+        addRoute(apigwv2.HttpMethod.GET, "/analytics/chart-data", analyticsLambda);
         addRoute(apigwv2.HttpMethod.GET, "/health", healthLambda);
 
         // Profile
@@ -1259,7 +1292,8 @@ export class CostsCrunchStack extends Stack {
             { fn: snsWebhookLambda, timeout: 29 },
             { fn: wsNotifierLambda, timeout: 29 },
             { fn: authTriggerLambda, timeout: 29 },
-            { fn: authLambda, timeout: 29 }
+            { fn: authLambda, timeout: 29 },
+            { fn: expenseExportLambda, timeout: 29 },
         ];
 
         const errorRateThreshold = alarmThreshold.errorRate;

@@ -702,6 +702,7 @@ $AWS ssm put-parameter --name "/costscrunch/dev/conn-table-name"      --value "$
 $AWS ssm put-parameter --name "/costscrunch/dev/ws-endpoint"          --value "http://localhost:4566/_aws/apigatewayv2/ws" --type String --overwrite --no-cli-pager 2>/dev/null || true
 # Bedrock model ID (matches CDK BEDROCK_MODEL_ID)
 $AWS ssm put-parameter --name "/costscrunch/dev/bedrock-model-id"     --value "foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0" --type String --overwrite --no-cli-pager 2>/dev/null || true
+$AWS ssm put-parameter --name "/costscrunch/dev/assets-bucket"        --value "$BUCKET_ASSETS"                      --type String --overwrite --no-cli-pager 2>/dev/null || true
 
 echo "✅ SSM ready"
 
