@@ -8,7 +8,7 @@
  * here (requires deployed CF distribution). Use CDK snapshot tests for that.
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { createServer } from "http";
 
 // Mock the Lambda handlers before importing app to avoid real AWS SDK calls
@@ -23,6 +23,7 @@ vi.mock("../../src/lambdas/analytics/index.js", () => ({
 }));
 
 import { app } from "../../src/server.js";
+import { rawHandler as expensesMock } from "../../src/lambdas/expenses/index.js";
 
 const TEST_PORT = 4001;
 const BASE = `http://localhost:${TEST_PORT}`;
@@ -155,5 +156,53 @@ describe("Lambda CORS headers are stripped — Express is the authority", () => 
 
     // Content-Type comes from Lambda (set via res.set(safeHeaders))
     expect(res.headers.get("content-type")).toContain("application/json");
+  });
+});
+
+// TEST-004 — CORS headers on error responses
+describe("CORS headers on 4xx and unauthenticated responses", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("4xx response still includes Access-Control-Allow-Origin", async () => {
+    vi.mocked(expensesMock).mockResolvedValueOnce({
+      statusCode: 400,
+      body: JSON.stringify({ error: "Validation failed" }),
+      headers: {},
+    });
+
+    const res = await fetch(`${BASE}/expenses`, {
+      method: "POST",
+      headers: { Origin: "http://localhost:5173", "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("401 response (simulated JWT rejection) still includes Access-Control-Allow-Origin", async () => {
+    vi.mocked(expensesMock).mockResolvedValueOnce({
+      statusCode: 401,
+      body: JSON.stringify({ error: "Unauthorized" }),
+      headers: {},
+    });
+
+    const res = await fetch(`${BASE}/expenses`, {
+      headers: { Origin: "http://localhost:5173" },
+    });
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("OPTIONS preflight on authenticated endpoint returns CORS allow headers", async () => {
+    const res = await fetch(`${BASE}/expenses`, { method: "OPTIONS" });
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-headers")).not.toBeNull();
+    expect(res.headers.get("access-control-allow-headers")).toContain("Authorization");
   });
 });
