@@ -29,7 +29,7 @@ interface ExpenseStore {
   addExpense: (expenseData: Omit<Expense, "id">) => void;
   updateExpense: (id: string, patch: Partial<Expense>) => void;
   removeExpense: (id: string) => void;
-  fetchExpenses: () => Promise<void>;
+  fetchExpenses: (isLoadMore?: boolean) => Promise<void>;
   setLimit: (limit: number) => void;
 
   setFilter: (f: ExpenseFilter) => void;

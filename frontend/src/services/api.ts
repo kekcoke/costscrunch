@@ -399,14 +399,20 @@ export const authApi = {
     return tokens;
   },
 
-  deleteAccount: (userId: string, email: string) =>
+  deleteAccount: () =>
     apiFetch<{ message: string }>("/auth/account", {
       method: "DELETE",
-      body: JSON.stringify({ userId, email }),
     }),
 
-  logout: () =>
-    apiFetch<{ message: string }>("/auth/logout", { method: "POST" }),
+  logout: async () => {
+    try {
+      await apiFetch<{ message: string }>("/auth/logout", { method: "POST" });
+    } finally {
+      localStorage.removeItem("cc_access_token");
+      localStorage.removeItem("cc_id_token");
+      localStorage.removeItem("cc_refresh_token");
+    }
+  },
 
   claimData: (sessionId: string) =>
     apiFetch<{ message: string; count: number }>("/auth/claim-data", {

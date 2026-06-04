@@ -21,12 +21,14 @@ export const useWebSocket = (url: string | undefined) => {
     ws.current = socket;
 
     socket.onopen = () => {
+      if (socket !== ws.current) return;
       console.log('WebSocket Connected');
       reconnectDelay.current = 1000;
       setStatus('open');
     };
 
     socket.onmessage = (event) => {
+      if (socket !== ws.current) return;
       try {
         const data: WsMessage = JSON.parse(event.data);
         setLastMessage(data);
@@ -44,6 +46,7 @@ export const useWebSocket = (url: string | undefined) => {
     };
 
     socket.onclose = () => {
+      if (socket !== ws.current) return;
       console.log('WebSocket Disconnected');
       setStatus('closed');
       if (!manualClose.current) {
@@ -56,6 +59,7 @@ export const useWebSocket = (url: string | undefined) => {
     };
 
     socket.onerror = (error) => {
+      if (socket !== ws.current) return;
       console.error('WebSocket Error', error);
       socket.close();
     };

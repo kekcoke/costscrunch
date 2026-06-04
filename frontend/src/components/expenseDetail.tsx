@@ -23,6 +23,10 @@ export default function ExpenseDetail({ expense: initialExpense, onBack, onUpdat
   });
 
   useEffect(() => {
+    setError(null);
+    setSubmitting(false);
+    setIsEditing(false);
+    setIsUploading(false);
     setLoading(true);
     expensesApi.get(initialExpense.id)
       .then((data) => {

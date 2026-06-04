@@ -1,5 +1,5 @@
 // ─── CostsCrunch — AnalyticsPage ─────────────────────────────────────────────
-import { useState, useEffect, useCallback, lazy, Suspense, useMemo } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, useMemo, useRef } from "react";
 import { analyticsApi } from "../services/api.js";
 
 import { CATEGORIES } from "../models/constants";
@@ -117,6 +117,18 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showCategoryMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
+        setShowCategoryMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showCategoryMenu]);
 
   const chartQuery = useMemo<AnalyticsQuery>(
     () => ({
@@ -244,7 +256,7 @@ export default function AnalyticsPage() {
               </select>
             </label>
 
-            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
+            <div ref={categoryMenuRef} style={{ position: "relative", display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--color-text-dim)" }}>
               Categories
               <button
                 type="button"
