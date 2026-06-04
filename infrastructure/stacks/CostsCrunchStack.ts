@@ -1305,6 +1305,7 @@ export class CostsCrunchStack extends Stack {
             { fn: authTriggerLambda, timeout: 29 },
             { fn: authLambda, timeout: 29 },
             { fn: expenseExportLambda, timeout: 29 },
+            { fn: wsHandlerLambda, timeout: 29 },
         ];
 
         const errorRateThreshold = alarmThreshold.errorRate;
