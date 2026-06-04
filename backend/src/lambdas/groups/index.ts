@@ -196,7 +196,7 @@ export const rawHandler = async (event: ApiEvent) => {
   if (route === "GET /groups/{id}/balances") {
     const [groupRes, expRes] = await Promise.all([
       ddb.send(new GetCommand({ TableName: TABLE, Key: { pk: `GROUP#${groupId}`, sk: `PROFILE#${groupId}` } })),
-      ddb.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)", ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#" } }))
+      ddb.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)", FilterExpression: "#status <> :reimbursed", ExpressionAttributeNames: { "#status": "status" }, ExpressionAttributeValues: { ":pk": `GROUP#${groupId}`, ":prefix": "EXPENSE#", ":reimbursed": "reimbursed" } }))
     ]);
     if (!groupRes.Item) {
         console.error(`[BALANCES_ERROR] Group ${groupId} not found`);
