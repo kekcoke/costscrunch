@@ -25,6 +25,7 @@ describe("ExpensesPage Unit Tests", () => {
       sortOrder: "date-desc",
       limit: 10,
       nextToken: null,
+      isFetched: false,
     });
     // Ensure all mocks are fresh
     vi.mocked(expensesApi.list).mockReset();

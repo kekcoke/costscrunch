@@ -71,16 +71,16 @@ export function DashboardPage() {
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "15px", marginBottom: "16px" }}>Group Budgets</div>
         <div style={{ display: "grid", gridTemplateColumns: "var(--grid-cols-3, repeat(3, 1fr))", gap: "16px" }}>
           {groups.map((g) => (
-            <div key={g.id} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}22`, borderRadius: "14px", padding: "20px" }}>
+            <div key={g.groupId} style={{ background: "var(--color-surface)", border: `1px solid ${g.color}22`, borderRadius: "14px", padding: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
                 <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: g.color }} />
                 <span style={{ fontWeight: 700, fontSize: "15px" }}>{g.name}</span>
-                <span style={{ marginLeft: "auto", fontSize: "12px", color: "var(--color-text-dim)" }}>{g.members} members</span>
+                <span style={{ marginLeft: "auto", fontSize: "12px", color: "var(--color-text-dim)" }}>{g.memberCount} members</span>
               </div>
-              <div style={{ fontSize: "22px", fontWeight: 800, color: g.color, fontFamily: "var(--font-display)", letterSpacing: "-0.5px" }}>{fmt(g.total)}</div>
-              <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>Your share: {fmt(g.myShare)}</div>
+              <div style={{ fontSize: "22px", fontWeight: 800, color: g.color, fontFamily: "var(--font-display)", letterSpacing: "-0.5px" }}>{fmt(g.totalSpend ?? 0)}</div>
+              <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>Your share: {fmt(g.myShare ?? 0)}</div>
               <div style={{ marginTop: "12px", height: "4px", background: "var(--color-surface-2)", borderRadius: "2px" }}>
-                <div style={{ height: "100%", width: `${((g.myShare / g.total) * 100).toFixed(0)}%`, background: g.color, borderRadius: "2px" }} />
+                <div style={{ height: "100%", width: `${(g.totalSpend > 0 ? (((g.myShare ?? 0) / g.totalSpend) * 100) : 0).toFixed(0)}%`, background: g.color, borderRadius: "2px" }} />
               </div>
             </div>
           ))}
