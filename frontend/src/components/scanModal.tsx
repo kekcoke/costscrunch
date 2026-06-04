@@ -2,41 +2,48 @@
 import { useState, useRef } from "react";
 import Modal from "./modal";
 import { CATEGORIES } from "../models/constants";
-import { SCAN_MOCK_RESULTS } from './../mocks/results'
 import type { ScanModalProps } from "../models/interfaceProps";
 import type { CategoryName } from "../models/types";
 import { type ScanForm, type ScanStage, EMPTY_FORM, FIELD_DEFS } from "../models/scanForm";
 import { createExpenseFromForm } from "./../helpers/expense/createExpenseFromForm";
+import { receiptsApi } from "../services/api";
+import type { ScanResultResponse } from "@costscrunch/api";
 
 
 export default function ScanModal({ onClose, onAdd, userId = "user1", userName = "You" }: ScanModalProps & { userId?: string; userName?: string }) {
   const [stage,       setStage]       = useState<ScanStage>("idle");
   const [dragging,    setDragging]    = useState(false);
-  const [scannedData, setScannedData] = useState<(typeof SCAN_MOCK_RESULTS)[number] | null>(null);
+  const [scannedData, setScannedData] = useState<ScanResultResponse | null>(null);
   const [form,        setForm]        = useState<ScanForm>(EMPTY_FORM);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const simulateScan = (file: File) => {
+  const performScan = async (file: File) => {
     setSelectedFile(file);
     setStage("uploading");
-    
-    // Simulate upload delay
-    setTimeout(() => setStage("scanning"), 900);
-    
-    // Simulate scan completion
-    setTimeout(() => {
-      const result = SCAN_MOCK_RESULTS[Math.floor(Math.random() * SCAN_MOCK_RESULTS.length)];
+    try {
+      const { result } = await receiptsApi.scanReceipt(file, (progressStage) => {
+        if (progressStage === "scanning") setStage("scanning");
+      });
+
+      if (!result || result.status === "failed") {
+        throw new Error("Scan failed or returned no data");
+      }
+
       setScannedData(result);
       setForm({
-        merchant: result.merchant,
-        amount:   result.amount,
-        category: result.category as CategoryName,
-        date:     result.date,
-        notes:    result.notes,
+        merchant: result.merchant ?? "",
+        amount:   result.amount != null ? String(result.amount) : "",
+        category: (result.category as CategoryName) ?? "Other",
+        date:     result.date ?? new Date().toISOString().slice(0, 10),
+        notes:    "",
       });
       setStage("result");
-    }, 2800);
+    } catch (err) {
+      console.error("Scan failed:", err);
+      setStage("idle");
+      alert("Scan failed — please try again or enter manually.");
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -53,7 +60,7 @@ export default function ScanModal({ onClose, onAdd, userId = "user1", userName =
         alert("File size must be less than 10MB");
         return;
       }
-      simulateScan(file);
+      performScan(file);
     }
   };
 
@@ -69,7 +76,7 @@ export default function ScanModal({ onClose, onAdd, userId = "user1", userName =
         alert("File size must be less than 10MB");
         return;
       }
-      simulateScan(file);
+      performScan(file);
     }
   };
 

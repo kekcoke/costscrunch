@@ -23,6 +23,7 @@ interface ExpenseStore {
   sortOrder: SortOrder;
   limit: number;
   nextToken: string | null;
+  isFetched: boolean;
 
   // ── Actions ─────────────────────────────────────────
   addExpense: (expenseData: Omit<Expense, "id">) => void;
@@ -47,6 +48,7 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
   sortOrder: "date-desc",
   limit: 10,
   nextToken: null,
+  isFetched: false,
 
   // ── Actions ────────────────────────────────────────────────────────────────
   /**
@@ -81,18 +83,20 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
     })),
 
   fetchExpenses: async (isLoadMore = false) => {
-    const { limit, filter, categoryFilter, nextToken, expenses } = useExpenseStore.getState();
+    const { limit, filter, categoryFilter, nextToken, expenses, isFetched } = useExpenseStore.getState();
+    if (isFetched && !isLoadMore) return;
     try {
-      const result = await expensesApi.list({ 
-        limit, 
+      const result = await expensesApi.list({
+        limit,
         status: filter !== "all" ? filter : undefined,
         category: categoryFilter !== "all" ? categoryFilter as CategoryName : undefined,
         nextToken: isLoadMore ? nextToken : undefined
       });
-      
-      set({ 
+
+      set({
         expenses: isLoadMore ? [...expenses, ...result.items] : result.items,
-        nextToken: result.nextToken 
+        nextToken: result.nextToken,
+        isFetched: true,
       });
     } catch (err) {
       console.error("Failed to fetch expenses:", err);
@@ -100,16 +104,16 @@ export const useExpenseStore = create<ExpenseStore>((set) => ({
   },
 
   setLimit: (limit) => {
-    set({ limit, nextToken: null }); // Reset pagination on limit change
+    set({ limit, nextToken: null, isFetched: false });
     useExpenseStore.getState().fetchExpenses();
   },
 
   setFilter: (f) => {
-    set({ filter: f, nextToken: null }); // Reset pagination on filter change
+    set({ filter: f, nextToken: null, isFetched: false });
     useExpenseStore.getState().fetchExpenses();
   },
   setCategoryFilter: (cat) => {
-    set({ categoryFilter: cat, nextToken: null });
+    set({ categoryFilter: cat, nextToken: null, isFetched: false });
     useExpenseStore.getState().fetchExpenses();
   },
   setSearch: (q) => set({ search: q }),
