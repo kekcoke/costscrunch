@@ -93,3 +93,60 @@
 | `p3/infra-cleanup` | `feat/p3/infra-cleanup` | infra-agent | IaC-019, IaC-020, IaC-021, IaC-022, IaC-024 | — | blocked | p2/infra |
 | `p3/cicd-cleanup` | `feat/p3/cicd-cleanup` | cicd-agent | cicd-SUG-001, SUG-002, SUG-005, SUG-007 | — | blocked | p2/cicd |
 | `p3/frontend-cleanup` | `feat/p3/frontend-cleanup` | frontend-agent | FE-015, FE-016, FE-018, FE-020, FE-022 | — | blocked | p2/frontend |
+
+---
+
+## Test Worktrees — E2E Setup (prerequisite · open immediately)
+
+> Must merge before any E2E test worktree opens. Details: `ai/phases/TEST-COVERAGE.md` · Primers: `ai/phases/primers/test-primers.md` → E2E Setup section
+
+| Worktree | Branch | Agent | Type | PR | Status | Depends On |
+|---|---|---|---|---|---|---|
+| `test/e2e-setup` | `feat/test/e2e-setup` | frontend-agent | Playwright setup | — | ready | — |
+
+---
+
+## Test Worktrees — Phase 0 (retroactive · opens after e2e-setup merges)
+
+> Details: `ai/phases/TEST-COVERAGE.md` · Primers: `ai/phases/primers/test-primers.md` → Phase 0 section
+
+| Worktree | Branch | Agent | Type | Issues Verified | PR | Status | Depends On |
+|---|---|---|---|---|---|---|---|
+| `test/p0-backend-integ` | `feat/test/p0-backend-integ` | backend-agent | Vitest + LocalStack | CON-001, CON-002, PERF-001, DEP-001, DEP-002, DEP-004 | — | blocked | test/e2e-setup |
+| `test/p0-frontend-e2e` | `feat/test/p0-frontend-e2e` | frontend-agent | Playwright | FE-001, FE-002, FE-004, FE-005 | — | blocked | test/e2e-setup |
+
+---
+
+## Test Worktrees — Phase 1 (opens after Phase 1 fix PRs merge + e2e-setup)
+
+> Details: `ai/phases/TEST-COVERAGE.md` · Primers: `ai/phases/primers/test-primers.md` → Phase 1 section
+
+| Worktree | Branch | Agent | Type | Issues Verified | PR | Status | Depends On |
+|---|---|---|---|---|---|---|---|
+| `test/p1-backend-integ` | `feat/test/p1-backend-integ` | backend-agent | Vitest + LocalStack | PERF-002, SF-002, SF-004, SF-005 | — | blocked | p1/backend-critical + test/e2e-setup |
+| `test/p1-infra` | `feat/test/p1-infra` | infra-agent | CDK assertions | IaC-007 | — | blocked | p1/infra-critical |
+
+---
+
+## Test Worktrees — Phase 2 (domain-parallel · rolling unblock per fix PR)
+
+> Details: `ai/phases/TEST-COVERAGE.md` · Primers: `ai/phases/primers/test-primers.md` → Phase 2 section
+
+| Worktree | Branch | Agent | Type | Issues Verified | PR | Status | Depends On |
+|---|---|---|---|---|---|---|---|
+| `test/p2-backend-perf-integ` | `feat/test/p2-backend-perf-integ` | backend-agent | Vitest + LocalStack | CON-003, CON-004, PERF-003, SCALE-001, SCALE-002 | — | blocked | p2/backend-perf |
+| `test/p2-backend-safety-integ` | `feat/test/p2-backend-safety-integ` | backend-agent | Vitest + LocalStack | SF-006, SF-007, SF-008, SF-009, SIMP-001 | — | blocked | p2/backend-safety |
+| `test/p2-types` | `feat/test/p2-types` | types-agent | tsc + Vitest unit | TDA-001, TDA-002, TDA-003, TDA-004, TDA-005 | — | blocked | p2/types |
+| `test/p2-infra` | `feat/test/p2-infra` | infra-agent | CDK assertions | IaC-008, IaC-009, IaC-010, IaC-011, IaC-013, IaC-014, IaC-016, IaC-017 | — | blocked | p2/infra |
+| `test/p2-frontend-e2e` | `feat/test/p2-frontend-e2e` | frontend-agent | Playwright | FE-006, FE-007, FE-009, FE-010, FE-011, FE-013, FE-014 | — | blocked | p2/frontend |
+
+---
+
+## Test Worktrees — Phase 3 (smoke/regression · opens after Phase 3 fix PRs merge)
+
+> Details: `ai/phases/TEST-COVERAGE.md` · Primers: `ai/phases/primers/test-primers.md` → Phase 3 section
+
+| Worktree | Branch | Agent | Type | Issues Verified | PR | Status | Depends On |
+|---|---|---|---|---|---|---|---|
+| `test/p3-backend-integ` | `feat/test/p3-backend-integ` | backend-agent | Vitest unit | SUG-001, SUG-002, SUG-005, SUG-006 | — | blocked | p3/backend-cleanup |
+| `test/p3-frontend-e2e` | `feat/test/p3-frontend-e2e` | frontend-agent | Playwright smoke | FE-016, FE-020, FE-022 | — | blocked | p3/frontend-cleanup |
