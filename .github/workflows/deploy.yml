@@ -108,6 +108,7 @@ jobs:
           path: |
             backend/dist/
             frontend/dist/
+            infrastructure/cdk.out/
           retention-days: 7
 
   # ─── Deploy to Staging ───────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ jobs:
         with:
           name: build-artifacts
       - name: CDK Deploy — Staging
-        run: npm run deploy:staging -w infrastructure
+        run: npm run deploy:staging -w infrastructure -- --app cdk.out
         env:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_STAGING }}
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
@@ -198,7 +199,7 @@ jobs:
         with:
           name: build-artifacts
       - name: CDK Deploy — Production
-        run: npm run deploy:prod -w infrastructure
+        run: npm run deploy:prod -w infrastructure -- --app cdk.out
         env:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
