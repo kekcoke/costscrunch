@@ -19,7 +19,7 @@
 | `infra/fix-iac` | `feat/infra/fix-iac` | infra-agent | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 | #62 | merged | — |
 | `cicd/fix-security` | `feat/cicd/fix-security` | cicd-agent | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001, CON-CI-002 | #64 | merged | — |
 | `frontend/fix-critical` | `feat/frontend/fix-critical` | frontend-agent | FE-001, FE-002, FE-004, FE-005 | #63 | merged | — |
-| `qa/fix-coverage` | `feat/qa/fix-coverage` | qa-agent | TEST-001, TEST-002, TEST-003, TEST-004 | — | blocked | backend PR |
+| `qa/fix-coverage` | `feat/qa/fix-coverage` | qa-agent | TEST-001, TEST-002, TEST-003, TEST-004 | #65 | pr open | backend PR |
 
 ---
 

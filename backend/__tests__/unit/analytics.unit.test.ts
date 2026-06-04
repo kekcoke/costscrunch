@@ -161,6 +161,29 @@ describe("GET /analytics/summary", () => {
     // Should use amountUSD (92), not amount (100)
     expect(body.totalAmount).toBeCloseTo(92);
   });
+
+  // TEST-002 — Analytics pagination (PERF-001)
+  it("aggregates all items across multiple DynamoDB pages", async () => {
+    const page1Items = Array.from({ length: 100 }, () => makeExpense());
+    const page2Items = Array.from({ length: 50 }, () => makeExpense());
+
+    ddbMock
+      .on(QueryCommand)
+      .resolvesOnce({ Items: page1Items, LastEvaluatedKey: { pk: { S: "CURSOR" } } })
+      .resolvesOnce({ Items: page2Items });
+
+    const res = await handler(
+      makeEvent({
+        routeKey: "GET /analytics/summary",
+        queryStringParameters: { scope: "personal" },
+      }) as any
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.expenseCount).toBe(150);
+    expect(body.totalAmount).toBeCloseTo(12.5 * 150);
+  });
 });
 
 // ── Trends ─────────────────────────────────────────────────────────────────────
