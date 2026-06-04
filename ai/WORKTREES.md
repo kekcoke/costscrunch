@@ -16,7 +16,7 @@
 | Worktree | Branch | Agent | Issues | PR | Status | Depends On |
 |---|---|---|---|---|---|---|
 | `backend/fix-critical` | `feat/backend/fix-critical` | backend-agent | CON-001, CON-002, PERF-001, DEP-001, DEP-002, DEP-004 | — | blocked | AC-003 |
-| `infra/fix-iac` | `feat/infra/fix-iac` | infra-agent | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 | — | not started | — |
+| `infra/fix-iac` | `feat/infra/fix-iac` | infra-agent | IaC-001, IaC-002, IaC-003, IaC-004, IaC-005, IaC-006 | — | pr open | — |
 | `cicd/fix-security` | `feat/cicd/fix-security` | cicd-agent | SEC-001, SEC-002, BUG-001, BUG-002, CON-CI-001, CON-CI-002 | — | pr open | — |
 | `frontend/fix-critical` | `feat/frontend/fix-critical` | frontend-agent | FE-001, FE-002, FE-004, FE-005 | — | blocked | AC-003 |
 | `qa/fix-coverage` | `feat/qa/fix-coverage` | qa-agent | TEST-001, TEST-002, TEST-003, TEST-004 | — | blocked | backend PR |
@@ -38,7 +38,7 @@
 
 - **Contract gate check** — before starting blocked worktrees, verify: `git fetch origin && git log origin/main --oneline | grep -i "AC-003\|contract"`
 - **Shared types** — any change to `shared/src/api/types.ts` requires contract-agent sign-off. Add a row here before opening the PR.
-- **IaC-004 / DEP-001** — same env var (`BUCKET_ASSETS_NAME`) from two angles. infra-agent lands the CDK side; backend-agent verifies in integration tests afterward.
+- **IaC-004 / DEP-001** — same env var (`BUCKET_ASSETS_NAME`) from two angles. infra-agent has landed the CDK side (IaC-004 merged); backend-agent can now verify DEP-001 in integration tests. `BUCKET_ASSETS_NAME` is in `sharedEnv`, both SAM templates, setup.sh, and bootstrap.sh.
 - **LocalStack** — shared singleton. The first agent to need it calls `docker compose up -d`; all others poll health first. See `ai/agents/localstack-agent.md §9`.
 
 ---
