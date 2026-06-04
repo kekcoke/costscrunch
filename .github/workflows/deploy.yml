@@ -152,7 +152,7 @@ jobs:
   post-deploy-staging:
     name: Post-Deploy Health Check → Rollback
     needs: deploy-staging
-    if: always()
+    if: always() && needs.deploy-staging.result != 'skipped'
     permissions:
       id-token: write
       contents: read
