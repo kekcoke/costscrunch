@@ -212,21 +212,13 @@ async function handleQuarantineEvent(
     action:   "Please upload a valid image or PDF receipt",
   };
 
-  const { sent, stale } = await pushToUsers(userId, connectionIds, wsPayload);
+  const { sent, stale, errors } = await pushToUsers(userId, connectionIds, wsPayload);
 
   logger.info("Quarantine WebSocket push complete", { sent, stale });
   metrics.addMetric("WsQuarantineSent", MetricUnit.Count, sent);
-<<<<<<< HEAD
   if (errors > 0) {
     metrics.addMetric("WsPartialFailures", MetricUnit.Count, errors);
   }
-
-  if (errors > 0 && errors === connectionIds.length) {
-    const firstRejection = results.find(r => r.status === "rejected") as PromiseRejectedResult;
-    throw firstRejection.reason;
-  }
-=======
->>>>>>> 49c73c7 (fix(backend): CON-004 extract pushToUsers helper to deduplicate Promise.allSettled fan-out)
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
