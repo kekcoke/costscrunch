@@ -1388,6 +1388,20 @@ export class CostsCrunchStack extends Stack {
         });
         dlqAlarm.addAlarmAction(alarmAction);
 
+        new cloudwatch.Alarm(this, "NotifDlqAlarm", {
+            metric: notificationsDlq.metricApproximateNumberOfMessagesVisible(),
+            threshold: 1,
+            evaluationPeriods: 1,
+            alarmDescription: "notifDlq has unprocessed messages",
+        }).addAlarmAction(new cw_actions.SnsAction(alarmsTopic));
+
+        new cloudwatch.Alarm(this, "WsNotifierDlqAlarm", {
+            metric: wsNotifierDlq.metricApproximateNumberOfMessagesVisible(),
+            threshold: 1,
+            evaluationPeriods: 1,
+            alarmDescription: "wsNotifierDlq has unprocessed messages",
+        }).addAlarmAction(new cw_actions.SnsAction(alarmsTopic));
+
         new CfnOutput(this, "AlarmsTopicArn", {
             value: alarmsTopic.topicArn,
             exportName: `${prefix}-alarms-topic-arn`,
