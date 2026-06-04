@@ -32,16 +32,12 @@ export class GitHubActionsStack extends Stack {
     const prefix = `costscrunch-${environment}`;
 
     // ── 1. OpenID Connect Provider ───────────────────────────────────────────
-    // Note: Provider is created once per AWS account; CDK will only create
-    // if not already existing (idempotent). The thumbprint list is fixed for
-    // token.actions.githubusercontent.com.
-    const thumbprints = ["6938fd4d98bab03faadb97b34396831e3780aea1"];
-
-    const oidcProvider = new openIdConnect.CfnOIDCProvider(this, "GitHubOIDCProvider", {
-      url: "https://token.actions.githubusercontent.com",
-      clientIdList: ["sts.amazonaws.com"],
-      thumbprintList: thumbprints,
-    });
+    // Import the existing provider instead of creating a new one to avoid
+    // EntityAlreadyExists when the OIDC provider is already in the account.
+    const oidcProvider = openIdConnect.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+      this, 'GithubOidcProvider',
+      `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`
+    );
 
     // ── 2. IAM Role with Trust Policy ────────────────────────────────────────
     // Trust policy restricts authentication to:
@@ -169,7 +165,7 @@ export class GitHubActionsStack extends Stack {
 
     // ── Outputs ──────────────────────────────────────────────────────────────
     this.oidcProviderArn = new CfnOutput(this, "OIDCProviderArn", {
-      value: oidcProvider.attrArn,
+      value: oidcProvider.openIdConnectProviderArn,
       description: "ARN of the GitHub OIDC Provider",
       exportName: `${prefix}-github-oidc-provider-arn`,
     });

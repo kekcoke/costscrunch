@@ -8,10 +8,10 @@
     "typecheck": "tsc --noEmit",
     "synth": "cdk synth",
     "diff": "cdk diff",
-    "deploy:dev": "cdk deploy --context env=dev --require-approval never",
-    "deploy:staging": "cdk deploy --context env=staging --require-approval never",
-    "deploy:prod": "cdk deploy --context env=prod --require-approval broadening",
-    "destroy:dev": "cdk destroy --context env=dev --force",
+    "deploy:dev": "cdk deploy --context stage=dev --require-approval never",
+    "deploy:staging": "cdk deploy --context stage=staging --require-approval never",
+    "deploy:prod": "cdk deploy --context stage=prod --require-approval broadening",
+    "destroy:dev": "cdk destroy --context stage=dev --force",
     "bootstrap": "cdk bootstrap",
     "lint": "eslint . --ext .ts --max-warnings 0",
     "test": "vitest run --passWithNoTests",
@@ -47,7 +47,7 @@
     "vitest": "^4.0.18"
   },
   "cdk": {
-    "app": "npx ts-node --prefer-ts-exts bin/app.ts",
+    "app": "npx ts-node --prefer-ts-exts bin/costscrunch.ts",
     "watch": {
       "include": [
         "**"

@@ -150,7 +150,12 @@ export class CostsCrunchStack extends Stack {
             tableName: `${prefix}-main`,
             partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
             sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
-            billing: dynamodb.Billing.onDemand(),
+            billing: capacityMode === 'provisioned'
+                ? dynamodb.Billing.provisioned({
+                    readCapacity: dynamodb.Capacity.fixed(isProd ? 50 : 5),
+                    writeCapacity: dynamodb.Capacity.autoscaled({ maxCapacity: isProd ? 20 : 5 }),
+                  })
+                : dynamodb.Billing.onDemand(),
             encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
             pointInTimeRecovery: true,
             deletionProtection: isProd,
@@ -393,7 +398,7 @@ export class CostsCrunchStack extends Stack {
         // upgrade prod to at least cache.t4g.small for better performance
         const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
             replicationGroupDescription: `${prefix} Redis`,
-            cacheNodeType: isProd ? "cache.t2.micro" : "cache.t2.micro",
+            cacheNodeType: isProd ? "cache.t4g.small" : "cache.t2.micro",
             engine: "redis",
             engineVersion: "7.0",
             numCacheClusters: isProd ? 2 : 1,
@@ -512,6 +517,7 @@ export class CostsCrunchStack extends Stack {
             LOG_LEVEL: isProd ? "INFO" : "DEBUG",
             ENVIRONMENT: environment,
             AWS_REGION_ID: regionId, // Explicitly pass concrete region
+            BEDROCK_REGION: regionId,
             // SSM/Secrets Manager parameter paths for runtime retrieval
             SSM_BEDROCK_MODEL_ID: bedrockModelIdParam.parameterName,
             SSM_VITE_APP_URL: viteAppUrlParam.parameterName,
@@ -694,7 +700,7 @@ export class CostsCrunchStack extends Stack {
         table.grantReadData(analyticsLambda);
         table.grantReadWriteData(profileLambda);
         table.grantReadWriteData(notificationsLambda);
-        table.grantWriteData(authTriggerLambda);
+        table.grantReadWriteData(authTriggerLambda);
         table.grantReadData(expenseExportLambda);
 
         // Connection table (ws-notifier reads; $connect Lambda writes)
@@ -754,12 +760,6 @@ export class CostsCrunchStack extends Stack {
         // SNS: textractTopic -> scanQueue -> snsWebhookLambda
         textractTopic.addSubscription(new sns_subscriptions.SqsSubscription(scanQueue));
         snsWebhookLambda.addEventSource(new lambdaEventSources.SqsEventSource(scanQueue));
-
-        // API Gateway Management: ws-notifier pushes messages to connections
-        wsNotifierLambda.addToRolePolicy(new iam.PolicyStatement({
-            actions:   ["execute-api:ManageConnections"],
-            resources: [`arn:aws:execute-api:${regionId}:${accountId}:*/prod/POST/@connections/*`],
-        }));
 
         // KMS
         kmsKey.grantEncryptDecrypt(expensesLambda);
@@ -834,8 +834,19 @@ export class CostsCrunchStack extends Stack {
             autoDeploy:    true,
         });
 
-        // Inject the WSS callback URL so ws-notifier can call @connections
-        wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", config.webSocketEndpoint || wsStage.callbackUrl);
+        // Inject the WSS callback URL so ws-notifier and image-preprocess can call @connections
+        const wsEndpoint = config.webSocketEndpoint || wsStage.callbackUrl;
+        wsNotifierLambda.addEnvironment("WEBSOCKET_ENDPOINT", wsEndpoint);
+        imagePreprocessLambda.addEnvironment("WEBSOCKET_ENDPOINT", wsEndpoint);
+
+        // ── Provisioned Concurrency (prod only) ─────────────────────────────────
+        if (useProvisionedConcurrency) {
+            for (const fn of [expensesLambda, groupsLambda, snsWebhookLambda]) {
+                const alias = fn.addAlias('live');
+                const scaling = alias.addAutoScaling({ minCapacity: 1, maxCapacity: 10 });
+                scaling.scaleOnUtilization({ utilizationTarget: 0.5 });
+            }
+        }
 
         // ── EventBridge → Notifications Lambda ───────────────────────────────────
         // ReceiptScanCompleted fires both the WebSocket notifier AND the
@@ -1276,6 +1287,12 @@ export class CostsCrunchStack extends Stack {
             masterKey: kmsKey,
         });
 
+        // Subscribe an alert email if provided via CDK context (--context alarmEmail=ops@example.com)
+        const alarmEmail = this.node.tryGetContext("alarmEmail") as string | undefined;
+        if (alarmEmail) {
+            alarmsTopic.addSubscription(new sns_subscriptions.EmailSubscription(alarmEmail));
+        }
+
         const alarmAction = new cw_actions.SnsAction(alarmsTopic);
 
         // 1. Lambda Error Rate & Duration Alarms
@@ -1294,6 +1311,7 @@ export class CostsCrunchStack extends Stack {
             { fn: authTriggerLambda, timeout: 29 },
             { fn: authLambda, timeout: 29 },
             { fn: expenseExportLambda, timeout: 29 },
+            { fn: wsHandlerLambda, timeout: 29 },
         ];
 
         const errorRateThreshold = alarmThreshold.errorRate;
