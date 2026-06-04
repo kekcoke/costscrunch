@@ -61,7 +61,7 @@
 
 | Worktree | Branch | Agent | Issues | PR | Status |
 |---|---|---|---|---|---|
-| `p1/backend-critical` | `feat/p1/backend-critical` | backend-agent | PERF-002, SF-002, SF-004, SF-005 | — | in progress |
+| `p1/backend-critical` | `feat/p1/backend-critical` | backend-agent | PERF-002, SF-002, SF-004, SF-005 | — | pr open |
 | `p1/infra-critical` | `feat/p1/infra-critical` | infra-agent | IaC-007 | — | ready |
 | `p1/cicd-critical` | `feat/p1/cicd-critical` | cicd-agent | BUG-001, BUG-002, BUG-003 | — | ready |
 
