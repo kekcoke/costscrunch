@@ -115,16 +115,6 @@ const err = (msg: string, statusCode = 400) => ({
   body: JSON.stringify({ error: msg }),
 });
 
-/** Robust send to handle mock client issues in tests */
-async function sendCommand(command: any) {
-  try {
-    return await ddb.send(command);
-  } catch (e) {
-    logger.debug("Command failed", { error: e });
-    return undefined;
-  }
-}
-
 export function buildExpenseKeys(userId: string, expenseId: string, expense: Partial<Expense> & { groupId?: string }) {
   return {
     pk: expense.groupId ? `GROUP#${expense.groupId}` : `USER#${userId}`,
@@ -332,7 +322,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     }));
     if (result.Item) return ok(result.Item);
 
-    const scanRes = await sendCommand(new ScanCommand({
+    const scanRes = await ddb.send(new ScanCommand({
       TableName: TABLE,
       FilterExpression: "sk = :sk",
       ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
@@ -391,7 +381,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     const body = parsed.data;
     const now = new Date().toISOString();
 
-    const currentRes = await sendCommand(new QueryCommand({
+    const currentRes = await ddb.send(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: "pk = :pk AND sk = :sk",
       ExpressionAttributeValues: { ":pk": `USER#${auth.userId}`, ":sk": `EXPENSE#${expenseId}` }
@@ -399,7 +389,7 @@ export const rawHandler = withLocalAuth(withErrorHandler(async (event: ApiEvent 
     let currentItem = currentRes?.Items?.[0];
 
     if (!currentItem) {
-      const scanRes = await sendCommand(new ScanCommand({
+      const scanRes = await ddb.send(new ScanCommand({
         TableName: TABLE,
         FilterExpression: "sk = :sk",
         ExpressionAttributeValues: { ":sk": `EXPENSE#${expenseId}` }
