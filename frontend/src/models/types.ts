@@ -104,6 +104,11 @@ export interface Group {
 // Do not extend or duplicate here — update shared/src/api/types.ts instead.
 export type { ScanResultResponse as ScanResult } from "@costscrunch/api";
 
+export interface BalancesResponse {
+  balances: Record<string, number>;
+  settlements: Array<{ from: string; to: string; amount: number }>;
+}
+
 // ─── API Request / Response shapes ───────────────────────────────────────────
 
 export interface CreateExpenseRequest {

@@ -141,11 +141,12 @@ export const selectPending = createSelector(
   (expenses) => expenses.filter((e) => e.status === "pending")
 );
 
-/** Expenses added by the current user. */
-export const selectMyExpenses = createSelector(
-  (s: ExpenseStore) => s.expenses,
-  (expenses) => expenses.filter((e) => e.addedBy === "You")
-);
+/** Expenses owned by the given user. Pass the Cognito userId from getCurrentUser(). */
+export const makeSelectMyExpenses = (userId: string) =>
+  createSelector(
+    (s: ExpenseStore) => s.expenses,
+    (expenses) => expenses.filter((e) => e.ownerId === userId)
+  );
 
 /** Filter + search applied. Use with `shallow` if consumed alongside other selectors. */
 export const selectFiltered = createSelector(

@@ -1,10 +1,11 @@
 // ─── CostsCrunch — DashboardPage ─────────────────────────────────────────────
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getCurrentUser } from "@aws-amplify/auth";
 import {
   useExpenseStore,
   selectExpenses,
   selectPending,
-  selectMyExpenses,
+  makeSelectMyExpenses,
 } from "../stores/useExpenseStore";
 import { useGroupStore } from "../stores/useGroupStore";
 import { CATEGORIES } from "../models/constants";
@@ -12,10 +13,20 @@ import { fmt } from "../helpers/utils";
 import { StatCard, ExpenseRow, DonutChart } from "../components";
 
 export function DashboardPage() {
-  const expenses   = useExpenseStore(selectExpenses);
-  const pending    = useExpenseStore(selectPending);
-  const myExpenses = useExpenseStore(selectMyExpenses);
+  const expenses = useExpenseStore(selectExpenses);
+  const pending  = useExpenseStore(selectPending);
   const { groups, fetchGroups } = useGroupStore();
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    getCurrentUser().then((u) => setCurrentUserId(u.userId)).catch(() => {});
+  }, []);
+
+  const selectMine = useMemo(
+    () => currentUserId ? makeSelectMyExpenses(currentUserId) : () => [],
+    [currentUserId]
+  );
+  const myExpenses = useExpenseStore(selectMine);
 
   useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
@@ -40,7 +51,7 @@ export function DashboardPage() {
           Overview
         </h1>
         <div style={{ fontSize: "12px", color: "var(--color-text-dim)", marginTop: "4px" }}>
-          February 2026
+          {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
         </div>
       </header>
 

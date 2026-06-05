@@ -173,7 +173,7 @@ export default function ExpenseDetail({ expense: initialExpense, onBack, onUpdat
             </div>
             
             <div style={{ marginTop: "12px" }}>
-              {(expense.receipt || expense.s3Uri) ? (
+              {expense.receipt ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
                   <button
                     onClick={handleDownload}

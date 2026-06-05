@@ -8,6 +8,8 @@ import { fmt, fmtDate } from "../helpers/utils";
 import type { Expense } from "../models/types";
 import GroupDetail from "../components/groups/groupDetail";
 
+type SortOption = 'name' | 'type' | 'totalSpend' | 'monthSpend';
+
 export function GroupsPage() {
   const expenses = useExpenseStore(selectExpenses);
   const { groups, loading: groupsLoading, fetchGroups } = useGroupStore();
@@ -17,7 +19,7 @@ export function GroupsPage() {
   // View State
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "type" | "totalSpend" | "monthSpend">("name");
+  const [sortBy, setSortBy] = useState<SortOption>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Modal State
@@ -146,7 +148,7 @@ export function GroupsPage() {
           <span style={{ fontSize: "12px", color: "var(--color-text-dim)", fontWeight: 500 }}>Sort by:</span>
           <select 
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}
+            onChange={e => setSortBy(e.target.value as SortOption)}
             style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: "14px", cursor: "pointer" }}
           >
             <option value="name">Name</option>
