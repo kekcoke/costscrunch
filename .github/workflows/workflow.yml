@@ -17,7 +17,7 @@ env:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   quality-frontend:
@@ -41,6 +41,7 @@ jobs:
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: frontend
 
   quality-backend:
     name: Backend · Lint & Test
@@ -63,6 +64,7 @@ jobs:
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: backend
 
   quality-infrastructure:
     name: Infrastructure · Lint & Test
@@ -176,6 +178,7 @@ jobs:
           # Wait for LocalStack health
           echo "⏳ Waiting for LocalStack..."
           for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
+          curl -sf http://localhost:4566/_localstack/health || { echo "❌ LocalStack health check timed out after 100s"; exit 1; }
 
           # Wait for Cognito health
           echo "⏳ Waiting for Cognito Local..."
@@ -235,6 +238,7 @@ jobs:
       - name: Wait for LocalStack
         run: |
           for i in {1..20}; do curl -sf http://localhost:4566/_localstack/health && break || sleep 5; done
+          curl -sf http://localhost:4566/_localstack/health || { echo "❌ LocalStack health check timed out after 100s"; exit 1; }
       - name: Run LocalStack infrastructure tests
         run: npm run test:localstack -w infrastructure
 
