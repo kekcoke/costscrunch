@@ -8,7 +8,6 @@ import * as cdk from "aws-cdk-lib";
 import { Stack, StackProps, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as openIdConnect from "aws-cdk-lib/aws-iam";
 
 export interface GitHubActionsStackProps extends StackProps {
   /** GitHub organization or user name (e.g., "octocat") */
@@ -32,12 +31,16 @@ export class GitHubActionsStack extends Stack {
     const prefix = `costscrunch-${environment}`;
 
     // ── 1. OpenID Connect Provider ───────────────────────────────────────────
-    // Import the existing provider instead of creating a new one to avoid
-    // EntityAlreadyExists when the OIDC provider is already in the account.
-    const oidcProvider = openIdConnect.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
-      this, 'GithubOidcProvider',
-      `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`
-    );
+    // Create (or update) the provider with both current GitHub thumbprints so
+    // auth survives a certificate rotation to the second thumbprint.
+    const oidcProvider = new iam.OpenIdConnectProvider(this, 'GithubOidcProvider', {
+      url: 'https://token.actions.githubusercontent.com',
+      clientIds: ['sts.amazonaws.com'],
+      thumbprints: [
+        '6938fd4d98bab03faadb97b34396831e3780aea1',
+        '1c58a3a8518e8759bf075b76b750d4f2df264fcd',
+      ],
+    });
 
     // ── 2. IAM Role with Trust Policy ────────────────────────────────────────
     // Trust policy restricts authentication to:

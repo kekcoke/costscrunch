@@ -288,6 +288,7 @@ export class CostsCrunchStack extends Stack {
             encryption: s3.BucketEncryption.KMS,
             encryptionKey: kmsKey,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+            enforceSSL: true,
             removalPolicy,
         });
 
@@ -1387,6 +1388,20 @@ export class CostsCrunchStack extends Stack {
         });
         dlqAlarm.addAlarmAction(alarmAction);
 
+        new cloudwatch.Alarm(this, "NotifDlqAlarm", {
+            metric: notificationsDlq.metricApproximateNumberOfMessagesVisible(),
+            threshold: 1,
+            evaluationPeriods: 1,
+            alarmDescription: "notifDlq has unprocessed messages",
+        }).addAlarmAction(new cw_actions.SnsAction(alarmsTopic));
+
+        new cloudwatch.Alarm(this, "WsNotifierDlqAlarm", {
+            metric: wsNotifierDlq.metricApproximateNumberOfMessagesVisible(),
+            threshold: 1,
+            evaluationPeriods: 1,
+            alarmDescription: "wsNotifierDlq has unprocessed messages",
+        }).addAlarmAction(new cw_actions.SnsAction(alarmsTopic));
+
         new CfnOutput(this, "AlarmsTopicArn", {
             value: alarmsTopic.topicArn,
             exportName: `${prefix}-alarms-topic-arn`,
@@ -1414,6 +1429,13 @@ class EncryptionEnforcementAspect implements IAspect {
             const sse = node.sseSpecification;
             if (!sse || (sse as any).sseEnabled === false) {
                 Annotations.of(node).addError("DynamoDB Table must have SSE encryption enabled.");
+            }
+        }
+        // TableV2 synthesizes to AWS::DynamoDB::GlobalTable — enforce encryption there too
+        if (node instanceof dynamodb.CfnGlobalTable) {
+            const sse = (node as dynamodb.CfnGlobalTable).sseSpecification;
+            if (!sse) {
+                Annotations.of(node).addError("DynamoDB GlobalTable must have SSE encryption enabled.");
             }
         }
     }

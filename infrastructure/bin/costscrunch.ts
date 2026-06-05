@@ -54,7 +54,7 @@ function getStageConfig(app: cdk.App): StageConfig {
       capacityMode: "on-demand",
       alarmThreshold: { errorRate: 3, durationP99: 20000 },
       provisionedConcurrency: false,
-      removalPolicy: "destroy",
+      removalPolicy: "retain",
     },
     prod: {
       stage: "prod",
