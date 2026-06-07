@@ -21,10 +21,7 @@ exports[`GitHubActionsStack > matches snapshot 1`] = `
         "Name": "costscrunch-staging-github-oidc-provider-arn",
       },
       "Value": {
-        "Fn::GetAtt": [
-          "GitHubOIDCProvider",
-          "Arn",
-        ],
+        "Ref": "GithubOidcProviderD8241A88",
       },
     },
   },
@@ -36,6 +33,71 @@ exports[`GitHubActionsStack > matches snapshot 1`] = `
     },
   },
   "Resources": {
+    "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0": {
+      "DependsOn": [
+        "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-us-east-1",
+          "S3Key": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50.zip",
+        },
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "iam:CreateOpenIDConnectProvider",
+                    "iam:DeleteOpenIDConnectProvider",
+                    "iam:UpdateOpenIDConnectProviderThumbprint",
+                    "iam:AddClientIDToOpenIDConnectProvider",
+                    "iam:RemoveClientIDFromOpenIDConnectProvider",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
     "GitHubActionsDeployRoleA6F4AD3D": {
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -53,7 +115,7 @@ exports[`GitHubActionsStack > matches snapshot 1`] = `
               "Effect": "Allow",
               "Principal": {
                 "Federated": {
-                  "Ref": "GitHubOIDCProvider",
+                  "Ref": "GithubOidcProviderD8241A88",
                 },
               },
             },
@@ -174,17 +236,28 @@ exports[`GitHubActionsStack > matches snapshot 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
-    "GitHubOIDCProvider": {
+    "GithubOidcProviderD8241A88": {
+      "DeletionPolicy": "Delete",
       "Properties": {
-        "ClientIdList": [
+        "ClientIDList": [
           "sts.amazonaws.com",
         ],
+        "CodeHash": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50",
+        "RejectUnauthorized": false,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0",
+            "Arn",
+          ],
+        },
         "ThumbprintList": [
           "6938fd4d98bab03faadb97b34396831e3780aea1",
+          "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
         ],
         "Url": "https://token.actions.githubusercontent.com",
       },
-      "Type": "AWS::IAM::OIDCProvider",
+      "Type": "Custom::AWSCDKOpenIdConnectProvider",
+      "UpdateReplacePolicy": "Delete",
     },
   },
   "Rules": {
