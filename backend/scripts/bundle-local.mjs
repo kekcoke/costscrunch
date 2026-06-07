@@ -26,6 +26,7 @@ const root = join(__dirname, "../");
 const functions = [
   { name: "GroupsFunction", entry: "src/lambdas/_local/groups.ts" },
   { name: "ExpensesFunction", entry: "src/lambdas/_local/expenses.ts" },
+  { name: "ExpenseExportFunction", entry: "src/lambdas/expense-export/index.ts" },
   { name: "ReceiptsFunction", entry: "src/lambdas/_local/receipts.ts" },
   { name: "AnalyticsFunction", entry: "src/lambdas/_local/analytics.ts" },
   { name: "AuthFunction", entry: "src/lambdas/auth/index.ts" },
