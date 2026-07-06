@@ -6,12 +6,12 @@ import { existsSync } from "fs";
 
 // import.meta.url is always the absolute path of THIS file, regardless of cwd.
 // This file lives at: root/backend/__tests__/setup/setupTestEnv.ts
-// .env.dev lives at: root/.env.dev
-// Path:               ../../../.env.dev  (setup/ → __tests__/ → backend/ → root/)
+// .env.shared lives at: root/.env.shared
+// Path:                 ../../../.env.shared  (setup/ → __tests__/ → backend/ → root/)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Determine environment and set local as default if none is provided
-const environment = process.env.ENVIRONMENT || 'dev'
+const environment = process.env.ENVIRONMENT || 'shared'
 const envPath   = resolve(__dirname, `../../../.env.${environment}`);
 
 if (!existsSync(envPath)) {
