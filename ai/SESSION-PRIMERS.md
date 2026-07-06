@@ -96,7 +96,7 @@ FE-002 (HIGH) — frontend/src/services/api.ts, WebSocket client
 
 After each fix: cd frontend && npx vitest run
 For FE-005 and FE-004: also start the dev server and verify visually in a browser.
-Check .env.dev for VITE_API_URL before starting — confirm the correct backend port
+Check .env.shared for VITE_API_URL before starting — confirm the correct backend port
 (3001 for SAM opt3, 4000 for Express opt1/opt2).
 Open a PR when all fixes are committed and green. Update ai/WORKTREES.md row to 'pr open'.
 ```

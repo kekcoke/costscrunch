@@ -5,7 +5,7 @@ import { AnalyticsRepository } from "../../src/logic/analyticsRepository.js";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
-// Capture the TABLE name as the module sees it (from .env.dev loaded by vitest setup,
+// Capture the TABLE name as the module sees it (from .env.shared loaded by vitest setup,
 // before beforeEach overrides process.env.TABLE_NAME_MAIN to "TestTable").
 const MODULE_TABLE = process.env.TABLE_NAME_MAIN!;
 

@@ -73,9 +73,9 @@ else
 fi
 
 # 5. LINK SHARED CONFIGURATION INTO THE WORKTREE.
-ln -sf "$ROOT_DIR/.env.shared" "$WORKTREE_DIR/.env.dev"
+ln -sf "$ROOT_DIR/.env.shared" "$WORKTREE_DIR/.env.shared"
 ln -sf "$ROOT_DIR/tsconfig.base.json" "$WORKTREE_DIR/tsconfig.base.json"
-log "  • Linked shared configs (.env.dev, tsconfig.base.json)."
+log "  • Linked shared configs (.env.shared, tsconfig.base.json)."
 
 # 6. INJECT AGENT CONTEXT — maps feat/<domain>/<slug> → ai/agents/<domain>-agent.md.
 #    The second path segment is the domain: feat/backend/fix-concurrency → backend.

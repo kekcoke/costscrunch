@@ -34,7 +34,7 @@
 
 **Mocking Textract/Bedrock in E2E:** use `page.route('**/receipts/*/scan', ...)` to stub scan completion responses. Textract/Bedrock are not available in LocalStack free tier.
 
-**Auth strategy:** `MOCK_AUTH=true` in `.env.dev` makes backend inject `sub: "00000000-0000-0000-0000-test-user-001"`. Frontend bypasses Cognito in local dev. E2E tests set `cc_access_token` in localStorage to prevent /login redirects.
+**Auth strategy:** `MOCK_AUTH=true` in `.env.shared` makes backend inject `sub: "00000000-0000-0000-0000-test-user-001"`. Frontend bypasses Cognito in local dev. E2E tests set `cc_access_token` in localStorage to prevent /login redirects.
 
 ---
 
