@@ -91,7 +91,7 @@ export const handler = withErrorHandler(async (event, context) => {
 - `getAuth(event)` is the single source of identity — never read userId from request body
 - Responses use `ok()` / `err()` helpers which include CORS headers
 
-**Local dev:** `MOCK_AUTH=true` (`.env.dev`) bypasses Cognito JWT validation. The `_local/` handler wrappers inject mock claims via `withMockAuth()`.
+**Local dev:** `MOCK_AUTH=true` (`.env.shared`) bypasses Cognito JWT validation. The `_local/` handler wrappers inject mock claims via `withMockAuth()`.
 
 ---
 

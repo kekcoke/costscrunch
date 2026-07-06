@@ -59,7 +59,7 @@ Answer every question below before writing a single line of migration code. A "N
 
 | # | Question | Answer | Notes |
 |---|----------|--------|-------|
-| D-12 | Does ministack require a different `AWS_ENDPOINT_URL` format? | TBD | Affects `.env.dev` and Lambda env vars |
+| D-12 | Does ministack require a different `AWS_ENDPOINT_URL` format? | TBD | Affects `.env.shared` and Lambda env vars |
 | D-13 | Does ministack use the same AWS CLI command syntax? | TBD | `setup.sh` uses `awslocal` / `aws --endpoint-url` extensively |
 | D-14 | Does ministack support the `awslocal` CLI wrapper? | TBD | `setup.sh` calls `awslocal` throughout — may need to replace with `aws --endpoint-url=<ministack>` |
 | D-15 | Does ministack require a different Lambda invocation model? | TBD | Opt2 uses LocalStack container exec; opt3 uses SAM CLI — determine if SAM still works |
@@ -164,7 +164,7 @@ For each file, what changes when switching to ministack:
 - [ ] Verify `--docker-network` flag for SAM against ministack
 - [ ] Update SAM start command if endpoint flag differs
 
-### `.env.dev`
+### `.env.shared`
 - [ ] Update `AWS_ENDPOINT_URL=http://localhost:<ministack-port>`
 - [ ] Update `AWS_ENDPOINT_URL` references for Lambda env injection
 
@@ -222,7 +222,7 @@ If ministack fails parity checks mid-migration:
 git checkout main -- infrastructure/docker-compose.localstack.yml
 git checkout main -- infrastructure/localstack/dev/setup.sh
 git checkout main -- setup/localstack-opt3.sh
-git checkout main -- .env.dev
+git checkout main -- .env.shared
 
 # Option B: abandon migration branch entirely
 git checkout main
