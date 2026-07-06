@@ -53,13 +53,13 @@ CostsCrunch is a serverless expense tracker monorepo with four npm workspaces: `
 | Workspace | Role |
 |-----------|------|
 | `frontend` | React 19 + Vite SPA, deployed to CloudFront + S3 |
-| `backend` | 12 Lambda functions + Express adapter for local dev |
+| `backend` | 14 Lambda functions + Express adapter for local dev |
 | `infrastructure` | AWS CDK v2 stacks defining all cloud resources |
 | `shared` | Types and utilities shared across frontend/backend |
 
 ### Backend Lambda functions
 
-Each function is a separate entry point bundled by esbuild at deploy time:
+Each function is a separate entry point bundled by esbuild at deploy time (`backend/src/lambdas/*`):
 
 - **expenses** — CRUD + multi-party approval workflows
 - **groups** — splits, balances, and settlement logic
@@ -68,6 +68,7 @@ Each function is a separate entry point bundled by esbuild at deploy time:
 - **sns-webhook** — Textract completion → Bedrock Claude categorization → DynamoDB write
 - **web-socket-handler** — WebSocket `$connect`/`$disconnect` lifecycle
 - **web-socket-notifier** — Pushes real-time receipt scan results to connected clients
+- **notifications** — SES/Pinpoint email + push delivery
 - **auth** — Registration, login, MFA, PKCE token exchange, password reset
 - **auth-trigger** — Post-Cognito-confirmation DynamoDB profile creation
 - **analytics** — Aggregations and trend queries by category + time
@@ -106,6 +107,8 @@ GSIs: `gsi1` (approval queue by status+date), `gsi2` (analytics by category+date
 
 Entry point: `infrastructure/bin/costscrunch.ts`. Stage is passed via CDK context (`--context stage=dev|staging|prod`). Stage-specific differences: DynamoDB capacity mode (on-demand vs provisioned), Lambda provisioned concurrency, CloudWatch alarm thresholds, and `RemovalPolicy` (destroy vs retain).
 
+`CostsCrunchStack` (`infrastructure/stacks/CostsCrunchStack.ts`) composes the stack from L3 constructs under `infrastructure/stacks/constructs/`: `NetworkConstruct`, `DataConstruct`, `StorageConstruct`, `CognitoConstruct`, `ComputeConstruct`, `ApiConstruct`, `MessagingConstruct`, `EdgeConstruct`, `ObservabilityConstruct`, `ConfigConstruct`, plus `SecurityAspects` (the secrets-in-env-vars `IAspect`). When changing a resource, find its owning construct rather than searching the stack file directly.
+
 Secrets live in SSM Parameter Store and Secrets Manager — never in Lambda environment variables (enforced by a CDK `IAspect` during `cdk synth`).
 
 ### Frontend state
@@ -135,10 +138,10 @@ export const handler = withErrorHandler(async (event, context) => {
 
 **Logging** (backend): Use `@aws-lambda-powertools/logger`. Never use `console.log` in Lambda handlers.
 
-**Local dev env**: `.env.dev` at the root sets `MOCK_AUTH=true` (bypasses Cognito JWT validation) and `AWS_ENDPOINT_URL=http://localhost:4566` (LocalStack).
+**Local dev env**: `.env.shared` at the root sets `MOCK_AUTH=true` (bypasses Cognito JWT validation) and `AWS_ENDPOINT_URL=http://localhost:4566` (LocalStack).
 
 **Tests**:
-- Backend unit tests mock AWS SDK clients via `aws-sdk-client-mock`; they run without any local services.
+- Backend unit tests mock AWS SDK clients via `aws-sdk-client-mock`; they run without any local services. `backend/__tests__/setup/setupTestEnv.ts` loads `.env.shared` from the repo root by default (override the file via the `ENVIRONMENT` env var, e.g. `ENVIRONMENT=staging` → `.env.staging`).
 - Backend integration tests require LocalStack — run `npm run test:ig` only when LocalStack is up.
 - Frontend tests use JSDOM environment; coverage threshold is 70% branches/functions/lines.
 - Backend coverage thresholds: 75% functions/lines, 70% branches.
