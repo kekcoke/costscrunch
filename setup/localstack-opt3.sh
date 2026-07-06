@@ -56,10 +56,10 @@ for port in "$API_PORT" "$FRONTEND_PORT"; do
   fi
 done
 
-# 1. Load and expand env variables from .env.dev
-ENV_FILE="$PROJECT_ROOT/.env.dev"
+# 1. Load and expand env variables from .env.shared
+ENV_FILE="$PROJECT_ROOT/.env.shared"
 if [ ! -f "$ENV_FILE" ]; then
-  echo "❌ .env.dev not found at $ENV_FILE"
+  echo "❌ .env.shared not found at $ENV_FILE"
   exit 1
 fi
 
