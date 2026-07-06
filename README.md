@@ -76,7 +76,7 @@ costscrunch
     ├── localstack/          # Provisioning (Setup & Bootstrap) for Option 2
     ├── sam/                 # Local emulation templates (REST v1 / ARM64)
     ├── stacks/              # CDK Infrastructure-as-Code definitions
-    ├── .env.dev             # Mock variables for Vitest execution
+    ├── .env.shared          # Mock variables for Vitest execution
     └── docker-compose.yml   # Multi-container orchestration (LocalStack base)
 ```
 
@@ -567,7 +567,7 @@ docker cp infrastructure/localstack/opt2/bootstrap.sh costscrunch-localstack:/op
 docker cp infrastructure/localstack/opt2/enable-cors.sh costscrunch-localstack:/opt/bootstrap/
 docker cp backend/dist/lambda/. costscrunch-localstack:/opt/lambda-build/
 docker exec costscrunch-localstack bash /opt/bootstrap/bootstrap.sh
-# Update .env.dev with the API_ID from output, then restart Vite
+# Update .env.shared with the API_ID from output, then restart Vite
 ```
 
 > **Note:** `docker compose down` destroys LocalStack state (no persistent volume by default). The API ID changes on every fresh start. To persist the ID, add a named volume `localstack-data:/var/lib/localstack` to `docker-compose.localstack.yml` — see `notes/2026-03-21-fix-localstack-404s.md`.
@@ -604,7 +604,7 @@ npm run dev
 ```bash
 # Infrastructure tests
 cd infrastructure
-npm test                                        # all infra tests (loads .env.dev via setup.ts)
+npm test                                        # all infra tests (loads .env.shared via setup.ts)
 npx vitest run __tests__/EncryptionAspect.test.ts # Security compliance tests
 npx vitest run __tests__/opt3                   # Option 3 unit tests only (no LocalStack needed)
 npx vitest run __tests__/opt2                   # Option 2 integration tests (requires LocalStack + bootstrap)
