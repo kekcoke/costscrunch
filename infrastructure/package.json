@@ -16,7 +16,8 @@
     "lint": "eslint . --ext .ts --max-warnings 0",
     "test": "vitest run --passWithNoTests",
     "test:ci": "vitest run --passWithNoTests --coverage",
-    "test:localstack": "vitest run --testPathPattern='__tests__/localstack'"
+    "test:localstack": "vitest run --testPathPattern='__tests__/localstack'",
+    "update-snaps": "vitest run --update --exclude=**/localstack/** --exclude=**/rollback.test.ts --exclude=**/data-seed.test.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.154.1",
