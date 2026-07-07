@@ -21,6 +21,11 @@ export interface ComputeConstructProps {
   isProd: boolean;
   environment: string;
   regionId: string;
+  // AWSLambdaPowertoolsTypeScriptV2 layer version published by AWS to account
+  // 094274105915 in each supported region. AWS periodically publishes new
+  // versions; bump via CDK context (`-c powertoolsLayerVersion=<n>`) rather
+  // than editing this construct. See CostsCrunchStack.ts for the default.
+  powertoolsLayerVersion: number;
   // Network
   vpc: ec2.IVpc;
   lambdaSg: ec2.ISecurityGroup;
@@ -69,7 +74,7 @@ export class ComputeConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ComputeConstructProps) {
     super(scope, id);
     const {
-      prefix, isProd, environment, regionId,
+      prefix, isProd, environment, regionId, powertoolsLayerVersion,
       vpc, lambdaSg, redis,
       table, connTable,
       uploadsBucket, processedBucket, receiptsBucket, assetsBucket, quarantineBucket,
@@ -79,9 +84,13 @@ export class ComputeConstruct extends Construct {
     } = props;
 
     // https://docs.aws.amazon.com/powertools/typescript/latest/getting-started/lambda-layers/
+    // Layer version is configurable (default set in CostsCrunchStack.ts) since AWS
+    // periodically publishes new Powertools versions and this account ID
+    // (094274105915) is AWS's own published-layer account, not ours — only the
+    // version number should ever change here.
     const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
       this, "PowertoolsLayer",
-      `arn:aws:lambda:${regionId}:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:22`,
+      `arn:aws:lambda:${regionId}:094274105915:layer:AWSLambdaPowertoolsTypeScriptV2:${powertoolsLayerVersion}`,
     );
 
     // NOTE: Sensitive values (model IDs, emails) are NOT stored here.
