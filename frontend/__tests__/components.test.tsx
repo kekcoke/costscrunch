@@ -5,8 +5,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, cleanup, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 
@@ -20,6 +20,7 @@ import BubbleChart from "../src/components/charts/bubbleChart";
 import StackedBarChart from "../src/components/charts/stackedBarChart";
 import ScanModal  from "../src/components/scanModal";
 import GroupDetail from "../src/components/groups/groupDetail";
+import { receiptsApi } from "../src/services/api";
 import { SEED_EXPENSES_MOCK } from "../src/mocks/expenses";
 
 const EXPENSE_APPROVED = SEED_EXPENSES_MOCK[1];
@@ -328,6 +329,171 @@ describe("Component Suite", () => {
       await userEvent.click(getByText(/Enter manually instead/i));
       expect(getByLabelText(/Merchant/i)).toBeInTheDocument();
     });
+
+    describe("file validation and scan flow", () => {
+      let alertSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        vi.mocked(receiptsApi.scanReceipt).mockReset();
+        alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        alertSpy.mockRestore();
+      });
+
+      function getFileInput(container: HTMLElement) {
+        return container.querySelector('input[type="file"]') as HTMLInputElement;
+      }
+
+      it("rejects a file with an invalid type via file picker", () => {
+        const { container } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const file = new File(["x"], "malware.exe", { type: "application/x-msdownload" });
+        fireEvent.change(getFileInput(container), { target: { files: [file] } });
+
+        expect(alertSpy).toHaveBeenCalledWith("Please upload an image or PDF file");
+        expect(receiptsApi.scanReceipt).not.toHaveBeenCalled();
+      });
+
+      it("rejects a file over the 10MB size limit via file picker", () => {
+        const { container } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const bigFile = new File([new Uint8Array(11 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" });
+        fireEvent.change(getFileInput(container), { target: { files: [bigFile] } });
+
+        expect(alertSpy).toHaveBeenCalledWith("File size must be less than 10MB");
+        expect(receiptsApi.scanReceipt).not.toHaveBeenCalled();
+      });
+
+      it("scans a valid file via file picker and shows the result form", async () => {
+        vi.mocked(receiptsApi.scanReceipt).mockResolvedValue({
+          expenseId: "exp-1",
+          scanId: "scan-1",
+          result: {
+            status: "completed",
+            merchant: "Whole Foods",
+            amount: 42.5,
+            category: "Groceries",
+            date: "2026-03-01",
+            confidence: 91,
+          } as any,
+        });
+
+        const { container, findByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const file = new File(["x"], "receipt.jpg", { type: "image/jpeg" });
+        fireEvent.change(getFileInput(container), { target: { files: [file] } });
+
+        expect(await findByLabelText(/Merchant/i)).toHaveValue("Whole Foods");
+      });
+
+      it("shows an alert and returns to idle when the scan fails", async () => {
+        vi.mocked(receiptsApi.scanReceipt).mockResolvedValue({
+          expenseId: "exp-1",
+          scanId: "scan-1",
+          result: { status: "failed" } as any,
+        });
+
+        const { container, findByText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const file = new File(["x"], "receipt.jpg", { type: "image/jpeg" });
+        fireEvent.change(getFileInput(container), { target: { files: [file] } });
+
+        await findByText(/Drop receipt image or PDF/i);
+        expect(alertSpy).toHaveBeenCalledWith("Scan failed — please try again or enter manually.");
+      });
+
+      it("rejects an invalid file dropped onto the drop zone", () => {
+        render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const file = new File(["x"], "malware.exe", { type: "application/x-msdownload" });
+        fireEvent.drop(screen.getByText(/Drop receipt image or PDF/i).closest('[role="button"]')!, {
+          dataTransfer: { files: [file] },
+        });
+
+        expect(alertSpy).toHaveBeenCalledWith("Please upload an image or PDF file");
+      });
+
+      it("scans a valid file dropped onto the drop zone", async () => {
+        vi.mocked(receiptsApi.scanReceipt).mockResolvedValue({
+          expenseId: "exp-1",
+          scanId: "scan-1",
+          result: { status: "completed", merchant: "Trader Joe's", amount: 10, category: "Groceries", date: "2026-03-01", confidence: 80 } as any,
+        });
+
+        const { findByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        const file = new File(["x"], "receipt.png", { type: "image/png" });
+        const dropZone = screen.getByText(/Drop receipt image or PDF/i).closest('[role="button"]')!;
+
+        fireEvent.dragOver(dropZone);
+        fireEvent.dragLeave(dropZone);
+        fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+
+        expect(await findByLabelText(/Merchant/i)).toHaveValue("Trader Joe's");
+      });
+    });
+
+    describe("manual entry submission", () => {
+      let alertSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        onAdd.mockClear();
+        onClose.mockClear();
+        alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        alertSpy.mockRestore();
+      });
+
+      it("requires a merchant name", async () => {
+        const { getByText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        await userEvent.click(getByText(/Enter manually instead/i));
+        await userEvent.click(getByText(/Save Expense/i));
+        expect(alertSpy).toHaveBeenCalledWith("Merchant is required");
+        expect(onAdd).not.toHaveBeenCalled();
+      });
+
+      it("requires a valid positive amount", async () => {
+        const { getByText, getByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        await userEvent.click(getByText(/Enter manually instead/i));
+        await userEvent.type(getByLabelText(/Merchant/i), "Coffee Shop");
+        await userEvent.click(getByText(/Save Expense/i));
+        expect(alertSpy).toHaveBeenCalledWith("Valid amount is required");
+        expect(onAdd).not.toHaveBeenCalled();
+      });
+
+      it("requires a date", async () => {
+        const { getByText, getByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        await userEvent.click(getByText(/Enter manually instead/i));
+        await userEvent.type(getByLabelText(/Merchant/i), "Coffee Shop");
+        await userEvent.type(getByLabelText(/Amount/i), "12.50");
+        fireEvent.change(getByLabelText(/Date/i), { target: { value: "" } });
+        await userEvent.click(getByText(/Save Expense/i));
+        expect(alertSpy).toHaveBeenCalledWith("Date is required");
+        expect(onAdd).not.toHaveBeenCalled();
+      });
+
+      it("submits successfully with valid fields and selecting a category", async () => {
+        const { getByText, getByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        await userEvent.click(getByText(/Enter manually instead/i));
+        await userEvent.type(getByLabelText(/Merchant/i), "Coffee Shop");
+        await userEvent.type(getByLabelText(/Amount/i), "12.50");
+        fireEvent.change(getByLabelText(/^Category$/i), { target: { value: "Travel" } });
+        await userEvent.click(getByText(/Save Expense/i));
+
+        expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ merchant: "Coffee Shop", amount: 12.5, category: "Travel" }));
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    describe("New Scan reset button", () => {
+      it("resets to idle from the manual-entry result form", async () => {
+        const { getByText, getByLabelText, queryByLabelText } = render(<ScanModal onClose={onClose} onAdd={onAdd} />);
+        await userEvent.click(getByText(/Enter manually instead/i));
+        expect(getByLabelText(/Merchant/i)).toBeInTheDocument();
+
+        await userEvent.click(getByText("↺"));
+        expect(queryByLabelText(/Merchant/i)).not.toBeInTheDocument();
+        expect(getByText(/Drop receipt image or PDF/i)).toBeInTheDocument();
+      });
+    });
   });
 
   describe("<GroupDetail />", () => {
@@ -350,7 +516,15 @@ describe("Component Suite", () => {
           deleteMember: vi.fn(() => Promise.resolve({ success: true })),
           update: vi.fn(() => Promise.resolve({})),
           getBalances: vi.fn(() => Promise.resolve([])),
-        }
+        },
+        // ScanModal (below) also imports from this same module — this vi.mock
+        // call is hoisted to the top of the file by Vitest regardless of its
+        // placement here, so it mocks "../src/services/api" for the whole
+        // file. Provide receiptsApi alongside groupsApi so ScanModal's real
+        // import doesn't resolve to `undefined`.
+        receiptsApi: {
+          scanReceipt: vi.fn(),
+        },
       }));
     });
 
