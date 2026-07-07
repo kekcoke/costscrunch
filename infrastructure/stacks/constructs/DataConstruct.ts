@@ -9,6 +9,15 @@ export interface DataConstructProps {
   kmsKey: kms.IKey;
   capacityMode: "on-demand" | "provisioned";
   removalPolicy: RemovalPolicy;
+  /**
+   * Region -> KMS key ARN map for the MainTable's Global Table replicas.
+   * Required whenever `replicas` below is non-empty and the table uses a
+   * customer-managed key: DynamoDB cannot reference a CMK across regions
+   * without an explicit ARN (see IaC bug: "KMS key for us-west-2 was not
+   * found in 'replicaKeyArns'"). Populated by the caller from a companion
+   * KMS replica stack — see `bin/costscrunch.ts` and `KmsReplicaStack`.
+   */
+  replicaKeyArns?: { [region: string]: string };
 }
 
 export class DataConstruct extends Construct {
@@ -17,7 +26,7 @@ export class DataConstruct extends Construct {
 
   constructor(scope: Construct, id: string, props: DataConstructProps) {
     super(scope, id);
-    const { prefix, isProd, kmsKey, capacityMode, removalPolicy } = props;
+    const { prefix, isProd, kmsKey, capacityMode, removalPolicy, replicaKeyArns } = props;
 
     this.table = new dynamodb.TableV2(this, "MainTable", {
       tableName: `${prefix}-main`,
@@ -29,7 +38,7 @@ export class DataConstruct extends Construct {
             writeCapacity: dynamodb.Capacity.autoscaled({ maxCapacity: isProd ? 20 : 5 }),
           })
         : dynamodb.Billing.onDemand(),
-      encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey),
+      encryption: dynamodb.TableEncryptionV2.customerManagedKey(kmsKey, replicaKeyArns),
       pointInTimeRecovery: true,
       deletionProtection: isProd,
       timeToLiveAttribute: "ttl",

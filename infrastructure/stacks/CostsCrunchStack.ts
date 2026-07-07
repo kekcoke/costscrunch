@@ -56,7 +56,11 @@ export class CostsCrunchStack extends Stack {
     const { accountId, regionId, isTest } = config;
 
     // ── Foundation ───────────────────────────────────────────────────────────────
-    const kmsKey = new kms.Key(this, "CostsCrunchKey", {
+    // prod supplies its own multi-Region key (KmsKeyStack) plus a
+    // us-west-2 replicaKeyArns map (KmsReplicaStack) — see bin/costscrunch.ts.
+    // Global Table replication requires this: DynamoDB cannot reference a
+    // customer-managed key across regions without one already existing there.
+    const kmsKey = props.externalKmsKey ?? new kms.Key(this, "CostsCrunchKey", {
       alias:             `${prefix}-main`,
       enableKeyRotation: true,
       description:       "Primary KMS encryption key",
@@ -70,6 +74,7 @@ export class CostsCrunchStack extends Stack {
 
     const data = new DataConstruct(this, "Data", {
       prefix, isProd, kmsKey, capacityMode, removalPolicy,
+      replicaKeyArns: props.replicaKeyArns,
     });
 
     const storage = new StorageConstruct(this, "Storage", {
