@@ -55,7 +55,6 @@ export default function GuestScanWidget({ onConversion }: Props) {
       setStage("teaser");
     } catch (e: unknown) {
       console.error(e);
-      console.error(e);
       setError("Scanning failed. Try again?");
       setStage("idle");
     }
