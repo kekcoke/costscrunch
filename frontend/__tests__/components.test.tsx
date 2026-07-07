@@ -13,6 +13,7 @@ import userEvent from "@testing-library/user-event";
 import StatCard   from "../src/components/statCard";
 import ExpenseRow from "../src/components/expenseRow";
 import DonutChart from "../src/components/charts/donutChart";
+import DonutChartOrphan from "../src/components/donutChart";
 import ScanModal  from "../src/components/scanModal";
 import GroupDetail from "../src/components/groups/groupDetail";
 import { SEED_EXPENSES_MOCK } from "../src/mocks/expenses";
@@ -92,6 +93,28 @@ describe("Component Suite", () => {
     it("shows total in centre ($1,937)", () => {
       const { getByText } = render(<DonutChart data={DONUT_DATA} />);
       expect(getByText(/\$1,937/)).toBeInTheDocument();
+    });
+  });
+
+  describe("<DonutChart /> (orphaned top-level component)", () => {
+    it("renders correct number of SVG circle segments", () => {
+      const { container } = render(<DonutChartOrphan data={DONUT_DATA} />);
+      expect(container.querySelectorAll("circle").length).toBe(3);
+    });
+
+    it("renders all legend labels", () => {
+      const { getAllByText } = render(<DonutChartOrphan data={DONUT_DATA} />);
+      expect(getAllByText("Travel").length).toBeGreaterThan(0);
+    });
+
+    it("shows total in centre ($1,937)", () => {
+      const { getByText } = render(<DonutChartOrphan data={DONUT_DATA} />);
+      expect(getByText(/\$1,937/)).toBeInTheDocument();
+    });
+
+    it("renders nothing when total is zero", () => {
+      const { container } = render(<DonutChartOrphan data={[{ label: "Empty", value: 0, color: "#000" }]} />);
+      expect(container.firstChild).toBeNull();
     });
   });
 
