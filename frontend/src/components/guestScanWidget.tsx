@@ -22,9 +22,6 @@ export default function GuestScanWidget({ onConversion }: Props) {
   const wsUrl = import.meta.env.VITE_WS_URL;
   const { quarantineAlert, multiPageAlert, clearQuarantineAlert, clearMultiPageAlert } = useWebSocket(wsUrl);
 
-  const activeAlert = quarantineAlert ?? multiPageAlert;
-  const clearAlert: (() => void) = quarantineAlert ? clearQuarantineAlert : clearMultiPageAlert;
-
   const handleFile = async (file: File) => {
     if (!file.type.match(/image.*|application\/pdf/)) {
       setError("Please use JPG, PNG or PDF");
@@ -54,7 +51,6 @@ export default function GuestScanWidget({ onConversion }: Props) {
       setResult(scanResult);
       setStage("teaser");
     } catch (e: unknown) {
-      console.error(e);
       console.error(e);
       setError("Scanning failed. Try again?");
       setStage("idle");
@@ -204,8 +200,13 @@ export default function GuestScanWidget({ onConversion }: Props) {
         </div>
       )}
 
-      {/* Upload alerts for guest users */}
-      <UploadAlertToast alert={activeAlert} onDismiss={clearAlert} />
+      {/* Upload alerts for guest users — both can be active at once */}
+      <UploadAlertToast
+        alerts={[
+          ...(quarantineAlert ? [{ alert: quarantineAlert, onDismiss: clearQuarantineAlert }] : []),
+          ...(multiPageAlert ? [{ alert: multiPageAlert, onDismiss: clearMultiPageAlert }] : []),
+        ]}
+      />
     </div>
   );
 }
