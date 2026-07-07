@@ -70,6 +70,16 @@ export default defineConfig(({ mode }) => {
       reporter: ["text", "lcov"],
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.d.ts", "src/mocks/**"],
+      // Matches root CLAUDE.md: frontend coverage thresholds are
+      // 70% branches/functions/lines. Enforced via `vitest run --coverage`
+      // (CI: deploy.yml "Test & Lint" job) — a suite that silently drops to
+      // zero tests now fails the build instead of passing quietly.
+      thresholds: {
+        branches: 70,
+        functions: 70,
+        lines: 70,
+        statements: 70,
+      },
     },
   },
   };

@@ -1,13 +1,23 @@
 // ─── CostsCrunch — Upload Alert Toasts ────────────────────────────────────────
 // Displays QUARANTINE and MULTI_PAGE WebSocket notifications uniformly
 // for both authenticated (ScanModal) and guest (GuestScanWidget) flows.
+//
+// Both alert kinds are independent state slots (see useWebSocket) and can be
+// active at the same time. This component renders every active alert it is
+// given, stacked, instead of collapsing them into a single overwritable slot.
 
 import { useEffect, useCallback } from 'react';
 import type { WsQuarantineMessage, WsMultiPageMessage } from '../models/types';
 
-interface UploadAlertToastProps {
-  alert: WsQuarantineMessage | WsMultiPageMessage | null;
+type UploadAlert = WsQuarantineMessage | WsMultiPageMessage;
+
+export interface UploadAlertItem {
+  alert: UploadAlert;
   onDismiss: () => void;
+}
+
+interface UploadAlertToastProps {
+  alerts: UploadAlertItem[];
   autoCloseMs?: number;
 }
 
@@ -25,20 +35,24 @@ const QUARANTINE_LABELS: Record<WsQuarantineMessage['reason'], string> = {
   unsupported_format: 'Unsupported Format',
 };
 
-export default function UploadAlertToast({ alert, onDismiss, autoCloseMs = 8000 }: UploadAlertToastProps) {
-  const isQuarantine = (a: WsQuarantineMessage | WsMultiPageMessage | null): a is WsQuarantineMessage => a?.type === 'QUARANTINE';
-  const isMultiPage  = (a: WsQuarantineMessage | WsMultiPageMessage | null): a is WsMultiPageMessage  => a?.type === 'MULTI_PAGE';
+const isQuarantine = (a: UploadAlert): a is WsQuarantineMessage => a.type === 'QUARANTINE';
+const isMultiPage  = (a: UploadAlert): a is WsMultiPageMessage  => a.type === 'MULTI_PAGE';
 
+interface AlertToastItemProps {
+  alert: UploadAlert;
+  onDismiss: () => void;
+  autoCloseMs: number;
+  offsetPx: number;
+}
+
+function AlertToastItem({ alert, onDismiss, autoCloseMs, offsetPx }: AlertToastItemProps) {
   const handleDismiss = useCallback(() => onDismiss(), [onDismiss]);
 
   // Auto-dismiss
   useEffect(() => {
-    if (!alert) return;
     const timer = setTimeout(handleDismiss, autoCloseMs);
     return () => clearTimeout(timer);
-  }, [alert, autoCloseMs, handleDismiss]);
-
-  if (!alert) return null;
+  }, [autoCloseMs, handleDismiss]);
 
   return (
     <div
@@ -46,7 +60,7 @@ export default function UploadAlertToast({ alert, onDismiss, autoCloseMs = 8000 
       aria-live="polite"
       style={{
         position: 'fixed',
-        bottom: '24px',
+        bottom: `${24 + offsetPx}px`,
         right: '24px',
         zIndex: 9999,
         maxWidth: '380px',
@@ -163,5 +177,21 @@ export default function UploadAlertToast({ alert, onDismiss, autoCloseMs = 8000 
         </div>
       )}
     </div>
+  );
+}
+
+export default function UploadAlertToast({ alerts, autoCloseMs = 8000 }: UploadAlertToastProps) {
+  return (
+    <>
+      {alerts.map(({ alert, onDismiss }, index) => (
+        <AlertToastItem
+          key={alert.type}
+          alert={alert}
+          onDismiss={onDismiss}
+          autoCloseMs={autoCloseMs}
+          offsetPx={index * 96}
+        />
+      ))}
+    </>
   );
 }

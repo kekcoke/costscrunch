@@ -170,10 +170,12 @@ export default function App() {
           <PageComponent onNavigate={navigate} />
         </main>
 
-        {/* Upload status alerts (quarantine / multi-page) */}
+        {/* Upload status alerts (quarantine / multi-page) — both can be active at once */}
         <UploadAlertToast
-          alert={quarantineAlert ?? multiPageAlert}
-          onDismiss={quarantineAlert ? clearQuarantineAlert : clearMultiPageAlert}
+          alerts={[
+            ...(quarantineAlert ? [{ alert: quarantineAlert, onDismiss: clearQuarantineAlert }] : []),
+            ...(multiPageAlert ? [{ alert: multiPageAlert, onDismiss: clearMultiPageAlert }] : []),
+          ]}
         />
       </div>
     </div>

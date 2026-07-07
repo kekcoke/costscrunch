@@ -59,7 +59,11 @@ jobs:
       - name: Lint
         run: npm run lint -w backend
       - name: Run unit tests
-        run: npm run test:ut -w backend
+        # backend/vite.config.ts already defines coverage.thresholds (70/75/75
+        # branches/functions/lines per root CLAUDE.md) but they were never
+        # enforced here because --coverage was never passed — add it so the
+        # existing threshold config actually gates CI.
+        run: npm run test:ut -w backend -- --coverage
       - name: Upload coverage
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
@@ -137,6 +141,26 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: CDK Synth
         run: npm run synth -w infrastructure
+      # SUG-003: the synth above uses no --context, so it only validates the
+      # dev-default stack config. Validate staging/prod configs actually
+      # synth cleanly too (output discarded — this artifact isn't consumed by
+      # any deploy step, it's CI validation only).
+      - name: CDK Synth — validate staging config
+        run: npm run synth -w infrastructure -- --context stage=staging --output .synth-validate-staging
+      # continue-on-error: prod-context synth currently fails today (found
+      # while adding this check, 2026-07-06) — DataConstruct.ts enables a
+      # DynamoDB Global Table replica in us-west-2 for prod only
+      # (`replicas: isProd ? [{ region: "us-west-2" }] : []`) but never
+      # supplies a `replicaKeyArns` entry for that region's KMS-encrypted
+      # replica, so CDK throws `ValidationError: KMS key for us-west-2 was
+      # not found in 'replicaKeyArns'`. That's a pre-existing infra bug (data
+      # domain, not CI/CD) that nothing ever caught before because prod
+      # context was never synthesized in CI. Left non-blocking so this check
+      # is visible without breaking every future CI run over an unrelated
+      # construct bug — remove continue-on-error once DataConstruct.ts is fixed.
+      - name: CDK Synth — validate prod config
+        continue-on-error: true
+        run: npm run synth -w infrastructure -- --context stage=prod --output .synth-validate-prod
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
@@ -172,7 +196,7 @@ jobs:
           # Start Cognito Local Emulator
           docker run -d -p 9229:9229 --name cognito-local \
             -v $(pwd)/../.cognito:/app/.cognito \
-            jagregory/cognito-local:latest
+            jagregory/cognito-local@sha256:a5ad30d01da5016a38535a717f6e1642d1b37f886a7b17e90b67f6e5ad134831  # 5.3.0
       - name: Wait & Provision
         run: |
           # Wait for LocalStack health

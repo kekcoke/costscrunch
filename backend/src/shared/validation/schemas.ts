@@ -171,7 +171,7 @@ export const initiateUploadSchema = z.object({
 // ── Analytics Schemas ────────────────────────────────────────────────────────
 
 export const analyticsQuerySchema = z.object({
-  period: z.enum(['month', 'quarter', 'year']).optional().default('month'),
+  period: z.enum(['week', 'month', 'quarter', 'year']).optional().default('month'),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
   from: isoDateSchema.optional(), // Alias for startDate

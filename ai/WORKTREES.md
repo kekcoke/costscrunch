@@ -89,7 +89,9 @@
 
 | Worktree | Branch | Agent | Issues | PR | Status | Depends On |
 |---|---|---|---|---|---|---|
-| `p3/backend-cleanup` | `feat/p3/backend-cleanup` | backend-agent | SUG-001–006 (backend), deploy-SUG-004 | — | merged | p2/backend-perf + p2/backend-safety |
+| `p3/backend-cleanup` | `feat/p3/backend-cleanup` | backend-agent | SUG-001–006 (backend), deploy-SUG-004 | — | merged¹ | p2/backend-perf + p2/backend-safety |
+
+¹ Corrected 2026-07-06: re-verification against current code found SUG-003 (`pushToUsers()` extraction), SUG-004 (misleading Cognito retry comment), and SUG-006 (export pipeline dedup) still open — the `merged` PR did not actually land these three despite the row listing them. Picked up in `feat/backend/suggested-cleanup2`.
 | `p3/infra-cleanup` | `feat/p3/infra-cleanup` | infra-agent | IaC-019, IaC-020, IaC-021, IaC-022, IaC-024 | — | merged | p2/infra |
 | `p3/cicd-cleanup` | `feat/p3/cicd-cleanup` | cicd-agent | cicd-SUG-001, SUG-002, SUG-005, SUG-007 | — | merged | p2/cicd |
 | `p3/frontend-cleanup` | `feat/p3/frontend-cleanup` | frontend-agent | FE-015, FE-016, FE-018, FE-020, FE-022 | — | pr open | p2/frontend |
@@ -150,3 +152,19 @@
 |---|---|---|---|---|---|---|---|
 | `test/p3-backend-integ` | `feat/test/p3-backend-integ` | backend-agent | Vitest unit | SUG-001, SUG-002, SUG-005, SUG-006 | — | blocked | p3/backend-cleanup |
 | `test/p3-frontend-e2e` | `feat/test/p3-frontend-e2e` | frontend-agent | Playwright smoke | FE-016, FE-020, FE-022 | — | blocked | p3/frontend-cleanup |
+
+---
+
+## Phase 4 — Readiness Wave (2026-07-06 · 5 worktrees · merged locally, unpushed)
+
+> Driven by `notes/2026-07-06-readiness-assessment.md`. All four domain worktrees ran in parallel via isolated agent worktrees, then merged in dependency order (infra → frontend → backend → infra-hotfix → cicd) into `feat/contract-and-smoke`. No conflicts beyond one clean auto-merge in `CostsCrunchStack.ts`.
+
+| Worktree | Branch | Agent | Issues | Status | Depends On |
+|---|---|---|---|---|---|
+| `infra/suggested-cleanup2` | `feat/infra/suggested-cleanup2` | infra-agent | IaC-023 | merged (local) | — |
+| `frontend/suggested-cleanup2` | `feat/frontend/suggested-cleanup2` | frontend-agent | FE-017, FE-021 (FE-019 reconfirmed) | merged (local) | — |
+| `backend/suggested-cleanup2` | `feat/backend/suggested-cleanup2` | backend-agent | SUG-004, SUG-006 (backend), deploy-audit SUG-001/002/006 (SUG-003 reconfirmed already fixed) | merged (local) | — |
+| `infra/fix-global-table-kms` | `feat/infra/fix-global-table-kms` | infra-agent | Bonus: prod `cdk synth` KMS/Global-Table blocker (not in original scope, discovered by cicd worktree) | merged (local) | — |
+| `cicd/prod-hardening` | `feat/cicd/prod-hardening` | cicd-agent | Post-prod smoke test, rollback frontend/CDN revert + stack-name bugfix, SKIP_STAGING guard, coverage-threshold enforcement, cicd SUG-003/004 | merged (local) | infra fixes helpful but not required (independent files) |
+
+**Next human action:** push `feat/contract-and-smoke` and open PR(s); configure production Environment required reviewers (still `protection_rules: []` as of 2026-07-06); start the new frontend-coverage-raising backlog item now that the gate is enforced and failing honestly.

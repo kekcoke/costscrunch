@@ -34,6 +34,7 @@ jobs:
       contents: read
     outputs:
       health_check_passed: ${{ steps.health_check.outputs.passed }}
+      smoke_test_passed: ${{ steps.smoke_test.outputs.passed }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
@@ -89,8 +90,73 @@ jobs:
           echo "passed=false" >> $GITHUB_OUTPUT
           echo "All $MAX_RETRIES health check attempts failed. Triggering rollback..."
 
+      # Beyond generic liveness: actually exercise the authenticated request
+      # path (login → JWT → protected endpoint) so a deploy that returns 200
+      # on /health but has broken auth/DynamoDB wiring still trips rollback.
+      - name: Authenticated smoke test (login + protected endpoint)
+        id: smoke_test
+        if: steps.health_check.outputs.passed == 'true'
+        run: |
+          APP_URL="${{ inputs.api_url }}"
+
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            SMOKE_EMAIL="${{ secrets.PROD_SMOKE_TEST_EMAIL }}"
+            SMOKE_PASSWORD="${{ secrets.PROD_SMOKE_TEST_PASSWORD }}"
+          else
+            SMOKE_EMAIL="${{ secrets.TEST_USER_EMAIL }}"
+            SMOKE_PASSWORD="${{ secrets.TEST_USER_PASSWORD }}"
+          fi
+
+          if [ -z "$SMOKE_EMAIL" ] || [ -z "$SMOKE_PASSWORD" ]; then
+            echo "::warning::Smoke-test credentials not configured for '${{ inputs.environment }}' (expected PROD_SMOKE_TEST_EMAIL/PROD_SMOKE_TEST_PASSWORD for prod, TEST_USER_EMAIL/TEST_USER_PASSWORD for staging). Skipping authenticated check; liveness-only health check above still gates rollback."
+            echo "passed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Authenticating smoke-test user against ${APP_URL}/auth/login ..."
+          LOGIN_RESPONSE=$(curl -s -w '\n%{http_code}' --max-time 15 -X POST "${APP_URL}/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "$(printf '{"email":"%s","password":"%s"}' "$SMOKE_EMAIL" "$SMOKE_PASSWORD")")
+          LOGIN_HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -n1)
+          LOGIN_BODY=$(echo "$LOGIN_RESPONSE" | sed '$d')
+
+          if [ "$LOGIN_HTTP_CODE" != "200" ]; then
+            echo "❌ Smoke-test login failed (HTTP $LOGIN_HTTP_CODE)"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          ID_TOKEN=$(echo "$LOGIN_BODY" | jq -r '.idToken // .IdToken // .AuthenticationResult.IdToken // empty')
+          if [ -z "$ID_TOKEN" ]; then
+            echo "❌ Login succeeded but response contained no recognizable idToken field — cannot verify the authenticated path"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Calling authenticated ${APP_URL}/profile with the issued token ..."
+          PROFILE_RESPONSE=$(curl -s -w '\n%{http_code}' --max-time 15 "${APP_URL}/profile" \
+            -H "Authorization: Bearer ${ID_TOKEN}")
+          PROFILE_HTTP_CODE=$(echo "$PROFILE_RESPONSE" | tail -n1)
+          PROFILE_BODY=$(echo "$PROFILE_RESPONSE" | sed '$d')
+
+          if [ "$PROFILE_HTTP_CODE" != "200" ]; then
+            echo "❌ Authenticated /profile check failed (HTTP $PROFILE_HTTP_CODE)"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          PROFILE_EMAIL=$(echo "$PROFILE_BODY" | jq -r '.email // empty')
+          if [ "$PROFILE_EMAIL" != "$SMOKE_EMAIL" ]; then
+            echo "❌ /profile response did not have the expected shape (email field missing or mismatched)"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "✅ Authenticated smoke test passed (login + /profile 200 with expected shape)"
+          echo "passed=true" >> $GITHUB_OUTPUT
+
       - name: Rollback on failure
-        if: always() && steps.health_check.outputs.passed == 'false'
+        if: always() && (steps.health_check.outputs.passed == 'false' || steps.smoke_test.outputs.passed == 'false')
         run: |
           echo "Initiating rollback for stack: ${{ inputs.stack_name }}"
           echo "Deployment SHA: ${{ inputs.deployment_sha }}"
@@ -121,8 +187,47 @@ jobs:
 
           echo "Rollback completed for stack: ${{ inputs.stack_name }}"
 
+      # BUG: rollback previously only reverted the CloudFormation stack. The
+      # prod deploy job ("Deploy — Production" in deploy.yml) also syncs a new
+      # frontend build to S3 + invalidates CloudFront — none of that was ever
+      # undone, so a rolled-back backend could keep serving a frontend build
+      # that expects the new (now-rolled-back) API shape. Only applies to
+      # production: staging has no equivalent S3 sync step in the pipeline
+      # today.
+      - name: Revert frontend release (production only)
+        if: always() && inputs.environment == 'production' && (steps.health_check.outputs.passed == 'false' || steps.smoke_test.outputs.passed == 'false')
+        env:
+          PROD_ASSETS_BUCKET: ${{ secrets.PROD_ASSETS_BUCKET }}
+          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+        run: |
+          if [ -z "$PROD_ASSETS_BUCKET" ] || [ -z "$CF_DISTRIBUTION_ID" ]; then
+            echo "::warning::PROD_ASSETS_BUCKET/CF_DISTRIBUTION_ID not set — cannot revert the frontend release, only the backend stack was rolled back."
+            exit 0
+          fi
+
+          echo "Rebuilding the frontend from the pre-deploy commit to match the rolled-back backend..."
+          PREV_COMMIT=$(git rev-parse HEAD~1)
+          git checkout "$PREV_COMMIT"
+          npm ci
+          npm run build -w frontend
+          aws s3 sync frontend/dist/ "s3://${PROD_ASSETS_BUCKET}" --delete --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp frontend/dist/index.html "s3://${PROD_ASSETS_BUCKET}/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "${CF_DISTRIBUTION_ID}" --paths "/*"
+          git checkout -
+
+          echo "Frontend reverted to commit ${PREV_COMMIT} and CloudFront cache invalidated."
+
+      # SUG-006 (evaluated 2026-07-06): 8398a7/action-slack is unmaintained
+      # upstream but already SHA-pinned, so the supply-chain risk is
+      # mitigated. Not migrating to slackapi/slack-github-action here: that
+      # action takes a raw Slack Web API `payload` (chat.postMessage JSON)
+      # instead of this action's `status`/`fields`/`text` shorthand, so every
+      # call site below (4 across deploy.yml/rollback.yml) would need its
+      # message body hand-rewritten and re-verified against a real webhook —
+      # not a safe unattended change without a human confirming the Slack
+      # messages still render correctly. Judgment call: leave as-is.
       - name: Post rollback notification
-        if: always() && steps.health_check.outputs.passed == 'false'
+        if: always() && (steps.health_check.outputs.passed == 'false' || steps.smoke_test.outputs.passed == 'false')
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
         with:
           status: 'failure'
@@ -130,13 +235,13 @@ jobs:
             🚨 CostsCrunch ${{ inputs.environment }} deployment FAILED
             Commit: ${{ inputs.deployment_sha }}
             Stack: ${{ inputs.stack_name }}
-            Status: ROLLED BACK
-            Details: Health checks failed after deployment. Automated rollback triggered.
+            Status: ROLLED BACK${{ inputs.environment == 'production' && ' (backend + frontend)' || '' }}
+            Details: ${{ steps.health_check.outputs.passed == 'false' && 'Liveness health check failed after deployment.' || 'Authenticated smoke test (login + /profile) failed after deployment.' }} Automated rollback triggered.
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Post success notification
-        if: steps.health_check.outputs.passed == 'true'
+        if: steps.health_check.outputs.passed == 'true' && steps.smoke_test.outputs.passed != 'false'
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
         with:
           status: 'success'
@@ -148,6 +253,6 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Fail job if health check failed
-        if: always() && steps.health_check.outputs.passed == 'false'
+      - name: Fail job if checks failed
+        if: always() && (steps.health_check.outputs.passed == 'false' || steps.smoke_test.outputs.passed == 'false')
         run: exit 1
