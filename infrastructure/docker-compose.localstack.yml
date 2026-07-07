@@ -34,7 +34,7 @@ services:
     image: localstack/localstack:3.5
     container_name: costscrunch-localstack
     env_file:
-      - ../.env.${ENVIRONMENT:-dev}
+      - ../.env.shared
     ports:
       - "4566:4566"  # Main LocalStack edge port/gateway
     environment:

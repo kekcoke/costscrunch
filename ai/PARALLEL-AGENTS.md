@@ -109,7 +109,7 @@ feat/infra/fix-iac            →  ai/agents/infra-agent.md
 When you run `/worktree create feat/<domain>/<slug>` in Claude Code, the hook:
 
 1. Creates the git worktree at `../costscrunch.worktrees/<domain>/<slug>`
-2. Symlinks `.env.shared` → `.env.dev` and `tsconfig.base.json`
+2. Symlinks `.env.shared` → `.env.shared` and `tsconfig.base.json`
 3. Auto-assigns isolated port ranges (Vite: 3000–3009, SAM: 3010–3099)
 4. **Detects `<domain>` from the branch name** and writes `.agent.md` at the worktree root — containing the full agent persona + absolute paths to all skill files
 

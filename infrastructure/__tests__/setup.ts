@@ -4,7 +4,7 @@ import { resolve } from "path";
 
 
 // Determine environment and set local as default if none is provided
-const environment = process.env.ENVIRONMENT || 'dev'
+const environment = process.env.ENVIRONMENT || 'shared'
 
 // Load test environment variables for CDK synthesis assertions
 config({ path: resolve(__dirname, `../.env.${environment}`) });

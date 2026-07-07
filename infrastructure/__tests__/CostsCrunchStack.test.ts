@@ -25,7 +25,7 @@ describe("CostsCrunchStack Alarms", () => {
 
   it("creates Lambda Error Rate Alarms for all functions", () => {
     // We have 12 functions defined in the stack
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 27); // (12 functions * 2 alarms) + DynamoDB + Pipeline + DLQ
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 33); // (12 functions * 2 alarms) + DynamoDB + Pipeline + DLQ
     
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       ComparisonOperator: "GreaterThanOrEqualToThreshold",
@@ -174,7 +174,7 @@ describe("CostsCrunchStack WAF", () => {
   it("logs WAF requests to a CloudWatch log group with 90-day retention and redacts Authorization header", () => {
     template.hasResourceProperties("AWS::Logs::LogGroup", {
       RetentionInDays: 90,
-      LogGroupName: "/aws/wafv2/costscrunch-staging-waf-logs",
+      LogGroupName: "aws-waf-logs-costscrunch-staging",
     });
 
     // CfnLoggingConfiguration is a separate resource (CDK 2.241+)

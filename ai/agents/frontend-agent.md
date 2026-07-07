@@ -169,5 +169,5 @@ lsof -iTCP:3000 -sTCP:LISTEN && echo "PORT 3000 OCCUPIED — identify the proces
 ```
 
 > **Backend API port:** `npm run dev` wires the frontend to the backend via `VITE_API_URL`.
-> Confirm the value in `.env.dev` before testing: `3001` = SAM opt3, `4000` = Express opt1/opt2.
+> Confirm the value in `.env.shared` before testing: `3001` = SAM opt3, `4000` = Express opt1/opt2.
 > Mismatch causes every API call to fail with a connection refused — not a frontend bug.

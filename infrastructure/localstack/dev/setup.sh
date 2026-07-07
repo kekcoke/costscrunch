@@ -496,78 +496,101 @@ echo "✅ SES ready"
 
 # ── Import Seed CSV ───────────────────────────────────────────────────────────
 echo "📦 Importing seed expenses from CSV"
-# Using python3 to convert CSV to DynamoDB JSON format, then AWS CLI to batch load
-# This avoids the boto3 dependency in the aws-cli container image
-python3 << 'PYTHONEOF'
-import csv
-import json
+# Clean up any stale batch files from previous failed runs
+rm -f /tmp/seed_batch_*.json /tmp/seed_items.json /tmp/receipt_keys.txt
+# Using awk to convert CSV to DynamoDB JSON format, then AWS CLI to batch load
+# No python3 needed — aws-cli image has awk and coreutils
+# Generate 25-item batches directly in awk (DynamoDB BatchWrite limit)
+awk -F',' '
+BEGIN { batch=0; items=0; file="/tmp/seed_batch_" batch ".json" }
+NR == 1 { next }  # Skip header
+{
+    pk=$1; sk=$2; gsi1pk=$3; gsi1sk=$4; gsi2pk=$5; gsi2sk=$6
+    entityType=$7; expenseId=$8; ownerId=$9; merchant=$10
+    amount=$11; currency=$12; amountUSD=$13; category=$14
+    date=$15; status=$16; source=$17; addedBy=$18; receiptKey=$19
 
-with open('/localstack/dev/seed.csv', mode='r') as f:
-    reader = csv.DictReader(f)
-    items = []
-    for row in reader:
-        # Convert flat CSV to DynamoDB JSON format (all strings/numbers)
-        item = {
-            "PutRequest": {
-                "Item": {
-                    "pk": {"S": row["pk"]},
-                    "sk": {"S": row["sk"]},
-                    "gsi1pk": {"S": row["gsi1pk"]},
-                    "gsi1sk": {"S": row["gsi1sk"]},
-                    "gsi2pk": {"S": row["gsi2pk"]},
-                    "gsi2sk": {"S": row["gsi2sk"]},
-                    "entityType": {"S": row["entityType"]},
-                    "expenseId": {"S": row["expenseId"]},
-                    "ownerId": {"S": row["ownerId"]},
-                    "merchant": {"S": row["merchant"]},
-                    "amount": {"N": row["amount"]},
-                    "currency": {"S": row["currency"]},
-                    "amountUSD": {"N": row["amountUSD"]},
-                    "category": {"S": row["category"]},
-                    "date": {"S": row["date"]},
-                    "status": {"S": row["status"]},
-                    "source": {"S": row["source"]},
-                    "addedBy": {"S": row["addedBy"]},
-                    "receiptKey": {"S": row["receiptKey"]} if row.get("receiptKey") else {"NULL": True}
-                }
-            }
-        }
-        items.append(item)
-    
-    # Write chunks of 25 (DynamoDB BatchWrite limit)
-    for i in range(0, len(items), 25):
-        batch = {"costscrunch-dev-main": items[i:i+25]}
-        with open(f'/tmp/seed_batch_{i//25}.json', 'w') as out:
-            json.dump(batch, out)
-PYTHONEOF
+    if (items == 25) {
+        print "]}" > file
+        batch++; items=0
+        file="/tmp/seed_batch_" batch ".json"
+    }
+    if (items == 0) {
+        print "{\"costscrunch-dev-main\":[" > file
+    } else {
+        print "," > file
+    }
+
+    line = "{\"PutRequest\":{\"Item\":{"
+    line = line "\"pk\":{\"S\":\"" pk "\"},"
+    line = line "\"sk\":{\"S\":\"" sk "\"},"
+    line = line "\"gsi1pk\":{\"S\":\"" gsi1pk "\"},"
+    line = line "\"gsi1sk\":{\"S\":\"" gsi1sk "\"},"
+    line = line "\"gsi2pk\":{\"S\":\"" gsi2pk "\"},"
+    line = line "\"gsi2sk\":{\"S\":\"" gsi2sk "\"},"
+    line = line "\"entityType\":{\"S\":\"" entityType "\"},"
+    line = line "\"expenseId\":{\"S\":\"" expenseId "\"},"
+    line = line "\"ownerId\":{\"S\":\"" ownerId "\"},"
+    line = line "\"merchant\":{\"S\":\"" merchant "\"},"
+    line = line "\"amount\":{\"N\":\"" amount "\"},"
+    line = line "\"currency\":{\"S\":\"" currency "\"},"
+    line = line "\"amountUSD\":{\"N\":\"" amountUSD "\"},"
+    line = line "\"category\":{\"S\":\"" category "\"},"
+    line = line "\"date\":{\"S\":\"" date "\"},"
+    line = line "\"status\":{\"S\":\"" status "\"},"
+    line = line "\"source\":{\"S\":\"" source "\"},"
+    line = line "\"addedBy\":{\"S\":\"" addedBy "\""
+    if (receiptKey != "") line = line "},\"receiptKey\":{\"S\":\"" receiptKey "\"}"
+    else line = line "},\"receiptKey\":{\"NULL\":true}"
+    line = line "}}}"
+    print line > file
+    items++
+}
+END {
+    if (items > 0) print "]}}" > file
+}
+' /localstack/dev/seed.csv
+echo "  ↳ CSV processing done, loading items"
+
+# Load CSV items using inline put-item (no jq/batch-write needed — reliable on LocalStack)
+awk -F',' '
+NR == 1 { next }
+{
+    pk=$1; sk=$2; gsi1pk=$3; gsi1sk=$4; gsi2pk=$5; gsi2sk=$6
+    entityType=$7; expenseId=$8; ownerId=$9; merchant=$10
+    amount=$11; currency=$12; amountUSD=$13; category=$14
+    date=$15; status=$16; source=$17; addedBy=$18; receiptKey=$19
+
+    item = "{\"pk\":{\"S\":\"" pk "\"},\"sk\":{\"S\":\"" sk "\"},\"gsi1pk\":{\"S\":\"" gsi1pk "\"},\"gsi1sk\":{\"S\":\"" gsi1sk "\"},\"gsi2pk\":{\"S\":\"" gsi2pk "\"},\"gsi2sk\":{\"S\":\"" gsi2sk "\"},\"entityType\":{\"S\":\"" entityType "\"},\"expenseId\":{\"S\":\"" expenseId "\"},\"ownerId\":{\"S\":\"" ownerId "\"},\"merchant\":{\"S\":\"" merchant "\"},\"amount\":{\"N\":\"" amount "\"},\"currency\":{\"S\":\"" currency "\"},\"amountUSD\":{\"N\":\"" amountUSD "\"},\"category\":{\"S\":\"" category "\"},\"date\":{\"S\":\"" date "\"},\"status\":{\"S\":\"" status "\"},\"source\":{\"S\":\"" source "\"},\"addedBy\":{\"S\":\"" addedBy "\""
+    if (receiptKey != "") item = item "},\"receiptKey\":{\"S\":\"" receiptKey "\"}"
+    else item = item "},\"receiptKey\":{\"NULL\":true}"
+    item = item "}}"
+
+    # Use timeout to prevent hanging on LocalStack
+    cmd = "timeout 10 " $AWS " dynamodb put-item --table-name costscrunch-dev-main --item " item " --no-cli-pager 2>/dev/null"
+    system(cmd)
+    if (NR % 5 == 0) printf "."
+}
+END { print "" }
+' /localstack/dev/seed.csv
+
+echo "  ↳ ✅ CSV items loaded"
 
 # Upload sample PDF to S3 for seeded expenses
 echo "📦 Uploading sample receipt PDFs to S3 for all test users"
-# Iterate through the seed.csv and upload the sample file to every referenced receiptKey
-python3 << 'PYTHONEOF'
-import csv
-import subprocess
-import os
-
-bucket = os.environ.get("BUCKET_PROCESSED_NAME", "costscrunch-dev-processed-000000000000")
-aws_cmd = "aws --endpoint-url=http://localstack:4566 --region us-east-1"
-
-with open('/localstack/dev/seed.csv', mode='r') as f:
-    reader = csv.DictReader(f)
-    uploaded_keys = set()
-    for row in reader:
-        key = row.get("receiptKey")
-        if key and key != "" and key not in uploaded_keys:
-            print(f"  ↳ Uploading to s3://{bucket}/{key}")
-            subprocess.run(f"{aws_cmd} s3 cp /localstack/dev/sample.pdf s3://{bucket}/{key} --no-cli-pager", shell=True, capture_output=True)
-            uploaded_keys.add(key)
-PYTHONEOF
-
-# Batch load using AWS CLI (available in container)
-for batch_file in /tmp/seed_batch_*.json; do
-  $AWS dynamodb batch-write-item --request-items "file://$batch_file" --no-cli-pager 2>/dev/null
-  rm "$batch_file"
-done
+bucket="${BUCKET_PROCESSED_NAME:-costscrunch-dev-processed-000000000000}"
+# Use awk to extract unique receiptKeys from CSV and upload each
+# Write to temp file first to avoid SIGPIPE when awk exits (exit 252)
+awk -F',' '
+NR > 1 && $19 != "" && !seen[$19]++ {
+    print $19
+}
+' /localstack/dev/seed.csv > /tmp/receipt_keys.txt || true
+while IFS= read -r key; do
+    echo "  ↳ Uploading to s3://$bucket/$key"
+    $AWS s3 cp /localstack/dev/sample.pdf "s3://$bucket/$key" --no-cli-pager 2>/dev/null || true
+done < /tmp/receipt_keys.txt
+rm -f /tmp/receipt_keys.txt
 
 echo "✅ CSV seed complete"
 

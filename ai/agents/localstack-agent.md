@@ -32,7 +32,7 @@ Every file that must be touched when swapping the local dev environment:
 | `infrastructure/localstack/opt2/enable-cors.sh` | Applies CORS headers to all LocalStack API GW resources for opt2 | — |
 | `infrastructure/sam/template-arm.yaml` | SAM template (ARM64) — Lambda functions + API GW + CORS + GatewayResponses | ~100 |
 | `infrastructure/sam/template-x64.yaml` | SAM template (x86_64) — identical structure to ARM, different architecture field | ~100 |
-| `infrastructure/sam/env.json` | **Generated at runtime** by `localstack-opt3.sh` from `.env.dev` — per-function env overrides | — |
+| `infrastructure/sam/env.json` | **Generated at runtime** by `localstack-opt3.sh` from `.env.shared` — per-function env overrides | — |
 | `setup/localstack.sh` | Opt2 orchestrator: clean containers → start LocalStack → build Lambdas → bootstrap → fetch API_ID | ~100 |
 | `setup/localstack-opt3.sh` | Opt3 orchestrator: SAM version check → port check → generate env.json → SAM build → SAM start | ~100 |
 | `infrastructure/.env.test` | Unit test env var mock values — must match LocalStack resource names | — |
@@ -112,7 +112,7 @@ Services that LocalStack free tier **does not** fully emulate — any replacemen
 ## 5. Known Gotchas
 
 1. **SAM v1.155 bug** — `--container-host` option breaks socket resolution; workaround is `--docker-network costscrunch-local` in opt3 start command (documented in `notes/sam.md`)
-2. **API ID changes on every fresh LocalStack start** — no persistent volume by default; API_ID in `.env.dev` must be refreshed after `docker compose down`
+2. **API ID changes on every fresh LocalStack start** — no persistent volume by default; API_ID in `.env.shared` must be refreshed after `docker compose down`
 3. **Opt2 vs Opt3 endpoint format** — opt2 Lambda environment uses `http://localstack:4566`; opt3 uses `http://costscrunch-localstack:4566` (DNS differs by network)
 4. **SAM Globals env var merge bug** — `ENVIRONMENT: dev` is hardcoded in SAM Globals because SAM's merge strategy drops the parameter override; do not "fix" this
 5. **cognito-local is a separate container** — not part of LocalStack proper; its data does not persist across restarts; the `localstack-cognito` one-shot container re-provisions it on each start
@@ -132,7 +132,7 @@ High-level steps:
 3. Replace docker-compose services one at a time (start with DynamoDB — most critical)
 4. For each replaced service: run `cd backend && npm run test:ig` against the new endpoint
 5. Update opt3 orchestrator (`setup/localstack-opt3.sh`) with ministack endpoint URL
-6. Update `.env.dev` `AWS_ENDPOINT_URL` to ministack endpoint
+6. Update `.env.shared` `AWS_ENDPOINT_URL` to ministack endpoint
 7. Update SAM template if Lambda invocation model differs
 8. Final verification: `npm run dev:opt3` end-to-end smoke test
 9. Update `README.md`, `CLAUDE.md`, and this file with ministack specifics
@@ -210,7 +210,7 @@ localstack_start_locked
 |-----------------|------|-------|
 | `infrastructure/sam/env.json` | Two opt3 orchestrators clobber simultaneously | Only `localstack-opt3.sh` (owned by this agent) generates it; other agents must not invoke opt3 while it is running |
 | `cdk.out/` | Two `cdk synth` runs corrupt the output directory | Only infra-agent runs `cdk synth`; serialize with the LOCK_FILE above if running alongside integration tests |
-| `.env.dev` (API_ID) | LocalStack restart regenerates API_ID; stale value breaks integration tests in other agents | Never restart LocalStack while integration tests are in-flight; use `localstack_healthy` guard |
+| `.env.shared` (API_ID) | LocalStack restart regenerates API_ID; stale value breaks integration tests in other agents | Never restart LocalStack while integration tests are in-flight; use `localstack_healthy` guard |
 | `.aws-sam/` | `sam build` from two processes overwrites build artifacts | Use `--build-dir /tmp/sam-build-$$` (PID-namespaced) when running outside the canonical opt3 flow |
 
 ---
