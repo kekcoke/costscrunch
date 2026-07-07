@@ -152,3 +152,19 @@
 |---|---|---|---|---|---|---|---|
 | `test/p3-backend-integ` | `feat/test/p3-backend-integ` | backend-agent | Vitest unit | SUG-001, SUG-002, SUG-005, SUG-006 | — | blocked | p3/backend-cleanup |
 | `test/p3-frontend-e2e` | `feat/test/p3-frontend-e2e` | frontend-agent | Playwright smoke | FE-016, FE-020, FE-022 | — | blocked | p3/frontend-cleanup |
+
+---
+
+## Phase 4 — Readiness Wave (2026-07-06 · 5 worktrees · merged locally, unpushed)
+
+> Driven by `notes/2026-07-06-readiness-assessment.md`. All four domain worktrees ran in parallel via isolated agent worktrees, then merged in dependency order (infra → frontend → backend → infra-hotfix → cicd) into `feat/contract-and-smoke`. No conflicts beyond one clean auto-merge in `CostsCrunchStack.ts`.
+
+| Worktree | Branch | Agent | Issues | Status | Depends On |
+|---|---|---|---|---|---|
+| `infra/suggested-cleanup2` | `feat/infra/suggested-cleanup2` | infra-agent | IaC-023 | merged (local) | — |
+| `frontend/suggested-cleanup2` | `feat/frontend/suggested-cleanup2` | frontend-agent | FE-017, FE-021 (FE-019 reconfirmed) | merged (local) | — |
+| `backend/suggested-cleanup2` | `feat/backend/suggested-cleanup2` | backend-agent | SUG-004, SUG-006 (backend), deploy-audit SUG-001/002/006 (SUG-003 reconfirmed already fixed) | merged (local) | — |
+| `infra/fix-global-table-kms` | `feat/infra/fix-global-table-kms` | infra-agent | Bonus: prod `cdk synth` KMS/Global-Table blocker (not in original scope, discovered by cicd worktree) | merged (local) | — |
+| `cicd/prod-hardening` | `feat/cicd/prod-hardening` | cicd-agent | Post-prod smoke test, rollback frontend/CDN revert + stack-name bugfix, SKIP_STAGING guard, coverage-threshold enforcement, cicd SUG-003/004 | merged (local) | infra fixes helpful but not required (independent files) |
+
+**Next human action:** push `feat/contract-and-smoke` and open PR(s); configure production Environment required reviewers (still `protection_rules: []` as of 2026-07-06); start the new frontend-coverage-raising backlog item now that the gate is enforced and failing honestly.
