@@ -86,8 +86,17 @@ export class CostsCrunchStack extends Stack {
 
     const messaging = new MessagingConstruct(this, "Messaging", { prefix, kmsKey });
 
+    // AWSLambdaPowertoolsTypeScriptV2 layer version (published by AWS to account
+    // 094274105915 in each region). AWS periodically releases new versions —
+    // override per-deploy via `-c powertoolsLayerVersion=<n>` instead of
+    // editing ComputeConstruct.ts. See:
+    // https://docs.aws.amazon.com/powertools/typescript/latest/getting-started/lambda-layers/
+    const powertoolsLayerVersion = Number(
+      this.node.tryGetContext("powertoolsLayerVersion") ?? 22,
+    );
+
     const compute = new ComputeConstruct(this, "Compute", {
-      prefix, isProd, environment, regionId,
+      prefix, isProd, environment, regionId, powertoolsLayerVersion,
       vpc:          network.vpc,
       lambdaSg:     network.lambdaSg,
       redis:        network.redis,
