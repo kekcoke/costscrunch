@@ -89,7 +89,9 @@
 
 | Worktree | Branch | Agent | Issues | PR | Status | Depends On |
 |---|---|---|---|---|---|---|
-| `p3/backend-cleanup` | `feat/p3/backend-cleanup` | backend-agent | SUG-001–006 (backend), deploy-SUG-004 | — | merged | p2/backend-perf + p2/backend-safety |
+| `p3/backend-cleanup` | `feat/p3/backend-cleanup` | backend-agent | SUG-001–006 (backend), deploy-SUG-004 | — | merged¹ | p2/backend-perf + p2/backend-safety |
+
+¹ Corrected 2026-07-06: re-verification against current code found SUG-003 (`pushToUsers()` extraction), SUG-004 (misleading Cognito retry comment), and SUG-006 (export pipeline dedup) still open — the `merged` PR did not actually land these three despite the row listing them. Picked up in `feat/backend/suggested-cleanup2`.
 | `p3/infra-cleanup` | `feat/p3/infra-cleanup` | infra-agent | IaC-019, IaC-020, IaC-021, IaC-022, IaC-024 | — | merged | p2/infra |
 | `p3/cicd-cleanup` | `feat/p3/cicd-cleanup` | cicd-agent | cicd-SUG-001, SUG-002, SUG-005, SUG-007 | — | merged | p2/cicd |
 | `p3/frontend-cleanup` | `feat/p3/frontend-cleanup` | frontend-agent | FE-015, FE-016, FE-018, FE-020, FE-022 | — | pr open | p2/frontend |

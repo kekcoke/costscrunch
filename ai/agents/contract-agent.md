@@ -60,15 +60,10 @@ return ok({ items: (result.Items || []).map(item => myEntityToResponse(item)) })
 **Problem:** `api.ts` typed scan polls as `ScanResult` (wrong shape) and used `(result as any).items?.[0]` cast. `ScanResult` in `types.ts` had `amount: string` (should be `number`) and missing `"processing"` status.
 **Fix applied:** `api.ts` now uses `ScanListResponse` and `ScanResultResponse` from `@costscrunch/api`. `types.ts` re-exports `ScanResultResponse` as `ScanResult` from the shared package.
 
-### AC-003 — Group Response Leaks DynamoDB Keys (MEDIUM)
+### AC-003 — Group Response Leaks DynamoDB Keys (MEDIUM) ✅ FIXED
 **File:** `backend/src/lambdas/groups/index.ts`
 **Problem:** `GET /groups/{id}` and `POST /groups` return the raw Group entity including `pk`, `sk`, `gsi1pk`, `gsi1sk`, `entityType` fields. Frontend `Group` type does not include these keys but receives them silently.
-**Fix:** Add `groupToResponse(item: Group)` that omits DynamoDB keys:
-```typescript
-const { pk, sk, gsi1pk, gsi1sk, entityType, ...rest } = item;
-return rest;
-```
-Apply to `POST /groups` (line 178) and `GET /groups/{id}` (line 192) responses. Add `GroupResponse` type to `shared/src/api/types.ts`.
+**Fix applied:** `groupToResponse(item: Group)` added in `groups/index.ts` (line 19), applied to `POST /groups` (line 179) and `GET /groups/{id}` (line 193). `GroupResponse` type added to `shared/src/api/types.ts`. Landed in `6869ba7`.
 
 ### AC-004 — ExpenseStatus Enum Mismatch (MEDIUM) ✅ FIXED
 **Problem:** Frontend `ExpenseStatus` was missing `submitted` and `reimbursed` — both are valid backend values written to DynamoDB during the approval workflow and settlement.
@@ -78,10 +73,12 @@ Apply to `POST /groups` (line 178) and `GET /groups/{id}` (line 192) responses. 
 **Problem:** Frontend `Split.shares` and `Split.settledAt` were non-optional, but backend only sets them under specific conditions (`shares` for "shares" split method, `settledAt` after settlement).
 **Fix applied:** Made both optional in `frontend/src/models/types.ts`. Canonical `SplitResponse` in `shared/src/api/types.ts` documents the correct shape.
 
-### AC-006 — UploadUrl Field Name Mismatch (MEDIUM)
+### AC-006 — UploadUrl Field Name Mismatch (MEDIUM) ✅ FIXED
 **File:** `frontend/src/services/api.ts` (`scanReceipt`), `backend/src/lambdas/receipts/index.ts`
 **Problem:** Backend `POST /receipts/upload-url` returns `{ url, fields, key, expenseId, scanId }` but the old frontend `InitiateUploadResponse` type named it `uploadUrl`. The `scanReceipt` method destructured `{ uploadUrl }` which was always `undefined`, silently breaking S3 upload.
-**Fix:** `UploadUrlResponse` in `shared/src/api/types.ts` uses `url` (matching the backend). `api.ts` updated to use `url` in `scanReceipt`. `InitiateUploadResponse` in `frontend/src/models/types.ts` remains as an alias for backward compatibility — review whether it can be removed.
+**Fix applied:** `UploadUrlResponse` in `shared/src/api/types.ts` uses `url` (matching the backend). `api.ts` updated to use `url` in `scanReceipt`. `InitiateUploadResponse` in `frontend/src/models/types.ts` remains as an alias for backward compatibility — review whether it can be removed.
+
+**Note:** all six AC-001–AC-006 findings are now confirmed fixed in code. AC-001/002/004/005/006 landed together in `9144769` (PR #58, 2026-06-03 13:19), AC-003 landed separately in `6869ba7` (2026-06-03 19:41). Prior drafts of this file and `notes/2026-06-03-remediation-status.md` incorrectly reported AC-001/002/004/005/006 as uncommitted — verified against current `shared/src/api/types.ts`, `backend/src/lambdas/receipts/index.ts`, `backend/src/lambdas/groups/index.ts`, and `frontend/src/services/api.ts` on 2026-07-06.
 
 ---
 
