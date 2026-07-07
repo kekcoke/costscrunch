@@ -75,6 +75,89 @@ describe("LoginPage Flow", () => {
       expect(onNavigate).toHaveBeenCalledWith("dashboard");
     });
   });
+
+  it("does not call login when both fields are blank", async () => {
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText(/Sign in →/i));
+
+    await waitFor(() => {
+      expect(authApi.login).not.toHaveBeenCalled();
+    });
+  });
+
+  it("navigates to the MFA page when the login error body is an MFA challenge", async () => {
+    vi.mocked(authApi.login).mockRejectedValue(
+      new Error(JSON.stringify({ challenge: "MFA", session: "sess-tok" }))
+    );
+    vi.mocked(guestSession.exists).mockReturnValue(false);
+
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.change(screen.getByPlaceholderText(/you@company.com/i), { target: { value: "test@test.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/••••••••/i), { target: { value: "password" } });
+    fireEvent.click(screen.getByText(/Sign in →/i));
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith("mfa", { email: "test@test.com", session: "sess-tok" });
+    });
+  });
+
+  it("shows the raw error message when login fails with a non-JSON error", async () => {
+    vi.mocked(authApi.login).mockRejectedValue(new Error("Incorrect username or password."));
+    vi.mocked(guestSession.exists).mockReturnValue(false);
+
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.change(screen.getByPlaceholderText(/you@company.com/i), { target: { value: "test@test.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/••••••••/i), { target: { value: "password" } });
+    fireEvent.click(screen.getByText(/Sign in →/i));
+
+    expect(await screen.findByText("Incorrect username or password.")).toBeInTheDocument();
+  });
+
+  it("still navigates to dashboard when claiming guest data throws", async () => {
+    vi.mocked(authApi.login).mockResolvedValue({} as any);
+    vi.mocked(guestSession.exists).mockReturnValue(true);
+    vi.mocked(guestSession.getOrCreate).mockReturnValue("guest-123");
+    vi.mocked(authApi.claimData).mockRejectedValue(new Error("claim failed"));
+
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.change(screen.getByPlaceholderText(/you@company.com/i), { target: { value: "test@test.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/••••••••/i), { target: { value: "password" } });
+    fireEvent.click(screen.getByText(/Sign in →/i));
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith("dashboard");
+    });
+    // Guest session should NOT be cleared since claiming failed
+    expect(guestSession.clear).not.toHaveBeenCalled();
+  });
+
+  it("both handleOAuth branches show a 'coming soon' error", () => {
+    render(<LoginPage onNavigate={onNavigate} />);
+
+    fireEvent.click(screen.getByText("Google"));
+    expect(screen.getByText(/Google login coming soon!/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("GitHub"));
+    expect(screen.getByText(/GitHub login coming soon!/i)).toBeInTheDocument();
+  });
+
+  it("logo click navigates to landing", () => {
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText("CostsCrunch"));
+    expect(onNavigate).toHaveBeenCalledWith("landing");
+  });
+
+  it("'Forgot?' button navigates to password-reset", () => {
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText("Forgot?"));
+    expect(onNavigate).toHaveBeenCalledWith("password-reset");
+  });
+
+  it("'Create one free' button navigates to register", () => {
+    render(<LoginPage onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText("Create one free"));
+    expect(onNavigate).toHaveBeenCalledWith("register");
+  });
 });
 
 describe("LandingPage", () => {
