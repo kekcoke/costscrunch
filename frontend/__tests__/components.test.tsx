@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 
@@ -14,6 +14,9 @@ import StatCard   from "../src/components/statCard";
 import ExpenseRow from "../src/components/expenseRow";
 import DonutChart from "../src/components/charts/donutChart";
 import DonutChartOrphan from "../src/components/donutChart";
+import Sidebar from "../src/components/sideBar";
+import BubbleChart from "../src/components/charts/bubbleChart";
+import StackedBarChart from "../src/components/charts/stackedBarChart";
 import ScanModal  from "../src/components/scanModal";
 import GroupDetail from "../src/components/groups/groupDetail";
 import { SEED_EXPENSES_MOCK } from "../src/mocks/expenses";
@@ -115,6 +118,168 @@ describe("Component Suite", () => {
     it("renders nothing when total is zero", () => {
       const { container } = render(<DonutChartOrphan data={[{ label: "Empty", value: 0, color: "#000" }]} />);
       expect(container.firstChild).toBeNull();
+    });
+  });
+
+  describe("<Sidebar />", () => {
+    const onTabChange = vi.fn();
+    const onClose = vi.fn();
+
+    beforeEach(() => {
+      onTabChange.mockClear();
+      onClose.mockClear();
+    });
+
+    it("renders all nav items", () => {
+      render(<Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} />);
+      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Expenses")).toBeInTheDocument();
+      expect(screen.getByText("Groups")).toBeInTheDocument();
+      expect(screen.getByText("Analytics")).toBeInTheDocument();
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+    });
+
+    it("calls onTabChange when a nav item is clicked", () => {
+      render(<Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} />);
+      fireEvent.click(screen.getByText("Groups"));
+      expect(onTabChange).toHaveBeenCalledWith("groups");
+    });
+
+    it("also calls onClose when mobile and open", () => {
+      render(
+        <Sidebar
+          activeTab="dashboard"
+          onTabChange={onTabChange}
+          pendingCount={0}
+          isMobile
+          isOpen
+          onClose={onClose}
+        />
+      );
+      fireEvent.click(screen.getByText("Analytics"));
+      expect(onTabChange).toHaveBeenCalledWith("analytics");
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("does not call onClose on desktop (non-mobile)", () => {
+      render(<Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} onClose={onClose} />);
+      fireEvent.click(screen.getByText("Settings"));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("marks the active tab with aria-current", () => {
+      render(<Sidebar activeTab="expenses" onTabChange={onTabChange} pendingCount={0} />);
+      expect(screen.getByText("Expenses").closest("button")).toHaveAttribute("aria-current", "page");
+      expect(screen.getByText("Dashboard").closest("button")).not.toHaveAttribute("aria-current");
+    });
+
+    it("shows the pending-count badge only on the expenses item when > 0", () => {
+      render(<Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={3} />);
+      expect(screen.getByLabelText("3 pending")).toBeInTheDocument();
+      expect(screen.getByLabelText("3 pending")).toHaveTextContent("3");
+    });
+
+    it("hides the pending-count badge when pendingCount is 0", () => {
+      render(<Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} />);
+      expect(screen.queryByLabelText(/pending/i)).not.toBeInTheDocument();
+    });
+
+    it("renders the mobile overlay when isMobile and isOpen", () => {
+      const { container } = render(
+        <Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} isMobile isOpen onClose={onClose} />
+      );
+      expect(container.querySelector(".mobile-sidebar-overlay")).toBeInTheDocument();
+    });
+
+    it("omits the mobile overlay when isMobile and not open", () => {
+      const { container } = render(
+        <Sidebar activeTab="dashboard" onTabChange={onTabChange} pendingCount={0} isMobile isOpen={false} onClose={onClose} />
+      );
+      expect(container.querySelector(".mobile-sidebar-overlay")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("<BubbleChart />", () => {
+    const BUBBLE_DATA = [
+      { date: "2026-01-01", amount: 100, frequency: 3, category: "Travel" },
+      { date: "2026-01-15", amount: 250, frequency: 1, category: "Groceries" },
+      { date: "2026-02-01", amount: 50,  frequency: 5, category: "Travel" },
+    ];
+
+    it("shows the empty state when data is empty", () => {
+      render(<BubbleChart data={[]} />);
+      expect(screen.getByText(/No data available/i)).toBeInTheDocument();
+    });
+
+    it("renders one bubble circle per data point", () => {
+      const { container } = render(<BubbleChart data={BUBBLE_DATA} />);
+      expect(container.querySelectorAll("circle").length).toBe(BUBBLE_DATA.length);
+    });
+
+    it("shows a tooltip on hover and hides it on mouse leave", () => {
+      const { container } = render(<BubbleChart data={BUBBLE_DATA} />);
+      const circle = container.querySelector("circle")!;
+
+      fireEvent.mouseEnter(circle, { clientX: 10, clientY: 20 });
+      expect(screen.getAllByText("Travel").length).toBeGreaterThan(0);
+      expect(screen.getByText(/transactions/i)).toBeInTheDocument();
+
+      fireEvent.mouseMove(circle, { clientX: 30, clientY: 40 });
+
+      fireEvent.mouseLeave(circle);
+      expect(screen.queryByText(/transactions/i)).not.toBeInTheDocument();
+    });
+
+    it("renders a legend entry only for categories present in the data", () => {
+      render(<BubbleChart data={BUBBLE_DATA} />);
+      expect(screen.getByText("Bubble size = transaction frequency")).toBeInTheDocument();
+    });
+
+    it("uses 'Month' axis label for a year period and 'Week' for a quarter period", () => {
+      const { rerender, container } = render(<BubbleChart data={BUBBLE_DATA} period="year" />);
+      expect(container.querySelector('[aria-label*="over Month"]')).toBeInTheDocument();
+
+      rerender(<BubbleChart data={BUBBLE_DATA} period="quarter" />);
+      expect(container.querySelector('[aria-label*="over Week"]')).toBeInTheDocument();
+    });
+  });
+
+  describe("<StackedBarChart />", () => {
+    const STACKED_DATA = [
+      { period: "Jan", total: 300, categories: { Travel: 200, Groceries: 100 } },
+      { period: "Feb", total: 150, categories: { Travel: 150 } },
+    ];
+
+    it("shows the empty state when data is empty", () => {
+      render(<StackedBarChart data={[]} />);
+      expect(screen.getByText(/No data available/i)).toBeInTheDocument();
+    });
+
+    it("renders one bar group per period with a rect per non-zero category segment", () => {
+      const { container } = render(<StackedBarChart data={STACKED_DATA} />);
+      // Jan has 2 segments, Feb has 1 segment (its Groceries value is implicitly 0, filtered out)
+      expect(container.querySelectorAll("rect").length).toBe(3);
+      expect(screen.getByText("Jan")).toBeInTheDocument();
+      expect(screen.getByText("Feb")).toBeInTheDocument();
+    });
+
+    it("shows a tooltip with the segment total on hover and hides it on mouse leave", () => {
+      const { container } = render(<StackedBarChart data={STACKED_DATA} />);
+      const rect = container.querySelector("rect")!;
+
+      fireEvent.mouseEnter(rect, { clientX: 5, clientY: 5 });
+      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
+
+      fireEvent.mouseMove(rect, { clientX: 15, clientY: 15 });
+
+      fireEvent.mouseLeave(rect);
+      expect(screen.queryByText(/Total:/i)).not.toBeInTheDocument();
+    });
+
+    it("renders a legend entry per category key present across all buckets", () => {
+      render(<StackedBarChart data={STACKED_DATA} />);
+      expect(screen.getAllByText("Travel").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Groceries").length).toBeGreaterThan(0);
     });
   });
 
