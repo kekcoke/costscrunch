@@ -1,4 +1,4 @@
-import { isValid, z } from "zod";
+import { z } from "zod";
 
 export function createEnum<const T extends readonly [string, ...string[]]>(
     values: T
