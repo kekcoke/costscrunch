@@ -189,73 +189,9 @@ describe('Expenses Lambda - Group Support', () => {
     });
   });
 
-  describe('Export Functionality', () => {
-    it('should reject PDF export with 501', async () => {
-      const mockSend = getMockSend();
-      mockSend.mockResolvedValue({ Items: [], Count: 0 });
-      
-      const mockEvent = {
-        httpMethod: 'GET',
-        path: '/expenses/export',
-        queryStringParameters: {
-          format: 'pdf',
-        },
-      };
-
-      const result = await rawHandler(mockEvent);
-
-      expect(result.statusCode).toBe(501);
-      expect(result.body).toContain('PDF Export not implemented');
-    });
-
-    it('should export to JSON when format=json', async () => {
-      const mockSend = getMockSend();
-      
-      const mockEvent = {
-        httpMethod: 'GET',
-        path: '/expenses/export',
-        queryStringParameters: {
-          format: 'json',
-          from: '2024-01-01',
-          to: '2024-03-31',
-        },
-      };
-
-      mockSend.mockResolvedValueOnce({
-        Items: [{ expenseId: 'exp-1', amount: 100, status: 'approved' }],
-        Count: 1,
-      });
-
-      const result = await rawHandler(mockEvent);
-
-      expect(result.statusCode).toBe(200);
-      expect(result.headers['Content-Type']).toBe('application/json');
-    });
-
-    it('should export to CSV when format=csv', async () => {
-      const mockSend = getMockSend();
-      
-      const mockEvent = {
-        httpMethod: 'GET',
-        path: '/expenses/export',
-        queryStringParameters: {
-          format: 'csv',
-          from: '2024-01-01',
-        },
-      };
-
-      mockSend.mockResolvedValueOnce({
-        Items: [{ expenseId: 'exp-1', amount: 100, status: 'approved' }],
-        Count: 1,
-      });
-
-      const result = await rawHandler(mockEvent);
-
-      expect(result.statusCode).toBe(200);
-      expect(result.headers['Content-Type']).toBe('text/csv');
-      expect(result.headers['Content-Disposition']).toContain('attachment');
-    });
-  });
+  // NOTE: Export functionality tests removed — GET /expenses/export is owned
+  // exclusively by the dedicated expense-export Lambda (SUG-006). See
+  // backend/__tests__/unit/expense-export.unit.test.ts for that coverage.
 
   describe('Status-based Updates', () => {
     it('should set approvedAt and approverId when status=approved', async () => {
