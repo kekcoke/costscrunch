@@ -762,6 +762,8 @@ cdk deploy --context stage=prod --context alarmThreshold=1
 | `CF_DISTRIBUTION_ID` | Production CloudFront ID | CD |
 | `TEST_USER_EMAIL` | Test user for E2E tests | CD |
 | `TEST_USER_PASSWORD` | Test user password | CD |
+| `PROD_SMOKE_TEST_EMAIL` | Dedicated prod smoke-test user for post-deploy authenticated health check (rollback.yml) — separate from `TEST_USER_EMAIL` since it authenticates against the production Cognito pool | CD |
+| `PROD_SMOKE_TEST_PASSWORD` | Password for `PROD_SMOKE_TEST_EMAIL` | CD |
 | `SLACK_WEBHOOK_URL` | Slack notifications (optional) | CD |
 
 
@@ -824,11 +826,19 @@ Deployments include automated health checks and rollback on failure:
 - **Wait time:** 30 seconds for propagation
 - **Retries:** 3 attempts with 10-second intervals
 - **Timeout:** 30 seconds per attempt
-- **Success criteria:** HTTP 200 from `/health` endpoint
+- **Success criteria:** HTTP 200 from `/health` endpoint, *plus* an authenticated
+  smoke test (`POST /auth/login` with a dedicated smoke-test user → `GET
+  /profile` with the returned token, expecting HTTP 200 and a matching
+  `email` field). The authenticated check is skipped with a warning if its
+  secrets aren't configured for the environment; liveness-only health check
+  still gates rollback in that case.
 
 **Rollback strategies:**
 1. **Primary:** Use CloudFormation `Previous` template from S3
 2. **Fallback:** Git checkout `HEAD~1` + CDK redeploy
+3. **Production only:** also rebuilds the frontend from `HEAD~1` and re-syncs
+   it to S3 + invalidates CloudFront, so the frontend doesn't keep serving a
+   build meant for the now-rolled-back backend.
 
 **Always runs:** Uses `if: always()` — executes even on partial failures.
 
@@ -836,7 +846,9 @@ Deployments include automated health checks and rollback on failure:
 
 ```bash
 # Automatic rollback via CloudFormation
-aws cloudformation rollback-stack --stack-name costscrunch-prod-CostsCrunchStack
+# (stack name is `costscrunch-<stage>` — bin/costscrunch.ts names the stack
+# construct that way directly; there is no "-CostsCrunchStack" suffix)
+aws cloudformation rollback-stack --stack-name costscrunch-prod
 
 # Manual redeploy previous commit
 git checkout HEAD~1

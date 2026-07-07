@@ -48,7 +48,11 @@ describe("Rollback Workflow", () => {
 
     it("rollback.yml has Slack notification steps", () => {
       const content = fs.readFileSync(workflowPath, "utf8");
-      expect(content).toContain("8398a7/action-slack@v3");
+      // SEC-001 pinned this to a commit SHA (kept human-readable via a
+      // trailing version comment) instead of the mutable `@v3` tag this
+      // assertion originally checked for — updated to match, not a
+      // functional change.
+      expect(content).toContain("8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e");
       expect(content).toContain("SLACK_WEBHOOK_URL");
     });
   });
@@ -119,14 +123,20 @@ describe("Rollback Workflow", () => {
       const content = fs.readFileSync(deployPath, "utf8");
       expect(content).toContain("post-deploy-staging:");
       expect(content).toContain("uses: ./.github/workflows/rollback.yml");
-      expect(content).toContain("stack_name: costscrunch-staging-CostsCrunchStack");
+      // Bug fix (2026-07-06): bin/costscrunch.ts names the CFN stack
+      // `costscrunch-${stage}` — there is no "-CostsCrunchStack" suffix
+      // (that's only the TS construct's class name). The old expected value
+      // pointed at a stack that doesn't exist, which would have made every
+      // `aws cloudformation` call in rollback.yml fail with a
+      // ValidationError before ever attempting a rollback.
+      expect(content).toContain("stack_name: costscrunch-staging");
     });
 
     it("deploy.yml calls rollback workflow for production", () => {
       const content = fs.readFileSync(deployPath, "utf8");
       expect(content).toContain("post-deploy-prod:");
       expect(content).toContain("uses: ./.github/workflows/rollback.yml");
-      expect(content).toContain("stack_name: costscrunch-prod-CostsCrunchStack");
+      expect(content).toContain("stack_name: costscrunch-prod");
     });
 
     it("post-deploy jobs use if: always()", () => {

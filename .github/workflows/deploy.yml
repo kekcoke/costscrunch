@@ -36,7 +36,12 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Unit tests
-        run: npm test -- --coverage --passWithNoTests
+        # Scoped to frontend explicitly: root `npm test` fans out to every
+        # workspace via `--workspaces`, and backend's own `test` script runs
+        # vitest in watch mode (never exits) — `-w frontend` also matches the
+        # `flags: frontend` codecov upload below. `--passWithNoTests` removed
+        # (BUG: a silently-empty suite must fail the gate, not pass it).
+        run: npm run test -w frontend -- --coverage
       - name: Upload coverage
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
         with:
@@ -99,6 +104,28 @@ jobs:
           VITE_USER_POOL_CLIENT_ID: ${{ secrets.VITE_USER_POOL_CLIENT_ID }}
       - name: CDK Synth (validate templates)
         run: npm run synth -w infrastructure
+      # SUG-003: the synth above uses no --context (dev-default). Validate
+      # that staging/prod configs also synth cleanly. NOTE: this is
+      # deliberately validation-only (output discarded, not uploaded) — see
+      # the code comment on the "Deploy — Staging/Production" jobs below for
+      # why the actually-deployed template is NOT re-synthesized per stage
+      # today (a separate, pre-existing gap, out of scope for this fix).
+      - name: CDK Synth — validate staging config
+        run: npm run synth -w infrastructure -- --context stage=staging --output .synth-validate-staging
+      # continue-on-error: prod-context synth currently fails today (found
+      # while adding this check, 2026-07-06) — DataConstruct.ts enables a
+      # DynamoDB Global Table replica in us-west-2 for prod only
+      # (`replicas: isProd ? [{ region: "us-west-2" }] : []`) but never
+      # supplies a `replicaKeyArns` entry for that region's KMS-encrypted
+      # replica, so CDK throws `ValidationError: KMS key for us-west-2 was
+      # not found in 'replicaKeyArns'`. That's a pre-existing infra bug (data
+      # domain, not CI/CD) that nothing ever caught before because prod
+      # context was never synthesized in CI. Left non-blocking so this check
+      # is visible without breaking every future build over an unrelated
+      # construct bug — remove continue-on-error once DataConstruct.ts is fixed.
+      - name: CDK Synth — validate prod config
+        continue-on-error: true
+        run: npm run synth -w infrastructure -- --context stage=prod --output .synth-validate-prod
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
@@ -110,6 +137,16 @@ jobs:
           retention-days: 7
 
   # ─── Deploy to Staging ───────────────────────────────────────────────────────
+  # KNOWN GAP (found 2026-07-06, not fixed here — needs its own change + a
+  # real `cdk deploy` to verify, both out of scope for a workflow-only pass):
+  # this job's "CDK Deploy" step passes `--app cdk.out`, a *pre-synthesized*
+  # assembly built once in the `build` job above with no --context (so it
+  # defaults to stage=dev). Once `cdk deploy` is given a pre-built assembly
+  # via --app, it does NOT re-run the CDK app — so the `--context stage=staging`
+  # baked into `npm run deploy:staging` below has no effect, and this step may
+  # actually be deploying the dev-configured stack. Same applies to deploy-prod.
+  # Proper fix: synth staging and prod into separate artifacts (own --context
+  # each) and have each deploy job download its own, instead of sharing one.
   deploy-staging:
     name: Deploy — Staging
     runs-on: ubuntu-latest
@@ -159,20 +196,75 @@ jobs:
     secrets: inherit
     with:
       environment: staging
-      stack_name: costscrunch-staging-CostsCrunchStack
+      # bin/costscrunch.ts constructs the stack as `costscrunch-${stage}` with
+      # no "-CostsCrunchStack" suffix (that's just the TS class name) — the
+      # real deployed CloudFormation stack is "costscrunch-staging". The old
+      # "-CostsCrunchStack" value pointed at a stack that doesn't exist, so
+      # every `aws cloudformation` call in rollback.yml would have failed
+      # with a ValidationError before ever attempting a rollback.
+      stack_name: costscrunch-staging
       api_url: ${{ secrets.STAGING_URL }}/api
       deployment_sha: ${{ github.sha }}
       cdk_command: staging
+
+  # ─── SKIP_STAGING Bypass Guard ───────────────────────────────────────────────
+  # CONF-xxx: SKIP_STAGING (env.SKIP_STAGING, sourced from the repo variable at
+  # the top of this file) routes straight to prod with zero in-repo
+  # restriction on who can set it — GitHub Environment protection rules are
+  # currently empty on both `staging` and `production` (tracked separately as
+  # a repo-settings change, not fixed here). This job is the code-side
+  # defense-in-depth: it only runs when the bypass is active, and (1) makes
+  # the bypass loud (workflow warning + step summary + Slack) and (2) hard-fails
+  # unless the actor triggering this run has elevated (admin/maintain) repo
+  # permission, so an ordinary contributor can't quietly skip the staging +
+  # E2E gate by flipping the variable.
+  skip-staging-guard:
+    name: Guard — SKIP_STAGING bypass
+    runs-on: ubuntu-latest
+    needs: build
+    if: env.SKIP_STAGING == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Audit log — SKIP_STAGING bypass
+        run: |
+          echo "::warning::SKIP_STAGING=true — the staging deploy + E2E gate will be bypassed for this production deploy (actor: ${{ github.actor }}, run: ${{ github.run_id }})."
+          {
+            echo "## ⚠️ SKIP_STAGING bypass detected"
+            echo "- Actor: \`${{ github.actor }}\`"
+            echo "- Ref: \`${{ github.ref }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify actor has elevated repository permission
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PERMISSION=$(gh api "repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission" --jq '.permission' 2>/dev/null || echo "unknown")
+          echo "Actor '${{ github.actor }}' has repository permission: $PERMISSION"
+          if [ "$PERMISSION" != "admin" ] && [ "$PERMISSION" != "maintain" ]; then
+            echo "::error::SKIP_STAGING bypass requires admin or maintain repository permission. Actor '${{ github.actor }}' has permission level '$PERMISSION'. Failing this deploy — re-run without SKIP_STAGING, or have an authorized maintainer trigger it."
+            exit 1
+          fi
+      - name: Notify Slack — SKIP_STAGING bypass
+        if: always()
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
+        with:
+          status: custom
+          text: "⚠️ SKIP_STAGING bypass on ${{ github.repository }} — production deploy for ${{ github.sha }} is skipping the staging + E2E gate. Triggered by ${{ github.actor }}."
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   # ─── Deploy to Production ────────────────────────────────────────────────────
   deploy-prod:
     name: Deploy — Production
     runs-on: ubuntu-latest
-    needs: [build, deploy-staging, post-deploy-staging]
+    needs: [build, deploy-staging, post-deploy-staging, skip-staging-guard]
     if: |
       needs.build.result == 'success' &&
       (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped') &&
       (needs.post-deploy-staging.result == 'success' || needs.post-deploy-staging.result == 'skipped') &&
+      (needs.skip-staging-guard.result == 'success' || needs.skip-staging-guard.result == 'skipped') &&
       github.ref == 'refs/heads/main'
     environment:
       name: production
@@ -227,7 +319,10 @@ jobs:
     secrets: inherit
     with:
       environment: production
-      stack_name: costscrunch-prod-CostsCrunchStack
+      # See the matching comment on post-deploy-staging above: the real
+      # deployed stack name is "costscrunch-prod" (matches the manual
+      # `rollback` job below, which already had this right).
+      stack_name: costscrunch-prod
       api_url: https://api.costscrunch.io
       deployment_sha: ${{ github.sha }}
       cdk_command: prod
@@ -242,7 +337,15 @@ jobs:
       id-token: write
       contents: read
     steps:
+      # fetch-depth: 2 — the frontend revert step below needs `HEAD~1` to
+      # resolve; the default shallow (depth-1) checkout has no parent commit.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4
         with:
@@ -253,6 +356,30 @@ jobs:
         run: |
           aws cloudformation rollback-stack --stack-name costscrunch-prod
           aws cloudformation wait stack-rollback-complete --stack-name costscrunch-prod
+      # BUG: this manual rollback path only reverted the CloudFormation
+      # stack, same gap as the automated rollback.yml path (see the comment
+      # there). Re-sync the frontend to match the rolled-back backend.
+      - name: Revert frontend release
+        env:
+          PROD_ASSETS_BUCKET: ${{ secrets.PROD_ASSETS_BUCKET }}
+          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+        run: |
+          if [ -z "$PROD_ASSETS_BUCKET" ] || [ -z "$CF_DISTRIBUTION_ID" ]; then
+            echo "::warning::PROD_ASSETS_BUCKET/CF_DISTRIBUTION_ID not set — cannot revert the frontend release, only the backend stack was rolled back."
+            exit 0
+          fi
+
+          echo "Rebuilding the frontend from the pre-deploy commit to match the rolled-back backend..."
+          PREV_COMMIT=$(git rev-parse HEAD~1)
+          git checkout "$PREV_COMMIT"
+          npm ci
+          npm run build -w frontend
+          aws s3 sync frontend/dist/ "s3://${PROD_ASSETS_BUCKET}" --delete --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp frontend/dist/index.html "s3://${PROD_ASSETS_BUCKET}/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "${CF_DISTRIBUTION_ID}" --paths "/*"
+          git checkout -
+
+          echo "Frontend reverted to commit ${PREV_COMMIT} and CloudFront cache invalidated."
       - name: Notify Slack
         if: always()
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e  # v3.19.0
