@@ -15,6 +15,7 @@ import ExpenseRow from "../src/components/expenseRow";
 import DonutChart from "../src/components/charts/donutChart";
 import DonutChartOrphan from "../src/components/donutChart";
 import Sidebar from "../src/components/sideBar";
+import TopBar from "../src/components/topBar";
 import BubbleChart from "../src/components/charts/bubbleChart";
 import StackedBarChart from "../src/components/charts/stackedBarChart";
 import ScanModal  from "../src/components/scanModal";
@@ -280,6 +281,29 @@ describe("Component Suite", () => {
       render(<StackedBarChart data={STACKED_DATA} />);
       expect(screen.getAllByText("Travel").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Groceries").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("<TopBar />", () => {
+    it("calls onScan when the scan button is clicked", () => {
+      const onScan = vi.fn();
+      render(<TopBar onScan={onScan} onAdd={vi.fn()} />);
+      fireEvent.click(screen.getByText(/Scan Receipt/i));
+      expect(onScan).toHaveBeenCalled();
+    });
+
+    it("calls onAdd when the add button is clicked", () => {
+      const onAdd = vi.fn();
+      render(<TopBar onScan={vi.fn()} onAdd={onAdd} />);
+      fireEvent.click(screen.getByText(/Add Expense/i));
+      expect(onAdd).toHaveBeenCalled();
+    });
+
+    it("calls onMenuClick when the mobile menu button is clicked", () => {
+      const onMenuClick = vi.fn();
+      render(<TopBar onScan={vi.fn()} onAdd={vi.fn()} onMenuClick={onMenuClick} />);
+      fireEvent.click(screen.getByLabelText("Open menu"));
+      expect(onMenuClick).toHaveBeenCalled();
     });
   });
 
